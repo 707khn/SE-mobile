@@ -179,8 +179,8 @@ class _AdminPageState extends State<AdminPage> {
           ),
         ),
       ),
-      body: Center(
-        child: Container(
+      body: SingleChildScrollView(
+        child: Center(
           child: Column(
             children: [
               SizedBox(

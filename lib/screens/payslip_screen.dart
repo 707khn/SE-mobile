@@ -39,6 +39,7 @@ class _PayslipPageState extends State<PayslipPage> {
     final year = _selectedDate.year.toString();
     final data = await getPayslip(context, month, year);
 
+    if (!mounted) return;
     setState(() {
       _loading = false;
       if (data == null) {
