@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/report_request.dart';
 import 'package:se_mobile/requests/reportdate_request.dart';
+import 'package:se_mobile/screens/payslip_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -167,6 +168,14 @@ class _MainPage1State extends State<MainPage1> {
                             ],
                           ),
                         ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
+                        title: BigText(content: 'payslip'.tr),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const PayslipPage());
+                        },
                       ),
                     ],
                   ),
