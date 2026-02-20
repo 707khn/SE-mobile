@@ -7,6 +7,7 @@ import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/employeedate_request.dart';
 import 'package:se_mobile/requests/get_all_employees.dart';
 import 'package:se_mobile/screens/start_screen.dart';
+import 'package:se_mobile/utils/secure_storage_helper.dart';
 import 'package:se_mobile/utils/shared_preferences_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -571,6 +572,7 @@ class _MainPage2State extends State<MainPage2> {
   }
 
   _exit() async{
+    await SecureStorageHelper.instance.clearCredentials();
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     Get.offAll(() => const StartPage());

@@ -10,11 +10,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/main_screen_1.dart';
 import 'screens/main_screen_2.dart';
+import 'utils/secure_storage_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  initializeSharedPreferences();
-  await Future.delayed(const Duration(seconds: 1));
+  await initializeSharedPreferences();
   runApp(const MyApp());
 }
 
@@ -55,7 +55,7 @@ class MyApp extends StatelessWidget {
             onSecondary: AppColors.niceWhite,
           )
       ),
-      home: FutureBuilder(
+      home: FutureBuilder<Map<String, String?>>(
         future: authCheck(),
         builder: (context, res){
           if (res.connectionState == ConnectionState.waiting){
@@ -66,9 +66,10 @@ class MyApp extends StatelessWidget {
                 )
             );
           } else {
-            if (res.data == true){
-              String fullName = prefs.getString('fullName')!;
-              String job = prefs.getString('job')!;
+            final data = res.data;
+            if (data != null && data['loggedIn'] == 'true'){
+              String fullName = data['fullName'] ?? '';
+              String job = data['job'] ?? '';
               if (job.contains("Руководитель") || job.contains("руководитель") || job.contains("Начальник") || job.contains("начальник") || job.contains("Директор") || job.contains("директор")){
                 return AdminPage(fullName: fullName, job: job,);
               } else {
@@ -84,13 +85,17 @@ class MyApp extends StatelessWidget {
       translations: LocaleString(),
     );
   }
-  Future<bool> authCheck() async {
-    await Future.delayed(const Duration(seconds: 1));
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.containsKey('loggedIn')){
-      return true;
+  Future<Map<String, String?>> authCheck() async {
+    final secure = SecureStorageHelper.instance;
+    final isLogged = await secure.isLoggedIn();
+    if (isLogged) {
+      return {
+        'loggedIn': 'true',
+        'fullName': await secure.getFullName(),
+        'job': await secure.getJob(),
+      };
     } else {
-      return false;
+      return {'loggedIn': 'false'};
     }
   }
 }

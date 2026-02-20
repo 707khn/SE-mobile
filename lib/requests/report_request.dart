@@ -1,16 +1,16 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import '../utils/secure_storage_helper.dart';
+import '../utils/variables.dart';
 
 Future<List<List<String>>> getReportEntries(BuildContext context) async {
-  final prefs = await SharedPreferences.getInstance();
-  final login = prefs.getString('login');
+  final login = await SecureStorageHelper.instance.getLogin();
 
   try {
     var response = await http.post(
-      Uri.parse('http://cp.se-btrz.com/report'),
+      Uri.parse('${AppValues.baseUrl}/report'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'key_suffix': login}),
     );

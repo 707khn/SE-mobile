@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/secure_storage_helper.dart';
+import '../utils/variables.dart';
 
 class PayslipItem {
   final String name;
@@ -31,12 +32,11 @@ class PayslipData {
 }
 
 Future<PayslipData?> getPayslip(BuildContext context, String month, String year) async {
-  final prefs = await SharedPreferences.getInstance();
-  final login = prefs.getString('login');
+  final login = await SecureStorageHelper.instance.getLogin();
 
   try {
     var response = await http.post(
-      Uri.parse('http://cp.se-btrz.com/payslip'),
+      Uri.parse('${AppValues.baseUrl}/payslip'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'key_suffix': login, 'month': month, 'year': year}),
     );
