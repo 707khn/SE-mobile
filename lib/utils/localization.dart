@@ -1,0 +1,51 @@
+import 'package:get/get.dart';
+
+class LocaleString extends Translations {
+  @override
+  Map<String, Map<String, String>> get keys => {
+        'KZ': {
+          'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
+          'send report csv': 'CSV форматындағы ақырғы файлды көру',
+          'show report': 'Жеке есепті көрсету',
+          'choose period': 'Кезеңді таңдау',
+          'attendance report': 'Кіріп/Шығу тарихы',
+          'employee ID': 'Қызметкердің ЖСН-і',
+          'get employee name': 'Қызметкердің аты-жөні алу',
+          'employee name': 'Қызметкердің ТАЖ білу',
+          'scroll to right': 'Үлкен көлемде көру үшін өң жаққа өтіңіз',
+          'login': 'Логин',
+          'password': 'Құпия сөз',
+          'log in': 'Кіру',
+          'search': 'Іздеу',
+          'cancel': 'Болдырмау',
+          'choose employee': 'Қызметкерді таңдау',
+          'info': 'Қолданбадағы есеп, ақырғы таңдалған қызметкер бойынша көрсетілген. Жіберілген есепте, әр қызметкердің жеке есебі жүктелген/көрсетілген',
+          'self report': 'Сіздің есебіңізге өту/көру',
+          'employee report': 'Қызметкердің есебіне өту/көру',
+          'see last Excel': 'Excel бағдарламасындағы ақырғы файлды көру',
+          'see last CSV': 'CSV форматындағы ақырғы файлды көру',
+        },
+        'RU': {
+          'send report exc': 'Отправить отчёт Excel',
+          'send report csv': 'Отправить отчёт csv',
+          'show report': 'Показать личный отчёт',
+          'choose period': 'Выбрать период',
+          'attendance report': 'Отчёт о посещении',
+          'employee ID': 'ИИН сотрудника',
+          'get employee name': 'Получить ФИО сотрудника',
+          'employee name': 'ФИО сотрудника',
+          'scroll to right': 'Прокрутите вправо, чтобы увидеть больше',
+          'login': 'Логин',
+          'password': 'Пароль',
+          'log in': 'Войти',
+          'search': 'Найти',
+          'cancel': 'Отмена',
+          'choose employee': 'Выбрать сотрудника',
+          'info': 'В приложении отчёт указан для последнего выбранного сотрудника. При отправке отчёта он будет отправлен с каждым сотрудником из списка',
+          'self report': 'Перейти в Ваш отчёт',
+          'employee report': 'Перейти в отчёт сотрудников',
+          'see last Excel': 'Просмотреть последний файл Excel',
+          'see last CSV': 'Просмотреть последний файл',
+        }
+      };
+}
