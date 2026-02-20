@@ -7,9 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/colors.dart';
+import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../widgets/icon_button_drawer.dart';
 import 'main_screen_2.dart';
+import 'payslip_screen.dart';
 import 'start_screen.dart';
 
 class AdminPage extends StatefulWidget {
@@ -178,8 +180,8 @@ class _AdminPageState extends State<AdminPage> {
           ),
         ),
       ),
-      body: Center(
-        child: Container(
+      body: SingleChildScrollView(
+        child: Center(
           child: Column(
             children: [
               SizedBox(
@@ -220,6 +222,25 @@ class _AdminPageState extends State<AdminPage> {
                     )
                 ),
               ),
+              SizedBox(
+                height: Dimensions.height60,
+              ),
+              Icon(Icons.receipt_long, size: Dimensions.height120,),
+              Container(
+                padding: EdgeInsets.only(left: Dimensions.width20, right: Dimensions.width20),
+                decoration: BoxDecoration(
+                    borderRadius:  BorderRadius.all(Radius.circular(Dimensions.radius50))
+                ),
+                child: ElevatedButton(
+                    onPressed: (){
+                      Get.to(() => const PayslipPage());
+                    },
+                    child: Container(
+                        padding: EdgeInsets.only(top: Dimensions.height30 /2, bottom: Dimensions.height30 / 2),
+                        child: BigText(content: "payslip".tr, fontWeight: FontWeight.bold, overflow: TextOverflow.visible,)
+                    )
+                ),
+              ),
             ],
           ),
         ),
@@ -247,6 +268,7 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   _exit() async{
+    await SecureStorageHelper.instance.clearCredentials();
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     Get.offAll(() => const StartPage());

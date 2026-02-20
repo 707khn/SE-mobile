@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/variables.dart';
 
 
 Future getEmployee(String iin, BuildContext context) async {
@@ -10,7 +11,7 @@ Future getEmployee(String iin, BuildContext context) async {
 
   try {
     var response = await http.post(
-      Uri.parse('http://cp.se-btrz.com/get_sname'),
+      Uri.parse('${AppValues.baseUrl}/get_sname'),
       headers: {'Content-Type' : 'application/json'},
       body: jsonEncode({'emp_iin': iin}),
     );

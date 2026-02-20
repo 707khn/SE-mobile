@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import '../utils/variables.dart';
 
 Future<List<List<String>>> getEmployeeDate(BuildContext context, startdate, enddate) async {
   final prefs = await SharedPreferences.getInstance();
@@ -10,7 +11,7 @@ Future<List<List<String>>> getEmployeeDate(BuildContext context, startdate, endd
 
   try {
     var response = await http.post(
-      Uri.parse('http://cp.se-btrz.com/director_report'),
+      Uri.parse('${AppValues.baseUrl}/director_report'),
       headers: {'Content-Type' : 'application/json'},
       body: jsonEncode({'emp_sname': emp_sname, 'start_date': startdate, 'end_date': enddate}),
     );

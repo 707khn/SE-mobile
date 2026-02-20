@@ -24,6 +24,12 @@ class LocaleString extends Translations {
           'employee report': 'Қызметкердің есебіне өту/көру',
           'see last Excel': 'Excel бағдарламасындағы ақырғы файлды көру',
           'see last CSV': 'CSV форматындағы ақырғы файлды көру',
+          'payslip': 'Есептік парақ',
+          'accruals': 'Есептеулер',
+          'deductions': 'Ұстамалар',
+          'net pay': 'Төленетін жиынтық',
+          'total': 'Жиыны',
+          'payslip not found': 'Таңдалған кезең үшін есептік парақ табылмады',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -46,6 +52,12 @@ class LocaleString extends Translations {
           'employee report': 'Перейти в отчёт сотрудников',
           'see last Excel': 'Просмотреть последний файл Excel',
           'see last CSV': 'Просмотреть последний файл',
+          'payslip': 'Расчётный лист',
+          'accruals': 'Начисления',
+          'deductions': 'Удержания',
+          'net pay': 'Итого к выплате',
+          'total': 'Итого',
+          'payslip not found': 'Расчётный лист за выбранный период не найден',
         }
       };
 }
