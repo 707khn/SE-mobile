@@ -44,7 +44,7 @@ dependencies:
   excel: ^2.1.0
   path_provider: ^2.0.15
   filesystem_picker: ^3.1.0
-  open_file: ^3.3.2
+  open_file: ^3.5.4
 
 flutter_native_splash:
   color: "#ffffff"
