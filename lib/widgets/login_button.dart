@@ -33,7 +33,7 @@ class LoginButton extends StatelessWidget {
       ),
       child: TextButton(
         style: TextButton.styleFrom(
-          primary: Theme
+          foregroundColor: Theme
               .of(context)
               .colorScheme
               .onPrimary,
