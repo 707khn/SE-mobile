@@ -6,6 +6,23 @@ app = Flask(__name__)
 CORS(app)
 
 
+# ─── 0. INDEX (API status) ────────────────────────────────
+@app.route('/')
+def index():
+    return jsonify({
+        'status': 'ok',
+        'service': 'SE-mobile API',
+        'endpoints': [
+            'POST /login',
+            'POST /report',
+            'POST /reportdate',
+            'POST /director_report',
+            'POST /get_sname',
+            'POST /payslip'
+        ]
+    })
+
+
 # ─── 1. LOGIN ───────────────────────────────────────────
 @app.route('/login', methods=['POST'])
 def login():
