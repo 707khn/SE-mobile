@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from models import (db, Employee, AccessRecord, Payslip,
@@ -22,6 +23,7 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        _auto_seed()
 
     register_routes(app)
     return app
@@ -211,6 +213,103 @@ def _access_to_dict(record):
         'event': record.event_type,
         'door': record.door_location
     }
+
+
+def _auto_seed():
+    if Employee.query.first():
+        return
+
+    e1 = Employee(employee_id='001', full_name='Иванов Иван Иванович', job_title='Инженер', iin='900101350123')
+    e2 = Employee(employee_id='002', full_name='Петров Пётр Петрович', job_title='Руководитель отдела', iin='850515400456')
+    e3 = Employee(employee_id='003', full_name='Сидорова Анна Сергеевна', job_title='Бухгалтер', iin='920720450789')
+    db.session.add_all([e1, e2, e3])
+
+    for eid, d, t, ev, door in [
+        ('001', '2024-01-15', '08:55', 'Вход', 'Главный вход'),
+        ('001', '2024-01-15', '18:05', 'Выход', 'Главный вход'),
+        ('001', '2024-01-16', '08:50', 'Вход', 'Главный вход'),
+        ('001', '2024-01-16', '18:10', 'Выход', 'Главный вход'),
+        ('001', '2024-02-01', '09:00', 'Вход', 'Главный вход'),
+        ('001', '2024-02-01', '18:00', 'Выход', 'Главный вход'),
+        ('002', '2024-01-15', '08:30', 'Вход', 'Офис'),
+        ('002', '2024-01-15', '19:00', 'Выход', 'Офис'),
+        ('002', '2024-01-16', '08:40', 'Вход', 'Офис'),
+        ('002', '2024-01-16', '18:30', 'Выход', 'Офис'),
+        ('003', '2024-01-15', '08:45', 'Вход', 'Бухгалтерия'),
+        ('003', '2024-01-15', '17:45', 'Выход', 'Бухгалтерия'),
+        ('003', '2024-01-16', '08:50', 'Вход', 'Бухгалтерия'),
+        ('003', '2024-01-16', '17:50', 'Выход', 'Бухгалтерия'),
+    ]:
+        y, m, day = d.split('-')
+        db.session.add(AccessRecord(
+            employee_id=eid, access_date=date(int(y), int(m), int(day)),
+            access_time=t, event_type=ev, door_location=door
+        ))
+
+    for eid, month, year, display, accs, deds, ta, td, np in [
+        ('001', 1, 2024, 'Январь 2024',
+         [('Оклад', 350000), ('Премия', 50000), ('Надбавка за стаж', 17500)],
+         [('ИПН (10%)', 41750), ('ОПВ (10%)', 41750), ('ВОСМС (2%)', 8350)],
+         417500, 91850, 325650),
+        ('001', 2, 2024, 'Февраль 2024',
+         [('Оклад', 350000), ('Надбавка за стаж', 17500)],
+         [('ИПН (10%)', 36750), ('ОПВ (10%)', 36750), ('ВОСМС (2%)', 7350)],
+         367500, 80850, 286650),
+        ('002', 1, 2024, 'Январь 2024',
+         [('Оклад', 500000), ('Премия за KPI', 100000)],
+         [('ИПН (10%)', 60000), ('ОПВ (10%)', 60000), ('ВОСМС (2%)', 12000)],
+         600000, 132000, 468000),
+        ('002', 2, 2024, 'Февраль 2024',
+         [('Оклад', 500000)],
+         [('ИПН (10%)', 50000), ('ОПВ (10%)', 50000), ('ВОСМС (2%)', 10000)],
+         500000, 110000, 390000),
+        ('003', 1, 2024, 'Январь 2024',
+         [('Оклад', 280000)],
+         [('ИПН (10%)', 28000), ('ОПВ (10%)', 28000), ('ВОСМС (2%)', 5600)],
+         280000, 61600, 218400),
+    ]:
+        ps = Payslip(employee_id=eid, period_month=month, period_year=year,
+                     period_display=display, total_accruals=ta,
+                     total_deductions=td, net_pay=np)
+        db.session.add(ps)
+        db.session.flush()
+        for name, amount in accs:
+            db.session.add(PayslipAccrual(payslip_id=ps.id, name=name, amount=amount))
+        for name, amount in deds:
+            db.session.add(PayslipDeduction(payslip_id=ps.id, name=name, amount=amount))
+
+    for eid, lt, total, used, rem in [
+        ('001', 'Ежегодный трудовой отпуск', 24, 10, 14),
+        ('001', 'Экологический отпуск', 10, 0, 10),
+        ('002', 'Ежегодный трудовой отпуск', 30, 24, 6),
+        ('002', 'Экологический отпуск', 10, 5, 5),
+        ('003', 'Ежегодный трудовой отпуск', 24, 0, 24),
+        ('003', 'Экологический отпуск', 10, 0, 10),
+    ]:
+        db.session.add(LeaveBalance(
+            employee_id=eid, leave_type=lt,
+            total_days=total, used_days=used, remaining_days=rem
+        ))
+
+    for eid, lt, sd, ed, days, status in [
+        ('001', 'Ежегодный трудовой отпуск', '2024-01-15', '2024-01-24', 10, 'Утверждён'),
+        ('001', 'Больничный лист', '2023-11-05', '2023-11-12', 7, 'Закрыт'),
+        ('001', 'Больничный лист', '2023-06-20', '2023-06-23', 3, 'Закрыт'),
+        ('002', 'Ежегодный трудовой отпуск', '2024-02-01', '2024-02-14', 14, 'Утверждён'),
+        ('002', 'Ежегодный трудовой отпуск', '2023-07-10', '2023-07-19', 10, 'Утверждён'),
+        ('002', 'Экологический отпуск', '2023-09-01', '2023-09-05', 5, 'Утверждён'),
+        ('003', 'Больничный лист', '2024-01-08', '2024-01-12', 5, 'Закрыт'),
+    ]:
+        sy, sm, sday = sd.split('-')
+        ey, em, eday = ed.split('-')
+        db.session.add(LeaveHistory(
+            employee_id=eid, leave_type=lt,
+            start_date=date(int(sy), int(sm), int(sday)),
+            end_date=date(int(ey), int(em), int(eday)),
+            days=days, status=status
+        ))
+
+    db.session.commit()
 
 
 app = create_app()
