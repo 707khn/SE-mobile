@@ -8,6 +8,7 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/report_request.dart';
+import 'package:se_mobile/screens/leave_screen.dart';
 import 'package:se_mobile/requests/reportdate_request.dart';
 import 'package:se_mobile/screens/payslip_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
@@ -176,6 +177,14 @@ class _MainPage1State extends State<MainPage1> {
                         onTap: () {
                           Navigator.pop(context);
                           Get.to(() => const PayslipPage());
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.calendar_today, color: AppColors.mainColor),
+                        title: BigText(content: 'leave_sick_days'.tr),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const LeavePage());
                         },
                       ),
                     ],

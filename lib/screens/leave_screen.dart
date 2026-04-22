@@ -1,0 +1,218 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../requests/leave_request.dart';
+import '../utils/colors.dart';
+import '../utils/dimensions.dart';
+import '../widgets/custom_text.dart';
+
+class LeavePage extends StatefulWidget {
+  const LeavePage({Key? key}) : super(key: key);
+
+  @override
+  State<LeavePage> createState() => _LeavePageState();
+}
+
+class _LeavePageState extends State<LeavePage> {
+  LeaveData? _leaveData;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLeaves();
+  }
+
+  Future<void> _fetchLeaves() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _leaveData = null;
+    });
+
+    final data = await getLeaves(context);
+
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (data == null) {
+        _error = 'leave not found'.tr;
+      } else {
+        _leaveData = data;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: BigText(content: 'leave_sick_days'.tr, fontWeight: FontWeight.bold),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(Dimensions.width20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_loading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            if (_error != null)
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.all(Dimensions.height30),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.info_outline, size: 48, color: Colors.grey),
+                      SizedBox(height: Dimensions.height30 / 2),
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_leaveData != null) ...[
+              Card(
+                color: AppColors.mainColor,
+                child: Padding(
+                  padding: EdgeInsets.all(Dimensions.width20),
+                  child: Text(
+                    _leaveData!.employee,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: Dimensions.height30 / 2),
+              BigText(content: 'leave_balances'.tr, fontWeight: FontWeight.bold),
+              SizedBox(height: Dimensions.height30 / 4),
+              ..._leaveData!.balances.map((b) => _buildBalanceCard(b)),
+              SizedBox(height: Dimensions.height30 / 2),
+              BigText(content: 'leave_history'.tr, fontWeight: FontWeight.bold),
+              SizedBox(height: Dimensions.height30 / 4),
+              if (_leaveData!.history.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(Dimensions.width20),
+                    child: Center(
+                      child: Text(
+                        'no_records'.tr,
+                        style: const TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ..._leaveData!.history.map((r) => _buildHistoryCard(r)),
+              SizedBox(height: Dimensions.height30),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBalanceCard(LeaveBalance balance) {
+    final progress = balance.totalDays > 0
+        ? balance.usedDays / balance.totalDays
+        : 0.0;
+
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(Dimensions.width20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              balance.type,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            SizedBox(height: Dimensions.height30 / 3),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: Colors.grey.shade200,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  balance.remainingDays > 0 ? AppColors.mainColor : AppColors.niceRed,
+                ),
+              ),
+            ),
+            SizedBox(height: Dimensions.height30 / 3),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('${'used_days'.tr}: ${balance.usedDays}',
+                    style: const TextStyle(fontSize: 13, color: Colors.black54)),
+                Text('${'remaining_days'.tr}: ${balance.remainingDays}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: balance.remainingDays > 0 ? AppColors.mainColor : AppColors.niceRed,
+                    )),
+              ],
+            ),
+            SizedBox(height: Dimensions.height30 / 6),
+            Text('${'total_days'.tr}: ${balance.totalDays}',
+                style: const TextStyle(fontSize: 12, color: Colors.black38)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryCard(LeaveRecord record) {
+    IconData icon;
+    Color color;
+    if (record.type.contains('Больничный') || record.type.contains('Ауру')) {
+      icon = Icons.local_hospital;
+      color = AppColors.niceRed;
+    } else {
+      icon = Icons.beach_access;
+      color = AppColors.mainColor;
+    }
+
+    return Card(
+      child: ListTile(
+        leading: Icon(icon, color: color, size: 28),
+        title: Text(record.type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        subtitle: Text(
+          '${record.startDate} — ${record.endDate}  (${record.days} ${'days_short'.tr})',
+          style: const TextStyle(fontSize: 13),
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: record.status == 'Утверждён' || record.status == 'Закрыт'
+                ? AppColors.mainColor.withOpacity(0.15)
+                : Colors.orange.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            record.status,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: record.status == 'Утверждён' || record.status == 'Закрыт'
+                  ? AppColors.mainColor
+                  : Colors.orange.shade800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
