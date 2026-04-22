@@ -128,3 +128,41 @@ PAYSLIPS = {
         "net_pay": 218400.00,
     },
 }
+
+# ─── Отпуска и больничные ──────────────────────────────
+LEAVES = {
+    "001": {
+        "employee": "Иванов Иван Иванович",
+        "balances": [
+            {"type": "Ежегодный трудовой отпуск", "total_days": 24, "used_days": 10, "remaining_days": 14},
+            {"type": "Экологический отпуск", "total_days": 10, "used_days": 0, "remaining_days": 10},
+        ],
+        "history": [
+            {"type": "Ежегодный трудовой отпуск", "start_date": "2024-01-15", "end_date": "2024-01-24", "days": 10, "status": "Утверждён"},
+            {"type": "Больничный лист", "start_date": "2023-11-05", "end_date": "2023-11-12", "days": 7, "status": "Закрыт"},
+            {"type": "Больничный лист", "start_date": "2023-06-20", "end_date": "2023-06-23", "days": 3, "status": "Закрыт"},
+        ],
+    },
+    "002": {
+        "employee": "Петров Пётр Петрович",
+        "balances": [
+            {"type": "Ежегодный трудовой отпуск", "total_days": 30, "used_days": 24, "remaining_days": 6},
+            {"type": "Экологический отпуск", "total_days": 10, "used_days": 5, "remaining_days": 5},
+        ],
+        "history": [
+            {"type": "Ежегодный трудовой отпуск", "start_date": "2024-02-01", "end_date": "2024-02-14", "days": 14, "status": "Утверждён"},
+            {"type": "Ежегодный трудовой отпуск", "start_date": "2023-07-10", "end_date": "2023-07-19", "days": 10, "status": "Утверждён"},
+            {"type": "Экологический отпуск", "start_date": "2023-09-01", "end_date": "2023-09-05", "days": 5, "status": "Утверждён"},
+        ],
+    },
+    "003": {
+        "employee": "Сидорова Анна Сергеевна",
+        "balances": [
+            {"type": "Ежегодный трудовой отпуск", "total_days": 24, "used_days": 0, "remaining_days": 24},
+            {"type": "Экологический отпуск", "total_days": 10, "used_days": 0, "remaining_days": 10},
+        ],
+        "history": [
+            {"type": "Больничный лист", "start_date": "2024-01-08", "end_date": "2024-01-12", "days": 5, "status": "Закрыт"},
+        ],
+    },
+}

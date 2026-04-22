@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from mock_data import EMPLOYEES, REPORTS, PAYSLIPS
+from mock_data import EMPLOYEES, REPORTS, PAYSLIPS, LEAVES
 
 app = Flask(__name__)
 CORS(app)
@@ -18,7 +18,8 @@ def index():
             'POST /reportdate',
             'POST /director_report',
             'POST /get_sname',
-            'POST /payslip'
+            'POST /payslip',
+            'POST /leaves'
         ]
     })
 
@@ -124,6 +125,20 @@ def payslip():
 
     if ps:
         return jsonify({'message': 'Success', 'payslip': ps})
+    else:
+        return jsonify({'message': 'Failure'})
+
+
+# ─── 8. LEAVES (отпуска и больничные) ──────────────────
+@app.route('/leaves', methods=['POST'])
+def leaves():
+    data = request.get_json()
+    key_suffix = data.get('key_suffix', '')
+
+    leave_data = LEAVES.get(key_suffix)
+
+    if leave_data:
+        return jsonify({'message': 'Success', 'leaves': leave_data})
     else:
         return jsonify({'message': 'Failure'})
 

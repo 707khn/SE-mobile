@@ -30,6 +30,15 @@ class LocaleString extends Translations {
           'net pay': 'Төленетін жиынтық',
           'total': 'Жиыны',
           'payslip not found': 'Таңдалған кезең үшін есептік парақ табылмады',
+          'leave_sick_days': 'Демалыс және ауру парағы',
+          'leave_balances': 'Қолжетімді демалыстар',
+          'leave_history': 'Демалыс және ауру тарихы',
+          'leave not found': 'Демалыс туралы мәліметтер табылмады',
+          'used_days': 'Пайдаланылған',
+          'remaining_days': 'Қалды',
+          'total_days': 'Барлығы',
+          'days_short': 'күн',
+          'no_records': 'Жазбалар жоқ',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -58,6 +67,15 @@ class LocaleString extends Translations {
           'net pay': 'Итого к выплате',
           'total': 'Итого',
           'payslip not found': 'Расчётный лист за выбранный период не найден',
+          'leave_sick_days': 'Отпуска и больничные',
+          'leave_balances': 'Доступные отпуска',
+          'leave_history': 'История отпусков и больничных',
+          'leave not found': 'Данные об отпусках не найдены',
+          'used_days': 'Использовано',
+          'remaining_days': 'Осталось',
+          'total_days': 'Всего дней',
+          'days_short': 'дн.',
+          'no_records': 'Записей нет',
         }
       };
 }
