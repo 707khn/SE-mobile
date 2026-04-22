@@ -1,147 +1,215 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from mock_data import EMPLOYEES, REPORTS, PAYSLIPS, LEAVES
-
-app = Flask(__name__)
-CORS(app)
+from models import (db, Employee, AccessRecord, Payslip,
+                    PayslipAccrual, PayslipDeduction, LeaveBalance, LeaveHistory)
 
 
-# ─── 0. INDEX (API status) ────────────────────────────────
-@app.route('/')
-def index():
-    return jsonify({
-        'status': 'ok',
-        'service': 'SE-mobile API',
-        'endpoints': [
-            'POST /login',
-            'POST /report',
-            'POST /reportdate',
-            'POST /director_report',
-            'POST /get_sname',
-            'POST /payslip',
-            'POST /leaves'
-        ]
-    })
+def create_app():
+    app = Flask(__name__)
+    CORS(app)
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+        'DATABASE_URL', 'sqlite:///se_mobile.db'
+    )
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
+
+    register_routes(app)
+    return app
 
 
-# ─── 1. LOGIN ───────────────────────────────────────────
-@app.route('/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    key_suffix = data.get('key_suffix', '')
+def register_routes(app):
 
-    employee = EMPLOYEES.get(key_suffix)
-    if employee and key_suffix != '':
+    @app.route('/')
+    def index():
+        return jsonify({
+            'status': 'ok',
+            'service': 'SE-mobile API',
+            'version': '2.0 (PostgreSQL)',
+            'endpoints': [
+                'POST /login',
+                'POST /report',
+                'POST /reportdate',
+                'POST /director_report',
+                'POST /get_sname',
+                'POST /payslip',
+                'POST /leaves'
+            ]
+        })
+
+    @app.route('/login', methods=['POST'])
+    def login():
+        data = request.get_json()
+        key_suffix = data.get('key_suffix', '')
+
+        emp = Employee.query.get(key_suffix)
+        if emp and key_suffix != '':
+            return jsonify({
+                'message': 'Success',
+                'full_name': emp.full_name,
+                'job': emp.job_title
+            })
+        return jsonify({'message': 'Failure'})
+
+    @app.route('/report', methods=['POST'])
+    def report():
+        data = request.get_json()
+        key_suffix = data.get('key_suffix', '')
+
+        records = AccessRecord.query.filter_by(employee_id=key_suffix)\
+            .order_by(AccessRecord.access_date, AccessRecord.access_time).all()
+        if not records:
+            return jsonify({'message': 'Failure'})
         return jsonify({
             'message': 'Success',
-            'full_name': employee['full_name'],
-            'job': employee['job']
+            'report': [_access_to_dict(r) for r in records]
         })
-    else:
-        return jsonify({'message': 'Failure'})
 
+    @app.route('/reportdate', methods=['POST'])
+    def reportdate():
+        data = request.get_json()
+        key_suffix = data.get('key_suffix', '')
+        start_date = data.get('start_date', '')
+        end_date = data.get('end_date', '')
 
-# ─── 2. REPORT (все записи сотрудника) ──────────────────
-@app.route('/report', methods=['POST'])
-def report():
-    data = request.get_json()
-    key_suffix = data.get('key_suffix', '')
+        records = AccessRecord.query.filter(
+            AccessRecord.employee_id == key_suffix,
+            AccessRecord.access_date >= start_date,
+            AccessRecord.access_date <= end_date
+        ).order_by(AccessRecord.access_date, AccessRecord.access_time).all()
 
-    records = REPORTS.get(key_suffix, [])
-    if not records:
-        return jsonify({'message': 'Failure'})
-    return jsonify({'message': 'Success', 'report': records})
+        if not records:
+            return jsonify({'message': 'Failure'})
+        return jsonify({
+            'message': 'Success',
+            'report': [_access_to_dict(r) for r in records]
+        })
 
+    @app.route('/director_report', methods=['POST'])
+    def director_report():
+        data = request.get_json()
+        emp_sname = data.get('emp_sname', '')
+        start_date = data.get('start_date', '')
+        end_date = data.get('end_date', '')
 
-# ─── 3. REPORTDATE (записи за период) ───────────────────
-@app.route('/reportdate', methods=['POST'])
-def reportdate():
-    data = request.get_json()
-    key_suffix = data.get('key_suffix', '')
-    start_date = data.get('start_date', '')
-    end_date = data.get('end_date', '')
+        emp = Employee.query.filter(Employee.full_name.contains(emp_sname)).first()
+        if not emp:
+            return jsonify({'message': 'Failure'})
 
-    records = REPORTS.get(key_suffix, [])
-    filtered = [r for r in records
-                if start_date <= r.get('date', '') <= end_date]
-    if not filtered:
-        return jsonify({'message': 'Failure'})
-    return jsonify({'message': 'Success', 'report': filtered})
+        records = AccessRecord.query.filter(
+            AccessRecord.employee_id == emp.employee_id,
+            AccessRecord.access_date >= start_date,
+            AccessRecord.access_date <= end_date
+        ).order_by(AccessRecord.access_date, AccessRecord.access_time).all()
 
+        if not records:
+            return jsonify({'message': 'Failure'})
+        return jsonify({
+            'message': 'Success',
+            'director_report': [_access_to_dict(r) for r in records]
+        })
 
-# ─── 4. DIRECTOR_REPORT (отчёт по сотруднику) ───────────
-@app.route('/director_report', methods=['POST'])
-def director_report():
-    data = request.get_json()
-    emp_sname = data.get('emp_sname', '')
-    start_date = data.get('start_date', '')
-    end_date = data.get('end_date', '')
+    @app.route('/get_sname', methods=['POST'])
+    def get_sname():
+        data = request.get_json()
 
-    records = []
-    for key, emp in EMPLOYEES.items():
-        if emp_sname in emp['full_name']:
-            records = REPORTS.get(key, [])
-            break
+        if 'key_suffix' in data:
+            employees = Employee.query.all()
+            return jsonify({'fio': [e.full_name for e in employees]})
 
-    filtered = [r for r in records
-                if start_date <= r.get('date', '') <= end_date]
-    if not filtered:
-        return jsonify({'message': 'Failure'})
-    return jsonify({'message': 'Success', 'director_report': filtered})
-
-
-# ─── 5/6. GET_SNAME (список сотрудников / поиск по ИИН) ─
-@app.route('/get_sname', methods=['POST'])
-def get_sname():
-    data = request.get_json()
-
-    if 'key_suffix' in data:
-        fio_list = [e['full_name'] for e in EMPLOYEES.values()]
-        return jsonify({'fio': fio_list})
-
-    if 'emp_iin' in data:
-        emp_iin = data['emp_iin']
-        for emp in EMPLOYEES.values():
-            if emp.get('iin') == emp_iin:
+        if 'emp_iin' in data:
+            emp = Employee.query.filter_by(iin=data['emp_iin']).first()
+            if emp:
                 return jsonify({
                     'message': 'Success',
-                    'employee': [emp]
+                    'employee': [{
+                        'full_name': emp.full_name,
+                        'job': emp.job_title,
+                        'iin': emp.iin
+                    }]
                 })
+            return jsonify({'message': 'Failure'})
+
         return jsonify({'message': 'Failure'})
 
-    return jsonify({'message': 'Failure'})
+    @app.route('/payslip', methods=['POST'])
+    def payslip():
+        data = request.get_json()
+        key_suffix = data.get('key_suffix', '')
+        month = data.get('month', '')
+        year = data.get('year', '')
+
+        ps = Payslip.query.filter_by(
+            employee_id=key_suffix,
+            period_month=int(month),
+            period_year=int(year)
+        ).first()
+
+        if not ps:
+            return jsonify({'message': 'Failure'})
+
+        return jsonify({
+            'message': 'Success',
+            'payslip': {
+                'period': ps.period_display,
+                'employee': ps.employee.full_name,
+                'accruals': [{'name': a.name, 'amount': a.amount} for a in ps.accruals],
+                'deductions': [{'name': d.name, 'amount': d.amount} for d in ps.deductions],
+                'total_accruals': ps.total_accruals,
+                'total_deductions': ps.total_deductions,
+                'net_pay': ps.net_pay
+            }
+        })
+
+    @app.route('/leaves', methods=['POST'])
+    def leaves():
+        data = request.get_json()
+        key_suffix = data.get('key_suffix', '')
+
+        emp = Employee.query.get(key_suffix)
+        if not emp:
+            return jsonify({'message': 'Failure'})
+
+        balances = LeaveBalance.query.filter_by(employee_id=key_suffix).all()
+        history = LeaveHistory.query.filter_by(employee_id=key_suffix)\
+            .order_by(LeaveHistory.start_date.desc()).all()
+
+        return jsonify({
+            'message': 'Success',
+            'leaves': {
+                'employee': emp.full_name,
+                'balances': [{
+                    'type': b.leave_type,
+                    'total_days': b.total_days,
+                    'used_days': b.used_days,
+                    'remaining_days': b.remaining_days
+                } for b in balances],
+                'history': [{
+                    'type': h.leave_type,
+                    'start_date': h.start_date.isoformat(),
+                    'end_date': h.end_date.isoformat(),
+                    'days': h.days,
+                    'status': h.status
+                } for h in history]
+            }
+        })
 
 
-# ─── 7. PAYSLIP (расчётный лист) ────────────────────────
-@app.route('/payslip', methods=['POST'])
-def payslip():
-    data = request.get_json()
-    key_suffix = data.get('key_suffix', '')
-    month = data.get('month', '')
-    year = data.get('year', '')
-
-    period_key = f"{key_suffix}_{year}_{month}"
-    ps = PAYSLIPS.get(period_key)
-
-    if ps:
-        return jsonify({'message': 'Success', 'payslip': ps})
-    else:
-        return jsonify({'message': 'Failure'})
+def _access_to_dict(record):
+    return {
+        'date': record.access_date.isoformat(),
+        'time': record.access_time,
+        'event': record.event_type,
+        'door': record.door_location
+    }
 
 
-# ─── 8. LEAVES (отпуска и больничные) ──────────────────
-@app.route('/leaves', methods=['POST'])
-def leaves():
-    data = request.get_json()
-    key_suffix = data.get('key_suffix', '')
-
-    leave_data = LEAVES.get(key_suffix)
-
-    if leave_data:
-        return jsonify({'message': 'Success', 'leaves': leave_data})
-    else:
-        return jsonify({'message': 'Failure'})
-
+app = create_app()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
