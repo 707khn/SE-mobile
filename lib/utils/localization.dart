@@ -36,7 +36,7 @@ class LocaleString extends Translations {
           'send report csv': 'Отправить отчёт csv',
           'show report': 'Показать личный отчёт',
           'choose period': 'Выбрать период',
-          'attendance report': 'Отчёт о посещении',
+          'attendance report': 'Отчёт по турникету',
           'employee ID': 'ИИН сотрудника',
           'get employee name': 'Получить ФИО сотрудника',
           'employee name': 'ФИО сотрудника',
