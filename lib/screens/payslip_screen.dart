@@ -61,58 +61,62 @@ class _PayslipPageState extends State<PayslipPage> {
           title: Text('choose period'.tr),
           content: StatefulBuilder(
             builder: (context, setInnerState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        onPressed: () => setInnerState(() => selectedYear--),
-                        icon: const Icon(Icons.arrow_back_ios),
-                      ),
-                      Text(
-                        '$selectedYear',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        onPressed: () => setInnerState(() => selectedYear++),
-                        icon: const Icon(Icons.arrow_forward_ios),
-                      ),
-                    ],
-                  ),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      childAspectRatio: 1.5,
+              return SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          onPressed: () => setInnerState(() => selectedYear--),
+                          icon: const Icon(Icons.arrow_back_ios),
+                        ),
+                        Text(
+                          '$selectedYear',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          onPressed: () => setInnerState(() => selectedYear++),
+                          icon: const Icon(Icons.arrow_forward_ios),
+                        ),
+                      ],
                     ),
-                    itemCount: 12,
-                    itemBuilder: (ctx, index) {
-                      final m = index + 1;
-                      final isSelected = m == selectedMonth;
-                      return GestureDetector(
-                        onTap: () => setInnerState(() => selectedMonth = m),
-                        child: Container(
-                          margin: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: isSelected ? AppColors.mainColor : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              DateFormat('MMM', 'ru').format(DateTime(selectedYear, m)),
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black87,
-                                fontSize: 13,
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        childAspectRatio: 1.5,
+                      ),
+                      itemCount: 12,
+                      itemBuilder: (ctx, index) {
+                        final m = index + 1;
+                        final isSelected = m == selectedMonth;
+                        return GestureDetector(
+                          onTap: () => setInnerState(() => selectedMonth = m),
+                          child: Container(
+                            margin: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppColors.mainColor : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                DateFormat('MMM', 'ru').format(DateTime(selectedYear, m)),
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.black87,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               );
             },
           ),
