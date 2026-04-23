@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:se_mobile/screens/admin_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/colors.dart';
@@ -14,6 +15,7 @@ import 'utils/secure_storage_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ru');
   await initializeSharedPreferences();
   runApp(const MyApp());
 }
