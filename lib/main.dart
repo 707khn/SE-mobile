@@ -39,7 +39,7 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
-        Locale('ru', '')
+        Locale('ru'),
       ],
       title: 'SemEng',
       theme: ThemeData(
