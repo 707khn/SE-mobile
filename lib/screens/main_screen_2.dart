@@ -319,6 +319,7 @@ class _MainPage2State extends State<MainPage2> {
                         final selectedDate = await showDatePicker(
                           context: context,
                           initialDate: isStartDateInitialized ? startDate : DateTime.now(),
+                          locale: const Locale('ru', ''),
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
@@ -350,6 +351,7 @@ class _MainPage2State extends State<MainPage2> {
                         final selectedDate = await showDatePicker(
                           context: context,
                           initialDate: isEndDateInitialized ? endDate : DateTime.now(),
+                          locale: const Locale('ru', ''),
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
