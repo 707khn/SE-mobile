@@ -359,10 +359,9 @@ class _MainMenu1State extends State<MainMenu1> {
                       final selectedDate = await showDatePicker(
                         context: context,
                         initialDate: isStartDateInitialized ? startDate : DateTime.now(),
-                        locale: const Locale('ru', 'RU'),
+                        locale: const Locale('ru', ''),
                         firstDate: DateTime(2000),
                         lastDate: DateTime(2100),
-
                       );
                       if (selectedDate != null) {
                         setState(() {
@@ -392,6 +391,7 @@ class _MainMenu1State extends State<MainMenu1> {
                       final selectedDate = await showDatePicker(
                         context: context,
                         initialDate: isEndDateInitialized ? endDate : DateTime.now(),
+                        locale: const Locale('ru', ''),
                         firstDate: DateTime(2000),
                         lastDate: DateTime(2100),
                       );
