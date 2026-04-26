@@ -407,6 +407,17 @@ class _MainPage2State extends State<MainPage2> {
                                       return ListTile(
                                         title: Text(employee),
                                         onTap: () async {
+                                          if (startDate.isAfter(endDate)) {
+                                            Navigator.pop(context);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('date_range_error'.tr),
+                                                behavior: SnackBarBehavior.floating,
+                                                backgroundColor: Colors.red.shade700,
+                                              ),
+                                            );
+                                            return;
+                                          }
                                           employees.add(employee);
                                           prefs.setStringList("emp_snames", employees);
                                           prefs.setString("emp_sname", employee);

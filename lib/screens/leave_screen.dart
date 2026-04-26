@@ -112,7 +112,18 @@ class _LeavePageState extends State<LeavePage> {
                   ),
                 ),
                 SizedBox(height: Dimensions.height30 / 2),
-                BigText(content: 'leave_balances'.tr, fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    BigText(content: 'leave_balances'.tr, fontWeight: FontWeight.bold),
+                    const Spacer(),
+                    if (_leaveData!.balances.isNotEmpty) ...[
+                      _buildTotalChip(
+                        _leaveData!.balances.fold(0, (s, b) => s + b.usedDays),
+                        _leaveData!.balances.fold(0, (s, b) => s + b.totalDays),
+                      ),
+                    ],
+                  ],
+                ),
                 SizedBox(height: Dimensions.height30 / 4),
                 ..._leaveData!.balances.map((b) => _buildBalanceCard(b)),
                 SizedBox(height: Dimensions.height30 / 2),
@@ -137,6 +148,23 @@ class _LeavePageState extends State<LeavePage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTotalChip(int used, int total) {
+    final remaining = total - used;
+    final color = remaining > 0 ? AppColors.mainColor : AppColors.niceRed;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        '$remaining / $total ${'days_short'.tr}',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }
