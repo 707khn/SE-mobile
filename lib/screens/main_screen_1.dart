@@ -266,6 +266,7 @@ class _MainMenu1State extends State<MainMenu1> {
   late DateTime endDate;
   bool _loadingReport = false;
   bool _dateError = false;
+  bool _initError = false;
 
   @override
   void initState() {
@@ -276,9 +277,14 @@ class _MainMenu1State extends State<MainMenu1> {
   }
 
   Future<void> _initData() async {
-    setState(() => _loadingReport = true);
+    setState(() { _loadingReport = true; _initError = false; });
     reportsEntries = await getReportEntries(context);
-    if (mounted) setState(() => _loadingReport = false);
+    if (mounted) {
+      setState(() {
+        _loadingReport = false;
+        _initError = reportsEntries.length == 1 && reportsEntries[0][0] == 'no';
+      });
+    }
   }
 
   bool get _hasData =>
@@ -288,7 +294,10 @@ class _MainMenu1State extends State<MainMenu1> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return RefreshIndicator(
+      onRefresh: _initData,
+      child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: Container(
         padding: EdgeInsets.only(
           top: Dimensions.height30 / 2,
@@ -587,6 +596,21 @@ class _MainMenu1State extends State<MainMenu1> {
                   ),
                 ),
               ),
+            ] else if (!_loadingReport && _initError) ...[
+              const SizedBox(height: 32),
+              Icon(Icons.wifi_off, size: 56, color: Colors.grey.shade400),
+              const SizedBox(height: 8),
+              Text(
+                'load_error'.tr,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: _initData,
+                icon: const Icon(Icons.refresh),
+                label: Text('refresh'.tr),
+              ),
             ] else if (!_loadingReport && !_hasData) ...[
               const SizedBox(height: 32),
               Icon(Icons.inbox_outlined, size: 56, color: Colors.grey.shade400),
@@ -600,6 +624,7 @@ class _MainMenu1State extends State<MainMenu1> {
           ],
         ),
       ),
+    ),
     );
   }
 
