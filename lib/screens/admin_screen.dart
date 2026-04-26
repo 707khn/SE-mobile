@@ -10,6 +10,7 @@ import '../utils/colors.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../widgets/icon_button_drawer.dart';
+import 'leave_screen.dart';
 import 'main_screen_2.dart';
 import 'payslip_screen.dart';
 import 'start_screen.dart';
@@ -25,17 +26,16 @@ class AdminPage extends StatefulWidget {
 }
 
 class _AdminPageState extends State<AdminPage> {
-
   static String _lang = "";
   late SharedPreferences prefs;
 
   @override
   void initState() {
     super.initState();
-    initializeSharedPreferences();
+    _initPrefs();
   }
 
-  Future<void> initializeSharedPreferences() async {
+  Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
       prefs.setString(AppValues.LANG, "KZ");
@@ -49,7 +49,8 @@ class _AdminPageState extends State<AdminPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold,),
+        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
+        centerTitle: true,
       ),
       drawer: Theme(
         data: Theme.of(context).copyWith(
@@ -92,7 +93,6 @@ class _AdminPageState extends State<AdminPage> {
                                       ),
                                     ],
                                   ),
-
                                   Row(
                                     children: [
                                       Padding(
@@ -101,15 +101,15 @@ class _AdminPageState extends State<AdminPage> {
                                           onTap: _changeLanguage,
                                           child: _lang == "KZ"
                                               ? SizedBox(
-                                            width: Dimensions.width20 * 1.25,
-                                            height: Dimensions.height30 * 1.25,
-                                            child: Image.asset('assets/ru.png'),
-                                          )
-                                              : Container(
-                                            width: Dimensions.width20 * 1.25,
-                                            height: Dimensions.height30 * 1.25,
-                                            child: Image.asset('assets/kz.png'),
-                                          ),
+                                                  width: Dimensions.width20 * 1.25,
+                                                  height: Dimensions.height30 * 1.25,
+                                                  child: Image.asset('assets/ru.png'),
+                                                )
+                                              : SizedBox(
+                                                  width: Dimensions.width20 * 1.25,
+                                                  height: Dimensions.height30 * 1.25,
+                                                  child: Image.asset('assets/kz.png'),
+                                                ),
                                         ),
                                       ),
                                       GestureDetector(
@@ -128,116 +128,148 @@ class _AdminPageState extends State<AdminPage> {
                           ),
                         ),
                       ),
+                      ListTile(
+                        leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
+                        title: BigText(content: 'payslip'.tr),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const PayslipPage());
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.calendar_today, color: AppColors.mainColor),
+                        title: BigText(content: 'leave_sick_days'.tr),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const LeavePage());
+                        },
+                      ),
                     ],
                   ),
                 ),
-
-
                 Container(
                   height: Dimensions.height30 / 15,
                   width: Dimensions.width120 * 2,
                   color: Colors.black26,
                 ),
                 Container(
-                    padding: EdgeInsets.only(
-                        bottom: Dimensions.height30,
-                        top: Dimensions.height30 / 2),
-                    height: Dimensions.height60 * 1.5,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/youtube.png'),
-                          function: () async {
-                            await launchUrl(Uri.parse('https://www.youtube.com/@semeyengineering4367'), mode: LaunchMode.externalApplication);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/instagram.png'),
-                          function: () async {
-                            await launchUrl(Uri.parse('https://www.instagram.com/jscsemeyengineering/'), mode: LaunchMode.externalApplication);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/facebook.png'),
-                          function: () async {
-                            await launchUrl(Uri.parse('https://www.facebook.com/semeybtrz/'), mode: LaunchMode.externalApplication);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/web.png'),
-                          function: () async {
-                            await launchUrl(Uri.parse('https://se-btrz.com/'), mode: LaunchMode.externalApplication);
-                          },
-                        ),
-                      ],
-                    )),
+                  padding: EdgeInsets.only(
+                    bottom: Dimensions.height30,
+                    top: Dimensions.height30 / 2,
+                  ),
+                  height: Dimensions.height60 * 1.5,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/youtube.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.youtube.com/@semeyengineering4367'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/instagram.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.instagram.com/jscsemeyengineering/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/facebook.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.facebook.com/semeybtrz/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/web.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://se-btrz.com/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
       body: SingleChildScrollView(
-        child: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: Dimensions.width20,
+            vertical: Dimensions.height30,
+          ),
           child: Column(
             children: [
-              SizedBox(
-                height: Dimensions.height60 * 1.25,
+              _buildMenuCard(
+                icon: Icons.person,
+                label: "self report".tr,
+                subtitle: "attendance report".tr,
+                onTap: () => Get.to(() => MainPage1(fullName: widget.fullName, job: widget.job)),
               ),
-              Icon(Icons.person, size: Dimensions.height120,),
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.groups,
+                label: "employee report".tr,
+                subtitle: "attendance report".tr,
+                onTap: () => Get.to(() => MainPage2(fullName: widget.fullName, job: widget.job)),
+              ),
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.receipt_long,
+                label: "payslip".tr,
+                subtitle: '',
+                onTap: () => Get.to(() => const PayslipPage()),
+              ),
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.beach_access,
+                label: "leave_sick_days".tr,
+                subtitle: '',
+                onTap: () => Get.to(() => const LeavePage()),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuCard({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: Dimensions.width20,
+            vertical: Dimensions.height30 * 0.7,
+          ),
+          child: Row(
+            children: [
               Container(
-                padding: EdgeInsets.only(left: Dimensions.width20, right: Dimensions.width20),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  borderRadius:  BorderRadius.all(Radius.circular(Dimensions.radius50))
+                  color: AppColors.mainColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: ElevatedButton(
-                    onPressed: (){
-                      Get.to(() => MainPage1(fullName: widget.fullName, job: widget.job,));
-                    },
-                    child: Container(
-                        padding: EdgeInsets.only(top: Dimensions.height30 /2, bottom: Dimensions.height30 / 2),
-                        child: BigText(content: "self report".tr, fontWeight: FontWeight.bold, overflow: TextOverflow.visible,)
-                    )
+                child: Icon(icon, color: AppColors.mainColor, size: 32),
+              ),
+              SizedBox(width: Dimensions.width20),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
-              SizedBox(
-                height: Dimensions.height60,
-              ),
-              Icon(Icons.groups, size: Dimensions.height120,),
-              Container(
-                padding: EdgeInsets.only(left: Dimensions.width20, right: Dimensions.width20),
-                decoration: BoxDecoration(
-                    borderRadius:  BorderRadius.all(Radius.circular(Dimensions.radius50))
-                ),
-                child: ElevatedButton(
-                    onPressed: (){
-                      Get.to(() => MainPage2(fullName: widget.fullName, job: widget.job,));
-                    },
-                    child: Container(
-                        padding: EdgeInsets.only(top: Dimensions.height30 /2, bottom: Dimensions.height30 / 2),
-                        child: BigText(content: "employee report".tr, fontWeight: FontWeight.bold, overflow: TextOverflow.visible,)
-                    )
-                ),
-              ),
-              SizedBox(
-                height: Dimensions.height60,
-              ),
-              Icon(Icons.receipt_long, size: Dimensions.height120,),
-              Container(
-                padding: EdgeInsets.only(left: Dimensions.width20, right: Dimensions.width20),
-                decoration: BoxDecoration(
-                    borderRadius:  BorderRadius.all(Radius.circular(Dimensions.radius50))
-                ),
-                child: ElevatedButton(
-                    onPressed: (){
-                      Get.to(() => const PayslipPage());
-                    },
-                    child: Container(
-                        padding: EdgeInsets.only(top: Dimensions.height30 /2, bottom: Dimensions.height30 / 2),
-                        child: BigText(content: "payslip".tr, fontWeight: FontWeight.bold, overflow: TextOverflow.visible,)
-                    )
-                ),
-              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),
         ),
@@ -249,22 +281,16 @@ class _AdminPageState extends State<AdminPage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (_lang == "KZ") {
       prefs.setString(AppValues.LANG, "RU");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-      });
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
+      setState(() => _lang = prefs.getString(AppValues.LANG)!);
     } else if (_lang == "RU") {
       prefs.setString(AppValues.LANG, "KZ");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-      });
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
+      setState(() => _lang = prefs.getString(AppValues.LANG)!);
     }
   }
 
-  _exit() async{
+  _exit() async {
     await SecureStorageHelper.instance.clearCredentials();
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
