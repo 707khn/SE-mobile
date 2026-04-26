@@ -255,6 +255,7 @@ class _MainMenu1State extends State<MainMenu1> {
   late DateTime startDate;
   late DateTime endDate;
   bool _loadingReport = false;
+  bool _dateError = false;
 
   @override
   void initState() {
@@ -341,21 +342,33 @@ class _MainMenu1State extends State<MainMenu1> {
                         firstDate: DateTime(2000),
                         lastDate: DateTime(2100),
                       );
-                      if (selected != null) setState(() => startDate = selected);
+                      if (selected != null) {
+                        setState(() {
+                          startDate = selected;
+                          _dateError = false;
+                        });
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
+                        border: Border.all(
+                          color: _dateError ? Colors.red.shade700 : Colors.grey,
+                          width: _dateError ? 1.5 : 1.0,
+                        ),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                          Icon(Icons.calendar_today, size: 16,
+                              color: _dateError ? Colors.red.shade700 : Colors.grey),
                           const SizedBox(width: 6),
                           Text(
                             '${startDate.day.toString().padLeft(2, '0')}.${startDate.month.toString().padLeft(2, '0')}.${startDate.year}',
-                            style: const TextStyle(fontSize: 15.0),
+                            style: TextStyle(
+                              fontSize: 15.0,
+                              color: _dateError ? Colors.red.shade700 : null,
+                            ),
                           ),
                         ],
                       ),
@@ -376,21 +389,33 @@ class _MainMenu1State extends State<MainMenu1> {
                         firstDate: DateTime(2000),
                         lastDate: DateTime(2100),
                       );
-                      if (selected != null) setState(() => endDate = selected);
+                      if (selected != null) {
+                        setState(() {
+                          endDate = selected;
+                          _dateError = false;
+                        });
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
+                        border: Border.all(
+                          color: _dateError ? Colors.red.shade700 : Colors.grey,
+                          width: _dateError ? 1.5 : 1.0,
+                        ),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                          Icon(Icons.calendar_today, size: 16,
+                              color: _dateError ? Colors.red.shade700 : Colors.grey),
                           const SizedBox(width: 6),
                           Text(
                             '${endDate.day.toString().padLeft(2, '0')}.${endDate.month.toString().padLeft(2, '0')}.${endDate.year}',
-                            style: const TextStyle(fontSize: 15.0),
+                            style: TextStyle(
+                              fontSize: 15.0,
+                              color: _dateError ? Colors.red.shade700 : null,
+                            ),
                           ),
                         ],
                       ),
@@ -407,6 +432,7 @@ class _MainMenu1State extends State<MainMenu1> {
                     ? null
                     : () async {
                         if (startDate.isAfter(endDate)) {
+                          setState(() => _dateError = true);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('date_range_error'.tr),
@@ -416,7 +442,10 @@ class _MainMenu1State extends State<MainMenu1> {
                           );
                           return;
                         }
-                        setState(() => _loadingReport = true);
+                        setState(() {
+                          _loadingReport = true;
+                          _dateError = false;
+                        });
                         reportsEntries = await getReportDateEntries(
                           context,
                           DateFormat('dd.MM.yyyy').format(startDate),

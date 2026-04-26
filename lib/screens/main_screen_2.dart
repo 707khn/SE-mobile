@@ -48,6 +48,7 @@ class _MainPage2State extends State<MainPage2> {
   String searchText = '';
   List<String> allEmployees = [];
   List<String> filteredEmployees = [];
+  bool _dateError = false;
 
   @override
   void initState() {
@@ -70,8 +71,12 @@ class _MainPage2State extends State<MainPage2> {
     if (prefs.getString(AppValues.LANG) == null) {
       prefs.setString(AppValues.LANG, "KZ");
     }
+    final savedEmployees = prefs.getStringList("emp_snames");
     setState(() {
       _lang = prefs.getString(AppValues.LANG)!;
+      if (savedEmployees != null && savedEmployees.isNotEmpty) {
+        employees = savedEmployees;
+      }
     });
   }
 
@@ -305,21 +310,33 @@ class _MainPage2State extends State<MainPage2> {
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
-                        if (selected != null) setState(() => startDate = selected);
+                        if (selected != null) {
+                          setState(() {
+                            startDate = selected;
+                            _dateError = false;
+                          });
+                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
+                          border: Border.all(
+                            color: _dateError ? Colors.red.shade700 : Colors.grey,
+                            width: _dateError ? 1.5 : 1.0,
+                          ),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                            Icon(Icons.calendar_today, size: 16,
+                                color: _dateError ? Colors.red.shade700 : Colors.grey),
                             const SizedBox(width: 6),
                             Text(
                               '${startDate.day.toString().padLeft(2, '0')}.${startDate.month.toString().padLeft(2, '0')}.${startDate.year}',
-                              style: const TextStyle(fontSize: 15.0),
+                              style: TextStyle(
+                                fontSize: 15.0,
+                                color: _dateError ? Colors.red.shade700 : null,
+                              ),
                             ),
                           ],
                         ),
@@ -340,21 +357,33 @@ class _MainPage2State extends State<MainPage2> {
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
-                        if (selected != null) setState(() => endDate = selected);
+                        if (selected != null) {
+                          setState(() {
+                            endDate = selected;
+                            _dateError = false;
+                          });
+                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
+                          border: Border.all(
+                            color: _dateError ? Colors.red.shade700 : Colors.grey,
+                            width: _dateError ? 1.5 : 1.0,
+                          ),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                            Icon(Icons.calendar_today, size: 16,
+                                color: _dateError ? Colors.red.shade700 : Colors.grey),
                             const SizedBox(width: 6),
                             Text(
                               '${endDate.day.toString().padLeft(2, '0')}.${endDate.month.toString().padLeft(2, '0')}.${endDate.year}',
-                              style: const TextStyle(fontSize: 15.0),
+                              style: TextStyle(
+                                fontSize: 15.0,
+                                color: _dateError ? Colors.red.shade700 : null,
+                              ),
                             ),
                           ],
                         ),
@@ -429,6 +458,7 @@ class _MainPage2State extends State<MainPage2> {
                                         onTap: () async {
                                           if (startDate.isAfter(endDate)) {
                                             Navigator.pop(context);
+                                            setState(() => _dateError = true);
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
                                                 content: Text('date_range_error'.tr),
