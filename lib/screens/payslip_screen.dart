@@ -51,6 +51,26 @@ class _PayslipPageState extends State<PayslipPage> {
     });
   }
 
+  bool get _isCurrentOrFutureMonth {
+    final now = DateTime.now();
+    return _selectedDate.year > now.year ||
+        (_selectedDate.year == now.year && _selectedDate.month >= now.month);
+  }
+
+  void _goToPrevMonth() {
+    setState(() {
+      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1);
+    });
+    _fetchPayslip();
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1);
+    });
+    _fetchPayslip();
+  }
+
   Future<void> _pickMonth() async {
     int selectedYear = _selectedDate.year;
     int selectedMonth = _selectedDate.month;
@@ -186,15 +206,36 @@ class _PayslipPageState extends State<PayslipPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Card(
-                child: ListTile(
-                  leading: const Icon(Icons.calendar_month, color: AppColors.mainColor),
-                  title: Text(
-                    DateFormat('MMMM yyyy', 'ru').format(_selectedDate),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  trailing: ElevatedButton(
-                    onPressed: _loading ? null : _pickMonth,
-                    child: Text('choose period'.tr),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left, color: AppColors.mainColor),
+                        onPressed: _loading ? null : _goToPrevMonth,
+                        tooltip: 'last_month'.tr,
+                      ),
+                      const Icon(Icons.calendar_month, color: AppColors.mainColor, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          DateFormat('MMMM yyyy', 'ru').format(_selectedDate),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.chevron_right,
+                          color: _isCurrentOrFutureMonth ? Colors.grey.shade300 : AppColors.mainColor,
+                        ),
+                        onPressed: (_loading || _isCurrentOrFutureMonth) ? null : _goToNextMonth,
+                        tooltip: 'this_month'.tr,
+                      ),
+                      TextButton(
+                        onPressed: _loading ? null : _pickMonth,
+                        child: Text('choose period'.tr, style: const TextStyle(fontSize: 12)),
+                      ),
+                    ],
                   ),
                 ),
               ),
