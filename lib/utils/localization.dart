@@ -83,6 +83,8 @@ class LocaleString extends Translations {
           'info_hint': 'Есеп туралы ақпарат...',
           'undo': 'Болдырмау',
           'this_week': 'Осы апта',
+          'select_period_hint': 'Кезеңді таңдап, «Есепті көрсету» түймесін басыңыз',
+          'select_employee_hint': 'Есеп алу үшін қызметкерді таңдаңыз',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -164,6 +166,8 @@ class LocaleString extends Translations {
           'info_hint': 'Как работает отчёт...',
           'undo': 'Отмена',
           'this_week': 'Эта неделя',
+          'select_period_hint': 'Выберите период и нажмите «Показать отчёт»',
+          'select_employee_hint': 'Добавьте сотрудника для просмотра отчёта',
         }
       };
 }

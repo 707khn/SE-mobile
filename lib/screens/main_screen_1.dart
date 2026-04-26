@@ -586,6 +586,11 @@ class _MainMenu1State extends State<MainMenu1> {
                 child: SizedBox(
                   width: Dimensions.width120 * 4,
                   child: DataTable(
+                    headingTextStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.mainColor,
+                      fontSize: 13,
+                    ),
                     columns: [
                       DataColumn(label: Text('col_date'.tr)),
                       DataColumn(label: Text('col_time'.tr)),
@@ -651,11 +656,17 @@ class _MainMenu1State extends State<MainMenu1> {
               ),
             ] else if (!_loadingReport && !_hasData) ...[
               const SizedBox(height: 32),
-              Icon(Icons.inbox_outlined, size: 56, color: Colors.grey.shade400),
+              Icon(Icons.date_range_outlined, size: 56, color: Colors.grey.shade400),
               const SizedBox(height: 8),
               Text(
                 'no_data'.tr,
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'select_period_hint'.tr,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
               ),
             ],
             SizedBox(height: Dimensions.height30),

@@ -786,7 +786,12 @@ class _MainPage2State extends State<MainPage2> {
                   child: SizedBox(
                     width: Dimensions.width120 * 4,
                     child: DataTable(
-                      columns: [
+                      headingTextStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.mainColor,
+                      fontSize: 13,
+                    ),
+                    columns: [
                         DataColumn(label: Text('col_date'.tr)),
                         DataColumn(label: Text('col_time'.tr)),
                         DataColumn(label: Text('col_event'.tr)),
@@ -836,12 +841,20 @@ class _MainPage2State extends State<MainPage2> {
                 ),
               ] else ...[
                 const SizedBox(height: 24),
-                Icon(Icons.inbox_outlined, size: 56, color: Colors.grey.shade400),
+                Icon(Icons.person_search, size: 56, color: Colors.grey.shade400),
                 const SizedBox(height: 8),
                 Center(
                   child: Text(
                     'no_data'.tr,
                     style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Center(
+                  child: Text(
+                    'select_employee_hint'.tr,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
                   ),
                 ),
               ],
