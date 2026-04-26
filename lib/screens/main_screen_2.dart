@@ -89,7 +89,19 @@ class _MainPage2State extends State<MainPage2> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
+            if (_hasData)
+              Text(
+                '${startDate.day.toString().padLeft(2, '0')}.${startDate.month.toString().padLeft(2, '0')}.${startDate.year}'
+                ' — '
+                '${endDate.day.toString().padLeft(2, '0')}.${endDate.month.toString().padLeft(2, '0')}.${endDate.year}',
+                style: const TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+          ],
+        ),
         centerTitle: true,
         actions: [
           PopupMenuButton<String>(

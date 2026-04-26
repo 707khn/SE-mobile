@@ -260,26 +260,38 @@ class _PayslipPageState extends State<PayslipPage> {
                   AppColors.niceRed,
                 ),
                 SizedBox(height: Dimensions.height30 / 2),
-                Card(
-                  elevation: 3,
-                  child: Padding(
-                    padding: EdgeInsets.all(Dimensions.width20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'net pay'.tr,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        Text(
-                          '${_numberFormat.format(_payslip!.netPay)} ₸',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            color: AppColors.mainColor,
+                GestureDetector(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(
+                      text: '${_numberFormat.format(_payslip!.netPay)} ₸',
+                    ));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('copied'.tr),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  },
+                  child: Card(
+                    elevation: 3,
+                    child: Padding(
+                      padding: EdgeInsets.all(Dimensions.width20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'net pay'.tr,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
-                        ),
-                      ],
+                          Text(
+                            '${_numberFormat.format(_payslip!.netPay)} ₸',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: AppColors.mainColor,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
