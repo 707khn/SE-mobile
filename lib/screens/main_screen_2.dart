@@ -445,7 +445,44 @@ class _MainPage2State extends State<MainPage2> {
                 ),
               ),
               const SizedBox(height: 12.0),
-              BigText(content: "choose employee".tr, fontWeight: FontWeight.bold),
+              Row(
+                children: [
+                  BigText(content: "choose employee".tr, fontWeight: FontWeight.bold),
+                  if (employees.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.mainColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${employees.length}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.mainColor,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          employees.clear();
+                          reportsEntriesForMsg.clear();
+                          reportsEntries = [["", "", "", ""]];
+                        });
+                        prefs.setStringList("emp_snames", []);
+                        prefs.setString("emp_sname", "");
+                      },
+                      icon: const Icon(Icons.clear_all, size: 16),
+                      label: Text('clear_all'.tr, style: const TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+                    ),
+                  ],
+                ],
+              ),
               const SizedBox(height: 8.0),
               ElevatedButton.icon(
                 icon: const Icon(Icons.person_search),
