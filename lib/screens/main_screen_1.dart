@@ -188,14 +188,16 @@ class _MainPage1State extends State<MainPage1> {
                       ListTile(
                         leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
                         title: BigText(content: 'payslip'.tr),
+                        subtitle: Text('payslip_subtitle'.tr, style: const TextStyle(fontSize: 11)),
                         onTap: () {
                           Navigator.pop(context);
                           Get.to(() => const PayslipPage());
                         },
                       ),
                       ListTile(
-                        leading: const Icon(Icons.calendar_today, color: AppColors.mainColor),
+                        leading: const Icon(Icons.beach_access, color: AppColors.mainColor),
                         title: BigText(content: 'leave_sick_days'.tr),
+                        subtitle: Text('leave_subtitle'.tr, style: const TextStyle(fontSize: 11)),
                         onTap: () {
                           Navigator.pop(context);
                           Get.to(() => const LeavePage());
@@ -607,11 +609,34 @@ class _MainMenu1State extends State<MainMenu1> {
                           'scroll to right'.tr,
                           style: const TextStyle(fontSize: 12.0, color: Colors.grey),
                         ),
-                        Text(
-                          _filterText.isEmpty
-                              ? '${reportsEntries.length} ${'records_count'.tr}'
-                              : '${filtered.length}/${reportsEntries.length} ${'records_count'.tr}',
-                          style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _filterText.isEmpty
+                                  ? '${reportsEntries.length} ${'records_count'.tr}'
+                                  : '${filtered.length}/${reportsEntries.length} ${'records_count'.tr}',
+                              style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(4),
+                              onTap: () {
+                                final lines = filtered.map((e) =>
+                                    '${_formatDate(e[0])}\t${e[1]}\t${e[2]}\t${e[3]}').join('\n');
+                                Clipboard.setData(ClipboardData(text: lines));
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text('copied'.tr),
+                                  duration: const Duration(seconds: 1),
+                                  behavior: SnackBarBehavior.floating,
+                                ));
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.all(2),
+                                child: Icon(Icons.copy_outlined, size: 14, color: Colors.grey),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
