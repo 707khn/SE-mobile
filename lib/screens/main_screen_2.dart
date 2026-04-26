@@ -548,7 +548,7 @@ class _MainPage2State extends State<MainPage2> {
                               future: _getEmployeesCached(),
                               builder: (BuildContext context, snapshot) {
                                 if (snapshot.hasData) {
-                                  allEmployees = snapshot.data!;
+                                  allEmployees = [...snapshot.data!]..sort((a, b) => a.compareTo(b));
                                   final displayed = searchText.isEmpty
                                       ? allEmployees
                                       : filteredEmployees;

@@ -178,7 +178,29 @@ class _LeavePageState extends State<LeavePage> {
                 else
                   ..._leaveData!.balances.map((b) => _buildBalanceCard(b)),
                 SizedBox(height: Dimensions.height30 / 2),
-                BigText(content: 'leave_history'.tr, fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    BigText(content: 'leave_history'.tr, fontWeight: FontWeight.bold),
+                    if (_leaveData!.history.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.mainColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${_leaveData!.history.length}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.mainColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 SizedBox(height: Dimensions.height30 / 4),
                 if (_leaveData!.history.isEmpty)
                   Card(

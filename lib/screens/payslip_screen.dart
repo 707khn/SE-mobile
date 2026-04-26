@@ -473,7 +473,18 @@ class _PayslipPageState extends State<PayslipPage> {
             else
               ...items.map((item) {
                 final pct = total > 0 ? (item.amount / total * 100) : 0.0;
-                return Padding(
+                return GestureDetector(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(
+                      text: '${item.name}: ${_numberFormat.format(item.amount)} ₸',
+                    ));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('copied'.tr),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  },
+                  child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -512,6 +523,7 @@ class _PayslipPageState extends State<PayslipPage> {
                         ],
                       ),
                     ],
+                  ),
                   ),
                 );
               }),
