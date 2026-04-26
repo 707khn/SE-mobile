@@ -477,9 +477,18 @@ class _MainPage2State extends State<MainPage2> {
                   child: CircularProgressIndicator(),
                 ))
               else if (_hasData) ...[
-                Text(
-                  'scroll to right'.tr,
-                  style: const TextStyle(fontSize: 12.0, color: Colors.grey),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'scroll to right'.tr,
+                      style: const TextStyle(fontSize: 12.0, color: Colors.grey),
+                    ),
+                    Text(
+                      '${reportsEntries.length} ${'records_count'.tr}',
+                      style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 SingleChildScrollView(
@@ -495,7 +504,7 @@ class _MainPage2State extends State<MainPage2> {
                       ],
                       rows: reportsEntries.map((entry) {
                         return DataRow(cells: [
-                          DataCell(Text(entry[0])),
+                          DataCell(Text(_formatDate(entry[0]))),
                           DataCell(Text(entry[1])),
                           DataCell(Text(entry[2])),
                           DataCell(Text(entry[3])),
@@ -537,4 +546,13 @@ class _MainPage2State extends State<MainPage2> {
   }
 
   _exit() => confirmAndLogout(context);
+
+  String _formatDate(String raw) {
+    try {
+      final d = DateTime.parse(raw);
+      return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+    } catch (_) {
+      return raw;
+    }
+  }
 }

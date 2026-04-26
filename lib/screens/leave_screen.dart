@@ -207,7 +207,7 @@ class _LeavePageState extends State<LeavePage> {
         leading: Icon(icon, color: iconColor, size: 28),
         title: Text(record.type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         subtitle: Text(
-          '${record.startDate} — ${record.endDate}  (${record.days} ${'days_short'.tr})',
+          '${_fmtDate(record.startDate)} — ${_fmtDate(record.endDate)}  (${record.days} ${'days_short'.tr})',
           style: const TextStyle(fontSize: 13),
         ),
         trailing: Container(
@@ -223,5 +223,14 @@ class _LeavePageState extends State<LeavePage> {
         ),
       ),
     );
+  }
+
+  String _fmtDate(String raw) {
+    try {
+      final d = DateTime.parse(raw);
+      return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+    } catch (_) {
+      return raw;
+    }
   }
 }

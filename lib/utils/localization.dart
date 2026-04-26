@@ -55,6 +55,7 @@ class LocaleString extends Translations {
           'url_error': 'Сілтемені ашу мүмкін болмады',
           'log_out_title': 'Шығу',
           'log_out_confirm': 'Шынымен шығасыз ба?',
+          'records_count': 'жазба',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -108,6 +109,7 @@ class LocaleString extends Translations {
           'url_error': 'Не удалось открыть ссылку',
           'log_out_title': 'Выйти',
           'log_out_confirm': 'Вы уверены, что хотите выйти?',
+          'records_count': 'записей',
         }
       };
 }
