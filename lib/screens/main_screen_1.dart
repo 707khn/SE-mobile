@@ -38,6 +38,7 @@ class _MainPage1State extends State<MainPage1> {
   static String _lang = "";
   late SharedPreferences prefs;
   final _recordCount = ValueNotifier<int>(0);
+  final _dateRange = ValueNotifier<String>('');
 
   @override
   void initState() {
@@ -48,6 +49,7 @@ class _MainPage1State extends State<MainPage1> {
   @override
   void dispose() {
     _recordCount.dispose();
+    _dateRange.dispose();
     super.dispose();
   }
 
@@ -67,15 +69,15 @@ class _MainPage1State extends State<MainPage1> {
       backgroundColor: AppColors.niceWhite,
       appBar: AppBar(
         centerTitle: true,
-        title: ValueListenableBuilder<int>(
-          valueListenable: _recordCount,
-          builder: (_, count, __) => Column(
+        title: ValueListenableBuilder<String>(
+          valueListenable: _dateRange,
+          builder: (_, dateStr, __) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
-              if (count > 0)
+              if (dateStr.isNotEmpty)
                 Text(
-                  '$count ${'records_count'.tr}',
+                  dateStr,
                   style: const TextStyle(fontSize: 11, color: Colors.white70),
                 ),
             ],
@@ -256,7 +258,7 @@ class _MainPage1State extends State<MainPage1> {
           ),
         ),
       ),
-      body: MainMenu1(recordCount: _recordCount),
+      body: MainMenu1(recordCount: _recordCount, dateRange: _dateRange),
     );
   }
 
@@ -278,9 +280,10 @@ class _MainPage1State extends State<MainPage1> {
 }
 
 class MainMenu1 extends StatefulWidget {
-  const MainMenu1({Key? key, required this.recordCount}) : super(key: key);
+  const MainMenu1({Key? key, required this.recordCount, required this.dateRange}) : super(key: key);
 
   final ValueNotifier<int> recordCount;
+  final ValueNotifier<String> dateRange;
 
   @override
   State<MainMenu1> createState() => _MainMenu1State();
@@ -311,7 +314,11 @@ class _MainMenu1State extends State<MainMenu1> {
         _loadingReport = false;
         _initError = reportsEntries.length == 1 && reportsEntries[0][0] == 'no';
       });
-      if (_hasData) widget.recordCount.value = reportsEntries.length;
+      if (_hasData) {
+        widget.recordCount.value = reportsEntries.length;
+        final today = DateFormat('dd.MM.yyyy').format(DateTime.now());
+        widget.dateRange.value = today;
+      }
     }
   }
 
@@ -557,6 +564,8 @@ class _MainMenu1State extends State<MainMenu1> {
                         setState(() => _loadingReport = false);
                         if (_hasData) {
                           widget.recordCount.value = reportsEntries.length;
+                          final fmt = DateFormat('dd.MM.yyyy');
+                          widget.dateRange.value = '${fmt.format(startDate)} — ${fmt.format(endDate)}';
                           HapticFeedback.lightImpact();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -567,6 +576,7 @@ class _MainMenu1State extends State<MainMenu1> {
                           );
                         } else {
                           widget.recordCount.value = 0;
+                          widget.dateRange.value = '';
                         }
                       },
                 style: ElevatedButton.styleFrom(
