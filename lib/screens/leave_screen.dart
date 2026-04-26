@@ -280,10 +280,21 @@ class _LeavePageState extends State<LeavePage> {
   }
 
   Widget _buildHistoryCard(LeaveRecord record) {
-    final isSick = record.type.toLowerCase().contains('больн') ||
-        record.type.toLowerCase().contains('ауру') ||
-        record.type.toLowerCase().contains('sick');
-    final icon = isSick ? Icons.local_hospital : Icons.beach_access;
+    final lower = record.type.toLowerCase();
+    final isSick = lower.contains('больн') || lower.contains('ауру') || lower.contains('sick');
+    final isMaternity = lower.contains('декрет') || lower.contains('бала');
+    final isStudy = lower.contains('учеб') || lower.contains('оқу');
+    final isUnpaid = lower.contains('содерж') || lower.contains('жалақы') || lower.contains('ақы');
+
+    final icon = isSick
+        ? Icons.local_hospital
+        : isMaternity
+            ? Icons.family_restroom
+            : isStudy
+                ? Icons.school_outlined
+                : isUnpaid
+                    ? Icons.work_off_outlined
+                    : Icons.beach_access;
     final iconColor = isSick ? AppColors.niceRed : AppColors.mainColor;
 
     final isApproved = record.status.toLowerCase().contains('утвержд') ||
