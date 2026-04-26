@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:filesystem_picker/filesystem_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -61,36 +58,22 @@ class _MainPage1State extends State<MainPage1> {
       backgroundColor: AppColors.niceWhite,
       appBar: AppBar(
         centerTitle: true,
-        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold,),
+        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
         actions: [
-          PopupMenuButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.share),
-            tooltip: 'Отправить отчёт',
-            itemBuilder: (BuildContext context) {
-              return {"send report exc".tr, "send report csv".tr}.map((String choice) {
-                return PopupMenuItem<String>(
-                  value: choice,
-                  child: Text(choice),
-                );
-              }).toList();
-            },
-            onSelected: (String value) {
-              switch (value) {
-                case "Отправить отчёт Excel":
-                  generateExcel(reportsEntries, context);
-                  break;
-                case "Есепті Excel бағдарламасына жүктеңіз":
-                  generateExcel(reportsEntries, context);
-                  break;
-                case "Отправить отчёт csv":
-                  generateTable(reportsEntries, context);
-                  break;
-                case "CSV форматындағы ақырғы файлды көру":
-                  generateTable(reportsEntries, context);
-                  break;
+            tooltip: 'send_report_tooltip'.tr,
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'send report exc', child: Text('send report exc'.tr)),
+              PopupMenuItem(value: 'send report csv', child: Text('send report csv'.tr)),
+            ],
+            onSelected: (value) {
+              if (value == 'send report exc') {
+                generateExcel(reportsEntries, context);
+              } else if (value == 'send report csv') {
+                generateTable(reportsEntries, context);
               }
             },
-
           ),
         ],
       ),
@@ -114,28 +97,27 @@ class _MainPage1State extends State<MainPage1> {
                             color: Theme.of(context).colorScheme.secondary,
                           ),
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end, // Align to the bottom
-                            crossAxisAlignment: CrossAxisAlignment.start, // Align to the left
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Wrap(
                                 children: [
                                   Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        BigText(
-                                          content: widget.fullName,
-                                          color: AppColors.niceWhite,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        MediumText(
-                                          content: widget.job,
-                                          color: AppColors.niceWhite,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      BigText(
+                                        content: widget.fullName,
+                                        color: AppColors.niceWhite,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      MediumText(
+                                        content: widget.job,
+                                        color: AppColors.niceWhite,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
                                   Row(
                                     children: [
                                       Padding(
@@ -144,15 +126,15 @@ class _MainPage1State extends State<MainPage1> {
                                           onTap: _changeLanguage,
                                           child: _lang == "KZ"
                                               ? SizedBox(
-                                            width: Dimensions.width20 * 1.25,
-                                            height: Dimensions.height30 * 1.25,
-                                            child: Image.asset('assets/ru.png'),
-                                          )
+                                                  width: Dimensions.width20 * 1.25,
+                                                  height: Dimensions.height30 * 1.25,
+                                                  child: Image.asset('assets/ru.png'),
+                                                )
                                               : SizedBox(
-                                            width: Dimensions.width20 * 1.25,
-                                            height: Dimensions.height30 * 1.25,
-                                            child: Image.asset('assets/kz.png'),
-                                          ),
+                                                  width: Dimensions.width20 * 1.25,
+                                                  height: Dimensions.height30 * 1.25,
+                                                  child: Image.asset('assets/kz.png'),
+                                                ),
                                         ),
                                       ),
                                       GestureDetector(
@@ -190,50 +172,47 @@ class _MainPage1State extends State<MainPage1> {
                     ],
                   ),
                 ),
-
-
                 Container(
                   height: Dimensions.height30 / 15,
                   width: Dimensions.width120 * 2,
                   color: Colors.black26,
                 ),
                 Container(
-                    padding: EdgeInsets.only(
-                        bottom: Dimensions.height30,
-                        top: Dimensions.height30 / 2),
-                    height: Dimensions.height60 * 1.5,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/youtube.png'),
-                          function: () async {
-                            const url = 'https://www.youtube.com/@semeyengineering4367';
-                            await launch(url);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/instagram.png'),
-                          function: () async {
-                            const url = 'https://www.instagram.com/jscsemeyengineering/';
-                            await launch(url);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/facebook.png'),
-                          function: () async {
-                            const url = 'https://www.facebook.com/semeybtrz/';
-                            await launch(url);
-                          },),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/web.png'),
-                          function: () async {
-                            const url = 'https://se-btrz.com/';
-                            await launch(url);
-                          },
-                        ),
-                      ],
-                    )),
+                  padding: EdgeInsets.only(
+                    bottom: Dimensions.height30,
+                    top: Dimensions.height30 / 2,
+                  ),
+                  height: Dimensions.height60 * 1.5,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/youtube.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.youtube.com/@semeyengineering4367'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/instagram.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.instagram.com/jscsemeyengineering/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/facebook.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.facebook.com/semeybtrz/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/web.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://se-btrz.com/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -242,26 +221,25 @@ class _MainPage1State extends State<MainPage1> {
       body: const MainMenu1(),
     );
   }
+
   _changeLanguage() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (_lang == "KZ") {
       prefs.setString(AppValues.LANG, "RU");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
       setState(() {
         _lang = prefs.getString(AppValues.LANG)!;
       });
     } else if (_lang == "RU") {
       prefs.setString(AppValues.LANG, "KZ");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
       setState(() {
         _lang = prefs.getString(AppValues.LANG)!;
       });
     }
   }
 
-  _exit() async{
+  _exit() async {
     await SecureStorageHelper.instance.clearCredentials();
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
@@ -273,140 +251,152 @@ class _MainPage1State extends State<MainPage1> {
 class MainMenu1 extends StatefulWidget {
   const MainMenu1({Key? key}) : super(key: key);
 
-
-
   @override
   State<MainMenu1> createState() => _MainMenu1State();
 }
 
 class _MainMenu1State extends State<MainMenu1> {
-  late String employeeId;
-  late String employeeName;
   late DateTime startDate;
   late DateTime endDate;
-  bool isStartDateInitialized = false;
-  bool isEndDateInitialized = false;
-
+  bool _loadingReport = false;
 
   @override
   void initState() {
     super.initState();
-    initializeData();
-  }
-
-  Future<void> initializeData() async {
-    employeeName = '';
     startDate = DateTime.now();
     endDate = DateTime.now();
-    isStartDateInitialized = true;
-    isEndDateInitialized = true;
-    reportsEntries = await getReportEntries(context);
-
-    setState(() {
-      // Update the state variables after initializing the reportsEntries
-    });
+    _initData();
   }
 
-  List<bool> openableData = List.filled(200, false, growable: false);
-  int opened = 0;
+  Future<void> _initData() async {
+    setState(() => _loadingReport = true);
+    reportsEntries = await getReportEntries(context);
+    if (mounted) setState(() => _loadingReport = false);
+  }
+
+  bool get _hasData =>
+      reportsEntries.isNotEmpty &&
+      !(reportsEntries.length == 1 && reportsEntries[0][0].isEmpty);
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: Container(
-        padding: EdgeInsets.only(top: Dimensions.height30 / 2, left: Dimensions.width20, right: Dimensions.width20),
+        padding: EdgeInsets.only(
+          top: Dimensions.height30 / 2,
+          left: Dimensions.width20,
+          right: Dimensions.width20,
+        ),
         child: Column(
           children: [
             const SizedBox(height: 4.0),
-            TextButton(
-              onPressed: () async {
-                final directory = await getExternalStorageDirectories();
-                if (directory == null || directory.isEmpty) return;
-                try {
-                  OpenFile.open("${directory[0].path}/saved_report.xlsx");
-                } catch (e) {
-                  print(e);
-                }
-              },
-              child: SmallText(content: "see last Excel".tr,),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton.icon(
+                  onPressed: () async {
+                    final directory = await getExternalStorageDirectories();
+                    if (directory == null || directory.isEmpty) return;
+                    try {
+                      OpenFile.open("${directory[0].path}/saved_report.xlsx");
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('url_error'.tr)),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.table_chart_outlined, size: 16),
+                  label: SmallText(content: "see last Excel".tr),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () async {
+                    final directory = await getExternalStorageDirectories();
+                    if (directory == null || directory.isEmpty) return;
+                    try {
+                      OpenFile.open("${directory[0].path}/saved_report.csv");
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('url_error'.tr)),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.description_outlined, size: 16),
+                  label: SmallText(content: "see last CSV".tr),
+                ),
+              ],
             ),
             const SizedBox(height: 4.0),
-            TextButton(
-              onPressed: () async {
-                final directory = await getExternalStorageDirectories();
-                if (directory == null || directory.isEmpty) return;
-                try {
-                  OpenFile.open("${directory[0].path}/saved_report.csv");
-                } catch (e) {
-                  print(e);
-                }
-              },
-              child: SmallText(content: "see last CSV".tr,),
-            ),
-            const SizedBox(height: 4.0),
-            BigText(content: "choose period".tr, fontWeight: FontWeight.bold,),
+            BigText(content: "choose period".tr, fontWeight: FontWeight.bold),
             const SizedBox(height: 8.0),
             Row(
               children: [
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      final selectedDate = await showDatePicker(
+                      final selected = await showDatePicker(
                         context: context,
-                        initialDate: isStartDateInitialized ? startDate : DateTime.now(),
+                        initialDate: startDate,
                         locale: const Locale('ru'),
                         firstDate: DateTime(2000),
                         lastDate: DateTime(2100),
                       );
-                      if (selectedDate != null) {
-                        setState(() {
-                          startDate = selectedDate;
-                          isStartDateInitialized = true;
-                        });
-                      }
+                      if (selected != null) setState(() => startDate = selected);
                     },
                     child: Container(
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
-                        isStartDateInitialized
-                            ? '${startDate.day}.${startDate.month}.${startDate.year}'
-                            : 'Начальная дата',
-                        style: const TextStyle(fontSize: 16.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${startDate.day.toString().padLeft(2, '0')}.${startDate.month.toString().padLeft(2, '0')}.${startDate.year}',
+                            style: const TextStyle(fontSize: 15.0),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8.0),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('—', style: TextStyle(color: Colors.grey.shade600)),
+                ),
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      final selectedDate = await showDatePicker(
+                      final selected = await showDatePicker(
                         context: context,
-                        initialDate: isEndDateInitialized ? endDate : DateTime.now(),
+                        initialDate: endDate,
                         locale: const Locale('ru'),
                         firstDate: DateTime(2000),
                         lastDate: DateTime(2100),
                       );
-                      if (selectedDate != null) {
-                        setState(() {
-                          endDate = selectedDate;
-                          isEndDateInitialized = true;
-                        });
-                      }
+                      if (selected != null) setState(() => endDate = selected);
                     },
                     child: Container(
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
-                        isEndDateInitialized
-                            ? '${endDate.day}.${endDate.month}.${endDate.year}'
-                            : 'Конечная дата',
-                        style: const TextStyle(fontSize: 16.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${endDate.day.toString().padLeft(2, '0')}.${endDate.month.toString().padLeft(2, '0')}.${endDate.year}',
+                            style: const TextStyle(fontSize: 15.0),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -414,88 +404,74 @@ class _MainMenu1State extends State<MainMenu1> {
               ],
             ),
             SizedBox(height: Dimensions.height30 / 5),
-            TextButton(
-                onPressed: () async{
-
-                  reportsEntries = await getReportDateEntries(context, DateFormat('dd.MM.yyyy').format(startDate), // Format startDate as "dd.MM.yyyy"
-                    DateFormat('dd.MM.yyyy').format(endDate),);
-                  setState(() {
-
-                  });
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  elevation: 3,
-                  minimumSize: Size(Dimensions.width120, Dimensions.height30),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _loadingReport
+                    ? null
+                    : () async {
+                        setState(() => _loadingReport = true);
+                        reportsEntries = await getReportDateEntries(
+                          context,
+                          DateFormat('dd.MM.yyyy').format(startDate),
+                          DateFormat('dd.MM.yyyy').format(endDate),
+                        );
+                        if (mounted) setState(() => _loadingReport = false);
+                      },
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: Dimensions.height30 / 2),
                 ),
-                child: MediumText(content: "show report".tr, fontWeight: FontWeight.bold,maxLines: 1)
+                child: _loadingReport
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : MediumText(content: "show report".tr, fontWeight: FontWeight.bold, maxLines: 1),
+              ),
             ),
-            SizedBox(height: Dimensions.height30 / 3,),
-            Text(
-              'scroll to right'.tr,
-              style: const TextStyle(fontSize: 12.0, color: Colors.grey),
-            ),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: Dimensions.width120 * 4, // Adjust the width as needed// Adjust the height as needed
-                child: DataTable(
-                  columns: const [
-                    DataColumn(label: Text('Дата')),
-                    DataColumn(label: Text('Время')),
-                    DataColumn(label: Text('Событие')),
-                    DataColumn(label: Text('Дверь')),
-                  ],
-                  rows: reportsEntries.map((entry) {
-                    return DataRow(cells: [
-                      DataCell(Text(entry[0])), // Вывод даты
-                      DataCell(Text(entry[1])), // Вывод времени
-                      DataCell(Text(entry[2])),
-                      DataCell(Text(entry[3])),
-                    ]);
-                  }).toList(),
+            SizedBox(height: Dimensions.height30 / 3),
+            if (!_loadingReport && _hasData) ...[
+              Text(
+                'scroll to right'.tr,
+                style: const TextStyle(fontSize: 12.0, color: Colors.grey),
+              ),
+              const SizedBox(height: 4),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: Dimensions.width120 * 4,
+                  child: DataTable(
+                    columns: [
+                      DataColumn(label: Text('col_date'.tr)),
+                      DataColumn(label: Text('col_time'.tr)),
+                      DataColumn(label: Text('col_event'.tr)),
+                      DataColumn(label: Text('col_door'.tr)),
+                    ],
+                    rows: reportsEntries.map((entry) {
+                      return DataRow(cells: [
+                        DataCell(Text(entry[0])),
+                        DataCell(Text(entry[1])),
+                        DataCell(Text(entry[2])),
+                        DataCell(Text(entry[3])),
+                      ]);
+                    }).toList(),
+                  ),
                 ),
               ),
-
-            ),
-            SizedBox(
-              height: Dimensions.height30,
-            ),
-            /*TextButton(
-              onPressed: (){
-                generateExcel(reportsEntries);
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                elevation: 5,
-                minimumSize: Size(Dimensions.screenWidth, Dimensions.height30 * 1.5),
+            ] else if (!_loadingReport && !_hasData) ...[
+              const SizedBox(height: 32),
+              Icon(Icons.inbox_outlined, size: 56, color: Colors.grey.shade400),
+              const SizedBox(height: 8),
+              Text(
+                'no_data'.tr,
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
               ),
-              child: BigText(content: "send report exc".tr, fontWeight: FontWeight.bold,),
-            ),
-            SizedBox(
-              height: Dimensions.height30 / 2,
-            ),
-            TextButton(
-              onPressed: (){
-                generateTable(reportsEntries);
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                elevation: 5,
-                minimumSize: Size(Dimensions.screenWidth, Dimensions.height30 * 1.5),
-              ),
-              child: BigText(content: "send report csv".tr, fontWeight: FontWeight.bold,),
-            ),
-            SizedBox(
-              height: Dimensions.height30,
-            ),*/
+            ],
+            SizedBox(height: Dimensions.height30),
           ],
         ),
       ),
     );
   }
-
 }

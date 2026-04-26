@@ -50,84 +50,100 @@ class _LeavePageState extends State<LeavePage> {
       appBar: AppBar(
         title: BigText(content: 'leave_sick_days'.tr, fontWeight: FontWeight.bold),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'refresh'.tr,
+            onPressed: _loading ? null : _fetchLeaves,
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(Dimensions.width20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_loading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-            if (_error != null)
-              Center(
-                child: Padding(
-                  padding: EdgeInsets.all(Dimensions.height30),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.info_outline, size: 48, color: Colors.grey),
-                      SizedBox(height: Dimensions.height30 / 2),
-                      Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    ],
+      body: RefreshIndicator(
+        onRefresh: _fetchLeaves,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(Dimensions.width20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(),
                   ),
                 ),
-              ),
-            if (_leaveData != null) ...[
-              Card(
-                color: AppColors.mainColor,
-                child: Padding(
-                  padding: EdgeInsets.all(Dimensions.width20),
-                  child: Text(
-                    _leaveData!.employee,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+              if (_error != null)
+                Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(Dimensions.height30),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.wifi_off, size: 56, color: Colors.grey),
+                        SizedBox(height: Dimensions.height30 / 2),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
+                        SizedBox(height: Dimensions.height30 / 2),
+                        ElevatedButton.icon(
+                          onPressed: _fetchLeaves,
+                          icon: const Icon(Icons.refresh),
+                          label: Text('refresh'.tr),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              BigText(content: 'leave_balances'.tr, fontWeight: FontWeight.bold),
-              SizedBox(height: Dimensions.height30 / 4),
-              ..._leaveData!.balances.map((b) => _buildBalanceCard(b)),
-              SizedBox(height: Dimensions.height30 / 2),
-              BigText(content: 'leave_history'.tr, fontWeight: FontWeight.bold),
-              SizedBox(height: Dimensions.height30 / 4),
-              if (_leaveData!.history.isEmpty)
+              if (_leaveData != null) ...[
                 Card(
+                  color: AppColors.mainColor,
                   child: Padding(
                     padding: EdgeInsets.all(Dimensions.width20),
-                    child: Center(
-                      child: Text(
-                        'no_records'.tr,
-                        style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    child: Text(
+                      _leaveData!.employee,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                )
-              else
-                ..._leaveData!.history.map((r) => _buildHistoryCard(r)),
-              SizedBox(height: Dimensions.height30),
+                ),
+                SizedBox(height: Dimensions.height30 / 2),
+                BigText(content: 'leave_balances'.tr, fontWeight: FontWeight.bold),
+                SizedBox(height: Dimensions.height30 / 4),
+                ..._leaveData!.balances.map((b) => _buildBalanceCard(b)),
+                SizedBox(height: Dimensions.height30 / 2),
+                BigText(content: 'leave_history'.tr, fontWeight: FontWeight.bold),
+                SizedBox(height: Dimensions.height30 / 4),
+                if (_leaveData!.history.isEmpty)
+                  Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(Dimensions.width20),
+                      child: Center(
+                        child: Text(
+                          'no_records'.tr,
+                          style: const TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ..._leaveData!.history.map((r) => _buildHistoryCard(r)),
+                SizedBox(height: Dimensions.height30),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildBalanceCard(LeaveBalance balance) {
-    final progress = balance.totalDays > 0
-        ? balance.usedDays / balance.totalDays
-        : 0.0;
+    final progress = balance.totalDays > 0 ? balance.usedDays / balance.totalDays : 0.0;
+    final color = balance.remainingDays > 0 ? AppColors.mainColor : AppColors.niceRed;
 
     return Card(
       child: Padding(
@@ -146,9 +162,7 @@ class _LeavePageState extends State<LeavePage> {
                 value: progress,
                 minHeight: 8,
                 backgroundColor: Colors.grey.shade200,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  balance.remainingDays > 0 ? AppColors.mainColor : AppColors.niceRed,
-                ),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
             SizedBox(height: Dimensions.height30 / 3),
@@ -157,12 +171,10 @@ class _LeavePageState extends State<LeavePage> {
               children: [
                 Text('${'used_days'.tr}: ${balance.usedDays}',
                     style: const TextStyle(fontSize: 13, color: Colors.black54)),
-                Text('${'remaining_days'.tr}: ${balance.remainingDays}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: balance.remainingDays > 0 ? AppColors.mainColor : AppColors.niceRed,
-                    )),
+                Text(
+                  '${'remaining_days'.tr}: ${balance.remainingDays}',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color),
+                ),
               ],
             ),
             SizedBox(height: Dimensions.height30 / 6),
@@ -175,19 +187,24 @@ class _LeavePageState extends State<LeavePage> {
   }
 
   Widget _buildHistoryCard(LeaveRecord record) {
-    IconData icon;
-    Color color;
-    if (record.type.contains('Больничный') || record.type.contains('Ауру')) {
-      icon = Icons.local_hospital;
-      color = AppColors.niceRed;
-    } else {
-      icon = Icons.beach_access;
-      color = AppColors.mainColor;
-    }
+    final isSick = record.type.toLowerCase().contains('больн') ||
+        record.type.toLowerCase().contains('ауру') ||
+        record.type.toLowerCase().contains('sick');
+    final icon = isSick ? Icons.local_hospital : Icons.beach_access;
+    final iconColor = isSick ? AppColors.niceRed : AppColors.mainColor;
+
+    final isApproved = record.status.toLowerCase().contains('утвержд') ||
+        record.status.toLowerCase().contains('бекіт') ||
+        record.status.toLowerCase().contains('закр') ||
+        record.status.toLowerCase().contains('жабы');
+    final statusColor = isApproved ? AppColors.mainColor : Colors.orange.shade800;
+    final statusBg = isApproved
+        ? AppColors.mainColor.withOpacity(0.12)
+        : Colors.orange.withOpacity(0.12);
 
     return Card(
       child: ListTile(
-        leading: Icon(icon, color: color, size: 28),
+        leading: Icon(icon, color: iconColor, size: 28),
         title: Text(record.type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         subtitle: Text(
           '${record.startDate} — ${record.endDate}  (${record.days} ${'days_short'.tr})',
@@ -196,20 +213,12 @@ class _LeavePageState extends State<LeavePage> {
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: record.status == 'Утверждён' || record.status == 'Закрыт'
-                ? AppColors.mainColor.withOpacity(0.15)
-                : Colors.orange.withOpacity(0.15),
+            color: statusBg,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             record.status,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: record.status == 'Утверждён' || record.status == 'Закрыт'
-                  ? AppColors.mainColor
-                  : Colors.orange.shade800,
-            ),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
           ),
         ),
       ),

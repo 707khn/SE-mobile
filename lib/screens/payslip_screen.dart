@@ -147,116 +147,133 @@ class _PayslipPageState extends State<PayslipPage> {
       appBar: AppBar(
         title: BigText(content: 'payslip'.tr, fontWeight: FontWeight.bold),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'refresh'.tr,
+            onPressed: _loading ? null : _fetchPayslip,
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(Dimensions.width20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.calendar_month, color: AppColors.mainColor),
-                title: Text(
-                  DateFormat('MMMM yyyy', 'ru').format(_selectedDate),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                trailing: ElevatedButton(
-                  onPressed: _pickMonth,
-                  child: Text('choose period'.tr),
-                ),
-              ),
-            ),
-            SizedBox(height: Dimensions.height30 / 2),
-            if (_loading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-            if (_error != null)
-              Center(
-                child: Padding(
-                  padding: EdgeInsets.all(Dimensions.height30),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.info_outline, size: 48, color: Colors.grey),
-                      SizedBox(height: Dimensions.height30 / 2),
-                      Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (_payslip != null) ...[
+      body: RefreshIndicator(
+        onRefresh: _fetchPayslip,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(Dimensions.width20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Card(
-                color: AppColors.mainColor,
-                child: Padding(
-                  padding: EdgeInsets.all(Dimensions.width20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _payslip!.employee,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: Dimensions.height30 / 4),
-                      Text(
-                        _payslip!.period,
-                        style: const TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                    ],
+                child: ListTile(
+                  leading: const Icon(Icons.calendar_month, color: AppColors.mainColor),
+                  title: Text(
+                    DateFormat('MMMM yyyy', 'ru').format(_selectedDate),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  trailing: ElevatedButton(
+                    onPressed: _loading ? null : _pickMonth,
+                    child: Text('choose period'.tr),
                   ),
                 ),
               ),
               SizedBox(height: Dimensions.height30 / 2),
-              _buildSection(
-                'accruals'.tr,
-                _payslip!.accruals,
-                _payslip!.totalAccruals,
-                Colors.green.shade700,
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              _buildSection(
-                'deductions'.tr,
-                _payslip!.deductions,
-                _payslip!.totalDeductions,
-                AppColors.niceRed,
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              Card(
-                elevation: 3,
-                child: Padding(
-                  padding: EdgeInsets.all(Dimensions.width20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'net pay'.tr,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      Text(
-                        '${_numberFormat.format(_payslip!.netPay)} ₸',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: AppColors.mainColor,
-                        ),
-                      ),
-                    ],
+              if (_loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(),
                   ),
                 ),
-              ),
-              SizedBox(height: Dimensions.height30),
+              if (_error != null)
+                Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(Dimensions.height30),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.receipt_long, size: 56, color: Colors.grey),
+                        SizedBox(height: Dimensions.height30 / 2),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.grey, fontSize: 16),
+                        ),
+                        SizedBox(height: Dimensions.height30 / 2),
+                        ElevatedButton.icon(
+                          onPressed: _fetchPayslip,
+                          icon: const Icon(Icons.refresh),
+                          label: Text('refresh'.tr),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (_payslip != null) ...[
+                Card(
+                  color: AppColors.mainColor,
+                  child: Padding(
+                    padding: EdgeInsets.all(Dimensions.width20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _payslip!.employee,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: Dimensions.height30 / 4),
+                        Text(
+                          _payslip!.period,
+                          style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: Dimensions.height30 / 2),
+                _buildSection(
+                  'accruals'.tr,
+                  _payslip!.accruals,
+                  _payslip!.totalAccruals,
+                  Colors.green.shade700,
+                ),
+                SizedBox(height: Dimensions.height30 / 2),
+                _buildSection(
+                  'deductions'.tr,
+                  _payslip!.deductions,
+                  _payslip!.totalDeductions,
+                  AppColors.niceRed,
+                ),
+                SizedBox(height: Dimensions.height30 / 2),
+                Card(
+                  elevation: 3,
+                  child: Padding(
+                    padding: EdgeInsets.all(Dimensions.width20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'net pay'.tr,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Text(
+                          '${_numberFormat.format(_payslip!.netPay)} ₸',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: AppColors.mainColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: Dimensions.height30),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -274,27 +291,33 @@ class _PayslipPageState extends State<PayslipPage> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
             ),
             const Divider(),
-            ...items.map((item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: Text(item.name, style: const TextStyle(fontSize: 14))),
-                      Text(
-                        '${_numberFormat.format(item.amount)} ₸',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                )),
+            if (items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'no_records'.tr,
+                  style: const TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+              )
+            else
+              ...items.map((item) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text(item.name, style: const TextStyle(fontSize: 14))),
+                        Text(
+                          '${_numberFormat.format(item.amount)} ₸',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  )),
             const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'total'.tr,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: color),
-                ),
+                Text('total'.tr, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
                 Text(
                   '${_numberFormat.format(total)} ₸',
                   style: TextStyle(fontWeight: FontWeight.bold, color: color),

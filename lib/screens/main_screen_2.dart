@@ -30,17 +30,12 @@ class MainPage2 extends StatefulWidget {
   State<MainPage2> createState() => _MainPage2State();
 }
 
-
 class _MainPage2State extends State<MainPage2> {
-
   static TextEditingController employeeController = TextEditingController();
 
-  late String employeeId;
-  late String employeeName;
   late DateTime startDate;
   late DateTime endDate;
-  bool isStartDateInitialized = false;
-  bool isEndDateInitialized = false;
+  bool _loadingReport = false;
   List<List<String>> reportsEntries = [["", "", "", ""]];
   List<List<List<String>>> reportsEntriesForMsg = [];
   List<String> employees = [];
@@ -54,20 +49,20 @@ class _MainPage2State extends State<MainPage2> {
   @override
   void initState() {
     super.initState();
-    initializeData();
-    initializeSharedPreferences();
+    startDate = DateTime.utc(2023, 5, 1);
+    endDate = DateTime.now();
+    _initPrefs();
     employeeController.addListener(() {
       setState(() {
         searchText = employeeController.text;
         filteredEmployees = allEmployees
-            .where((employee) =>
-            employee.toLowerCase().contains(employeeController.text.toLowerCase()))
+            .where((e) => e.toLowerCase().contains(employeeController.text.toLowerCase()))
             .toList();
       });
     });
   }
 
-  Future<void> initializeSharedPreferences() async {
+  Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
       prefs.setString(AppValues.LANG, "KZ");
@@ -77,72 +72,34 @@ class _MainPage2State extends State<MainPage2> {
     });
   }
 
-  Future<void> initializeData() async {
-    employeeName = '';
-    startDate = DateTime.utc(2023, 5, 1);
-    endDate = DateTime.now();
-    isStartDateInitialized = true;
-    isEndDateInitialized = true;
-
-    setState(() {
-
-    });
-  }
-
-
-  Future<void> fetchReportData() async {
-    if (prefs.containsKey('emp_sname') && prefs.getString('emp_sname')?.length != 1){
-      reportsEntries = await getEmployeeDate(context, DateFormat('dd.MM.yyyy').format(startDate),
-        DateFormat('dd.MM.yyyy').format(endDate),);
-      reportsEntriesForMsg.add(reportsEntries);
-    } else {
-      reportsEntries = await getReportDateEntries(context, DateFormat('dd.MM.yyyy').format(startDate),
-        DateFormat('dd.MM.yyyy').format(endDate),);
-    }
-    setState(() {
-
-    });
-  }
+  bool get _hasData =>
+      reportsEntries.isNotEmpty &&
+      !(reportsEntries.length == 1 && reportsEntries[0][0].isEmpty);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold,),
+        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
         centerTitle: true,
         actions: [
-          PopupMenuButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.share),
-            tooltip: 'Отправить отчёт',
-            itemBuilder: (BuildContext context) {
-              return {"send report exc".tr, "send report csv".tr}.map((String choice) {
-                return PopupMenuItem<String>(
-                  value: choice,
-                  child: Text(choice),
-                );
-              }).toList();
-            },
-            onSelected: (String value) {
-              switch (value) {
-                case "Отправить отчёт Excel":
-                  generateExcelEmp(reportsEntriesForMsg, context);
-                  break;
-                case "Есепті Excel бағдарламасына жүктеңіз":
-                  generateExcelEmp(reportsEntriesForMsg, context);
-                  break;
-                case "Отправить отчёт csv":
-                  generateTableEmp(reportsEntriesForMsg, context);
-                  break;
-                case "CSV форматындағы ақырғы файлды көру":
-                  generateTableEmp(reportsEntriesForMsg, context);
-                  break;
+            tooltip: 'send_report_tooltip'.tr,
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'send report exc', child: Text('send report exc'.tr)),
+              PopupMenuItem(value: 'send report csv', child: Text('send report csv'.tr)),
+            ],
+            onSelected: (value) {
+              if (value == 'send report exc') {
+                generateExcelEmp(reportsEntriesForMsg, context);
+              } else if (value == 'send report csv') {
+                generateTableEmp(reportsEntriesForMsg, context);
               }
             },
-
           ),
         ],
       ),
-
       drawer: Theme(
         data: Theme.of(context).copyWith(
           canvasColor: Theme.of(context).scaffoldBackgroundColor,
@@ -169,22 +126,21 @@ class _MainPage2State extends State<MainPage2> {
                               Wrap(
                                 children: [
                                   Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        BigText(
-                                          content: widget.fullName,
-                                          color: AppColors.niceWhite,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        MediumText(
-                                          content: widget.job,
-                                          color: AppColors.niceWhite,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      BigText(
+                                        content: widget.fullName,
+                                        color: AppColors.niceWhite,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      MediumText(
+                                        content: widget.job,
+                                        color: AppColors.niceWhite,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
                                   Row(
                                     children: [
                                       Padding(
@@ -193,15 +149,15 @@ class _MainPage2State extends State<MainPage2> {
                                           onTap: _changeLanguage,
                                           child: _lang == "KZ"
                                               ? SizedBox(
-                                            width: Dimensions.width20 * 1.25,
-                                            height: Dimensions.height30 * 1.25,
-                                            child: Image.asset('assets/ru.png'),
-                                          )
-                                              : Container(
-                                            width: Dimensions.width20 * 1.25,
-                                            height: Dimensions.height30 * 1.25,
-                                            child: Image.asset('assets/kz.png'),
-                                          ),
+                                                  width: Dimensions.width20 * 1.25,
+                                                  height: Dimensions.height30 * 1.25,
+                                                  child: Image.asset('assets/ru.png'),
+                                                )
+                                              : SizedBox(
+                                                  width: Dimensions.width20 * 1.25,
+                                                  height: Dimensions.height30 * 1.25,
+                                                  child: Image.asset('assets/kz.png'),
+                                                ),
                                         ),
                                       ),
                                       GestureDetector(
@@ -223,50 +179,47 @@ class _MainPage2State extends State<MainPage2> {
                     ],
                   ),
                 ),
-
-
                 Container(
                   height: Dimensions.height30 / 15,
                   width: Dimensions.width120 * 2,
                   color: Colors.black26,
                 ),
                 Container(
-                    padding: EdgeInsets.only(
-                        bottom: Dimensions.height30,
-                        top: Dimensions.height30 / 2),
-                    height: Dimensions.height60 * 1.5,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/youtube.png'),
-                          function: () async {
-                            const url = 'https://www.youtube.com/@semeyengineering4367';
-                            await launch(url);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/instagram.png'),
-                          function: () async {
-                            const url = 'https://www.instagram.com/jscsemeyengineering/';
-                            await launch(url);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/facebook.png'),
-                          function: () async {
-                            const url = 'https://www.facebook.com/semeybtrz/';
-                            await launch(url);
-                          },),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/web.png'),
-                          function: () async {
-                            const url = 'https://se-btrz.com/';
-                            await launch(url);
-                          },
-                        ),
-                      ],
-                    )),
+                  padding: EdgeInsets.only(
+                    bottom: Dimensions.height30,
+                    top: Dimensions.height30 / 2,
+                  ),
+                  height: Dimensions.height60 * 1.5,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/youtube.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.youtube.com/@semeyengineering4367'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/instagram.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.instagram.com/jscsemeyengineering/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/facebook.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.facebook.com/semeybtrz/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/web.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://se-btrz.com/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -274,109 +227,128 @@ class _MainPage2State extends State<MainPage2> {
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextButton(
-                onPressed: () async {
-                  final directory = await getExternalStorageDirectories();
-                  if (directory == null || directory.isEmpty) return;
-                  try {
-                    OpenFile.open("${directory[0].path}/saved_report.xlsx");
-                  } catch (e) {
-                    print(e);
-                  }
-                },
-                child: SmallText(content: "see last Excel".tr,),
-              ),
-              TextButton(
-                onPressed: () async {
-                  final directory = await getExternalStorageDirectories();
-                  if (directory == null || directory.isEmpty) return;
-                  try {
-                    OpenFile.open("${directory[0].path}/saved_report.csv");
-                  } catch (e) {
-                    print(e);
-                  }
-                },
-                child: SmallText(content: "see last CSV".tr,),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton.icon(
+                    onPressed: () async {
+                      final directory = await getExternalStorageDirectories();
+                      if (directory == null || directory.isEmpty) return;
+                      try {
+                        OpenFile.open("${directory[0].path}/saved_report.xlsx");
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('url_error'.tr)),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.table_chart_outlined, size: 16),
+                    label: SmallText(content: "see last Excel".tr),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final directory = await getExternalStorageDirectories();
+                      if (directory == null || directory.isEmpty) return;
+                      try {
+                        OpenFile.open("${directory[0].path}/saved_report.csv");
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('url_error'.tr)),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.description_outlined, size: 16),
+                    label: SmallText(content: "see last CSV".tr),
+                  ),
+                ],
               ),
               const SizedBox(height: 4.0),
-              BigText(content: "choose period".tr, fontWeight: FontWeight.bold,),
+              BigText(content: "choose period".tr, fontWeight: FontWeight.bold),
               const SizedBox(height: 8.0),
               Row(
                 children: [
                   Expanded(
                     child: InkWell(
                       onTap: () async {
-                        final selectedDate = await showDatePicker(
+                        final selected = await showDatePicker(
                           context: context,
-                          initialDate: isStartDateInitialized ? startDate : DateTime.now(),
+                          initialDate: startDate,
                           locale: const Locale('ru'),
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
-                        if (selectedDate != null) {
-                          setState(() {
-                            startDate = selectedDate;
-                            isStartDateInitialized = true;
-                          });
-                        }
-                      },
-                      child: Container(
-                        padding: EdgeInsets.all(16.0),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                        ),
-                        child: Text(
-                          isStartDateInitialized
-                              ? '${startDate.day}.${startDate.month}.${startDate.year}'
-                              : 'Начальная дата',
-                          style: const TextStyle(fontSize: 16.0),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final selectedDate = await showDatePicker(
-                          context: context,
-                          initialDate: isEndDateInitialized ? endDate : DateTime.now(),
-                          locale: const Locale('ru'),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (selectedDate != null) {
-                          setState(() {
-                            endDate = selectedDate;
-                            isEndDateInitialized = true;
-                          });
-                        }
+                        if (selected != null) setState(() => startDate = selected);
                       },
                       child: Container(
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(
-                          isEndDateInitialized
-                              ? '${endDate.day}.${endDate.month}.${endDate.year}'
-                              : 'Конечная дата',
-                          style: const TextStyle(fontSize: 16.0),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${startDate.day.toString().padLeft(2, '0')}.${startDate.month.toString().padLeft(2, '0')}.${startDate.year}',
+                              style: const TextStyle(fontSize: 15.0),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('—', style: TextStyle(color: Colors.grey.shade600)),
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () async {
+                        final selected = await showDatePicker(
+                          context: context,
+                          initialDate: endDate,
+                          locale: const Locale('ru'),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (selected != null) setState(() => endDate = selected);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${endDate.day.toString().padLeft(2, '0')}.${endDate.month.toString().padLeft(2, '0')}.${endDate.year}',
+                              style: const TextStyle(fontSize: 15.0),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16.0,),
+              const SizedBox(height: 16.0),
+              BigText(content: "choose employee".tr, fontWeight: FontWeight.bold),
               const SizedBox(height: 8.0),
-              BigText(content: "choose employee".tr, fontWeight: FontWeight.bold,),
-              const SizedBox(height: 8.0),
-              ElevatedButton(
+              ElevatedButton.icon(
+                icon: const Icon(Icons.person_search),
                 onPressed: () async {
                   await showDialog(
                     context: context,
@@ -388,13 +360,13 @@ class _MainPage2State extends State<MainPage2> {
                             setState(() {
                               searchText = value;
                               filteredEmployees = allEmployees
-                                  .where((employee) =>
-                                  employee.toLowerCase().contains(value.toLowerCase()))
+                                  .where((e) => e.toLowerCase().contains(value.toLowerCase()))
                                   .toList();
                             });
                           },
                           decoration: InputDecoration(
                             labelText: 'search'.tr,
+                            prefixIcon: const Icon(Icons.search),
                           ),
                         ),
                         content: SingleChildScrollView(
@@ -406,42 +378,44 @@ class _MainPage2State extends State<MainPage2> {
                               builder: (BuildContext context, snapshot) {
                                 if (snapshot.hasData) {
                                   allEmployees = snapshot.data!;
-                                  List<String> displayedEmployees =
-                                  searchText.isEmpty ? allEmployees : filteredEmployees;
+                                  final displayed = searchText.isEmpty
+                                      ? allEmployees
+                                      : filteredEmployees;
+                                  if (displayed.isEmpty) {
+                                    return Center(
+                                      child: Text(
+                                        'no_records'.tr,
+                                        style: const TextStyle(color: Colors.grey),
+                                      ),
+                                    );
+                                  }
                                   return ListView(
                                     shrinkWrap: true,
-                                    children: displayedEmployees.map((employee) {
+                                    children: displayed.map((employee) {
                                       return ListTile(
                                         title: Text(employee),
                                         onTap: () async {
-                                          employeeName = employee;
-                                          employees.add(employeeName);
+                                          employees.add(employee);
                                           prefs.setStringList("emp_snames", employees);
-                                          prefs.setString("emp_sname", employeeName);
-                                          reportsEntries = await getEmployeeDate(context, DateFormat('dd.MM.yyyy').format(startDate),
-                                            DateFormat('dd.MM.yyyy').format(endDate),);
-                                          reportsEntriesForMsg.add(reportsEntries);
-                                          setState(() {
-
-                                          });
+                                          prefs.setString("emp_sname", employee);
+                                          setState(() => _loadingReport = true);
+                                          final data = await getEmployeeDate(
+                                            context,
+                                            DateFormat('dd.MM.yyyy').format(startDate),
+                                            DateFormat('dd.MM.yyyy').format(endDate),
+                                          );
+                                          reportsEntries = data;
+                                          reportsEntriesForMsg.add(data);
+                                          if (mounted) setState(() => _loadingReport = false);
                                           Navigator.pop(context);
                                         },
                                       );
                                     }).toList(),
                                   );
-                                } else if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return Column(
-                                    children: [
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            top: Dimensions.height30 / 2),
-                                        child: const CircularProgressIndicator(),
-                                      ),
-                                    ],
-                                  );
+                                } else if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const Center(child: CircularProgressIndicator());
                                 } else {
-                                  return const Text("");
+                                  return Center(child: Text('no_records'.tr, style: const TextStyle(color: Colors.grey)));
                                 }
                               },
                             ),
@@ -449,9 +423,7 @@ class _MainPage2State extends State<MainPage2> {
                         ),
                         actions: [
                           TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
+                            onPressed: () => Navigator.of(context).pop(),
                             child: Text('cancel'.tr),
                           ),
                         ],
@@ -459,88 +431,90 @@ class _MainPage2State extends State<MainPage2> {
                     },
                   );
                 },
-                child: MediumText(
-                  content: "search".tr,
-                  fontWeight: FontWeight.bold,
-                  maxLines: 1,
-                ),
+                label: MediumText(content: "search".tr, fontWeight: FontWeight.bold, maxLines: 1),
               ),
-              const SizedBox(height: 16.0),
-              ListView.builder(
-                itemCount: employees.length,
-                shrinkWrap: true,
-                itemBuilder: (context, index) {
-                  return Row(
-                    children: [
-                      Text(
-                        employees[index] ?? '',
-                        style: const TextStyle(fontSize: 16.0),
-                      ),
-                      IconButton(
-                          onPressed: (){
+              const SizedBox(height: 8.0),
+              if (employees.isNotEmpty) ...[
+                ListView.builder(
+                  itemCount: employees.length,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemBuilder: (context, index) {
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.person_outline, color: AppColors.mainColor),
+                        title: Text(employees[index]),
+                        trailing: IconButton(
+                          onPressed: () {
                             setState(() {
                               employees.removeAt(index);
                               reportsEntriesForMsg.removeAt(index);
                               prefs.setStringList("emp_snames", employees);
-                              List<String>? names = prefs.getStringList("emp_snames");
-                              if (names!.length >= 1){
-                                employeeName = names[names.length - 1];
-                                prefs.setString("emp_sname", employeeName);
+                              if (employees.isNotEmpty) {
+                                prefs.setString("emp_sname", employees.last);
                               } else {
                                 prefs.setString("emp_sname", "");
                               }
                             });
                           },
-                          icon: const Icon(Icons.remove_circle_outline)
-                      )
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 16.0),
-              /*ElevatedButton(
-                onPressed: () {
-                  employees = [];
-                  reportsEntriesForMsg = [];
-                  prefs.remove("emp_sname") ;
-                  fetchReportData();
-                },
-                child: MediumText(content: "show report".tr, fontWeight: FontWeight.bold, maxLines: 1,),
-              ),*/
+                          icon: const Icon(Icons.remove_circle_outline, color: AppColors.niceRed),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
               const SizedBox(height: 8.0),
               Text(
                 "info".tr,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 14, color: Colors.black54),
               ),
               const SizedBox(height: 8.0),
-              Text(
-                'scroll to right'.tr,
-                style: const TextStyle(fontSize: 12.0, color: Colors.grey),
-              ),
-              const SizedBox(height: 8.0),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: Dimensions.width120 * 4,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Дата')),
-                      DataColumn(label: Text('Время')),
-                      DataColumn(label: Text('Событие')),
-                      DataColumn(label: Text('Дверь')),
-                    ],
-                    rows: reportsEntries.map((entry) {
-                      return DataRow(cells: [
-                        DataCell(Text(entry[0])),
-                        DataCell(Text(entry[1])),
-                        DataCell(Text(entry[2])),
-                        DataCell(Text(entry[3])),
-                      ]);
-                    }).toList(),
+              if (_loadingReport)
+                const Center(child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(),
+                ))
+              else if (_hasData) ...[
+                Text(
+                  'scroll to right'.tr,
+                  style: const TextStyle(fontSize: 12.0, color: Colors.grey),
+                ),
+                const SizedBox(height: 4),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: Dimensions.width120 * 4,
+                    child: DataTable(
+                      columns: [
+                        DataColumn(label: Text('col_date'.tr)),
+                        DataColumn(label: Text('col_time'.tr)),
+                        DataColumn(label: Text('col_event'.tr)),
+                        DataColumn(label: Text('col_door'.tr)),
+                      ],
+                      rows: reportsEntries.map((entry) {
+                        return DataRow(cells: [
+                          DataCell(Text(entry[0])),
+                          DataCell(Text(entry[1])),
+                          DataCell(Text(entry[2])),
+                          DataCell(Text(entry[3])),
+                        ]);
+                      }).toList(),
+                    ),
                   ),
                 ),
-
-              ),
+              ] else ...[
+                const SizedBox(height: 24),
+                Icon(Icons.inbox_outlined, size: 56, color: Colors.grey.shade400),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    'no_data'.tr,
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16.0),
             ],
           ),
@@ -548,26 +522,21 @@ class _MainPage2State extends State<MainPage2> {
       ),
     );
   }
+
   _changeLanguage() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (_lang == "KZ") {
       prefs.setString(AppValues.LANG, "RU");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-      });
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
+      setState(() => _lang = prefs.getString(AppValues.LANG)!);
     } else if (_lang == "RU") {
       prefs.setString(AppValues.LANG, "KZ");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-      });
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
+      setState(() => _lang = prefs.getString(AppValues.LANG)!);
     }
   }
 
-  _exit() async{
+  _exit() async {
     await SecureStorageHelper.instance.clearCredentials();
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();

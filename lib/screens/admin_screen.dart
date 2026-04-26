@@ -149,28 +149,25 @@ class _AdminPageState extends State<AdminPage> {
                         IconButtonDrawer(
                           icon: Image.asset('assets/youtube.png'),
                           function: () async {
-                            const url = 'https://www.youtube.com/@semeyengineering4367';
-                            await launch(url);
+                            await launchUrl(Uri.parse('https://www.youtube.com/@semeyengineering4367'), mode: LaunchMode.externalApplication);
                           },
                         ),
                         IconButtonDrawer(
                           icon: Image.asset('assets/instagram.png'),
                           function: () async {
-                            const url = 'https://www.instagram.com/jscsemeyengineering/';
-                            await launch(url);
+                            await launchUrl(Uri.parse('https://www.instagram.com/jscsemeyengineering/'), mode: LaunchMode.externalApplication);
                           },
                         ),
                         IconButtonDrawer(
                           icon: Image.asset('assets/facebook.png'),
                           function: () async {
-                            const url = 'https://www.facebook.com/semeybtrz/';
-                            await launch(url);
-                          },),
+                            await launchUrl(Uri.parse('https://www.facebook.com/semeybtrz/'), mode: LaunchMode.externalApplication);
+                          },
+                        ),
                         IconButtonDrawer(
                           icon: Image.asset('assets/web.png'),
                           function: () async {
-                            const url = 'https://se-btrz.com/';
-                            await launch(url);
+                            await launchUrl(Uri.parse('https://se-btrz.com/'), mode: LaunchMode.externalApplication);
                           },
                         ),
                       ],
