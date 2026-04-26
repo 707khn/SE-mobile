@@ -82,8 +82,11 @@ class _MainPage1State extends State<MainPage1> {
           ),
         ),
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.share),
+          ValueListenableBuilder<int>(
+            valueListenable: _recordCount,
+            builder: (_, count, __) => PopupMenuButton<String>(
+            icon: Icon(Icons.share, color: count > 0 ? null : Colors.white38),
+            enabled: count > 0,
             tooltip: 'send_report_tooltip'.tr,
             itemBuilder: (_) => [
               PopupMenuItem(value: 'send report exc', child: Text('send report exc'.tr)),
@@ -96,6 +99,7 @@ class _MainPage1State extends State<MainPage1> {
                 generateTable(reportsEntries, context);
               }
             },
+          ),
           ),
         ],
       ),

@@ -301,7 +301,8 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   Widget _buildGreeting() {
-    final hour = DateTime.now().hour;
+    final now = DateTime.now();
+    final hour = now.hour;
     final String greetKey;
     if (hour < 12) {
       greetKey = 'greeting_morning';
@@ -310,7 +311,11 @@ class _AdminPageState extends State<AdminPage> {
     } else {
       greetKey = 'greeting_evening';
     }
-    final firstName = widget.fullName.split(' ').first;
+    final firstName = widget.fullName.split(' ').first.isNotEmpty
+        ? widget.fullName.split(' ').first
+        : widget.fullName;
+    final dateStr =
+        '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}';
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(Dimensions.width20),
@@ -339,11 +344,21 @@ class _AdminPageState extends State<AdminPage> {
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            widget.job,
-            style: const TextStyle(color: Colors.white60, fontSize: 12),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.job,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                dateStr,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
           ),
         ],
       ),
