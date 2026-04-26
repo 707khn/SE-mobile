@@ -82,6 +82,7 @@ class LocaleString extends Translations {
           'info_title': 'Ақпарат',
           'info_hint': 'Есеп туралы ақпарат...',
           'undo': 'Болдырмау',
+          'this_week': 'Осы апта',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -162,6 +163,7 @@ class LocaleString extends Translations {
           'info_title': 'Справка',
           'info_hint': 'Как работает отчёт...',
           'undo': 'Отмена',
+          'this_week': 'Эта неделя',
         }
       };
 }

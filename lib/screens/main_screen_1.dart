@@ -37,11 +37,18 @@ class MainPage1 extends StatefulWidget {
 class _MainPage1State extends State<MainPage1> {
   static String _lang = "";
   late SharedPreferences prefs;
+  final _recordCount = ValueNotifier<int>(0);
 
   @override
   void initState() {
     super.initState();
     initializeSharedPreferences();
+  }
+
+  @override
+  void dispose() {
+    _recordCount.dispose();
+    super.dispose();
   }
 
   Future<void> initializeSharedPreferences() async {
@@ -60,7 +67,20 @@ class _MainPage1State extends State<MainPage1> {
       backgroundColor: AppColors.niceWhite,
       appBar: AppBar(
         centerTitle: true,
-        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
+        title: ValueListenableBuilder<int>(
+          valueListenable: _recordCount,
+          builder: (_, count, __) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
+              if (count > 0)
+                Text(
+                  '$count ${'records_count'.tr}',
+                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+            ],
+          ),
+        ),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.share),
@@ -230,7 +250,7 @@ class _MainPage1State extends State<MainPage1> {
           ),
         ),
       ),
-      body: const MainMenu1(),
+      body: MainMenu1(recordCount: _recordCount),
     );
   }
 
@@ -252,7 +272,9 @@ class _MainPage1State extends State<MainPage1> {
 }
 
 class MainMenu1 extends StatefulWidget {
-  const MainMenu1({Key? key}) : super(key: key);
+  const MainMenu1({Key? key, required this.recordCount}) : super(key: key);
+
+  final ValueNotifier<int> recordCount;
 
   @override
   State<MainMenu1> createState() => _MainMenu1State();
@@ -281,6 +303,7 @@ class _MainMenu1State extends State<MainMenu1> {
         _loadingReport = false;
         _initError = reportsEntries.length == 1 && reportsEntries[0][0] == 'no';
       });
+      if (_hasData) widget.recordCount.value = reportsEntries.length;
     }
   }
 
@@ -460,6 +483,12 @@ class _MainMenu1State extends State<MainMenu1> {
                     setState(() { startDate = now; endDate = now; _dateError = false; });
                   }),
                   const SizedBox(width: 6),
+                  _buildPresetChip('this_week'.tr, () {
+                    final now = DateTime.now();
+                    final monday = now.subtract(Duration(days: now.weekday - 1));
+                    setState(() { startDate = DateTime(monday.year, monday.month, monday.day); endDate = now; _dateError = false; });
+                  }),
+                  const SizedBox(width: 6),
                   _buildPresetChip('last_7_days'.tr, () {
                     final now = DateTime.now();
                     setState(() { startDate = now.subtract(const Duration(days: 6)); endDate = now; _dateError = false; });
@@ -509,6 +538,7 @@ class _MainMenu1State extends State<MainMenu1> {
                         if (!mounted) return;
                         setState(() => _loadingReport = false);
                         if (_hasData) {
+                          widget.recordCount.value = reportsEntries.length;
                           HapticFeedback.lightImpact();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -517,6 +547,8 @@ class _MainMenu1State extends State<MainMenu1> {
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
+                        } else {
+                          widget.recordCount.value = 0;
                         }
                       },
                 style: ElevatedButton.styleFrom(
