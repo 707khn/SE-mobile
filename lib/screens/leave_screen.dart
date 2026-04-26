@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../requests/leave_request.dart';
@@ -97,16 +98,26 @@ class _LeavePageState extends State<LeavePage> {
                   ),
                 ),
               if (_leaveData != null) ...[
-                Card(
-                  color: AppColors.mainColor,
-                  child: Padding(
-                    padding: EdgeInsets.all(Dimensions.width20),
-                    child: Text(
-                      _leaveData!.employee,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                GestureDetector(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(text: _leaveData!.employee));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('copied'.tr),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  },
+                  child: Card(
+                    color: AppColors.mainColor,
+                    child: Padding(
+                      padding: EdgeInsets.all(Dimensions.width20),
+                      child: Text(
+                        _leaveData!.employee,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),

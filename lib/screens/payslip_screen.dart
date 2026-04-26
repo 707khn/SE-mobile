@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
@@ -208,27 +209,39 @@ class _PayslipPageState extends State<PayslipPage> {
                   ),
                 ),
               if (_payslip != null) ...[
-                Card(
-                  color: AppColors.mainColor,
-                  child: Padding(
-                    padding: EdgeInsets.all(Dimensions.width20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _payslip!.employee,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                GestureDetector(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(
+                      text: '${_payslip!.employee}\n${_payslip!.period}',
+                    ));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('copied'.tr),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  },
+                  child: Card(
+                    color: AppColors.mainColor,
+                    child: Padding(
+                      padding: EdgeInsets.all(Dimensions.width20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _payslip!.employee,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: Dimensions.height30 / 4),
-                        Text(
-                          _payslip!.period,
-                          style: const TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                      ],
+                          SizedBox(height: Dimensions.height30 / 4),
+                          Text(
+                            _payslip!.period,
+                            style: const TextStyle(color: Colors.white70, fontSize: 14),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

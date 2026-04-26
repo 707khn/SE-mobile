@@ -133,21 +133,31 @@ class _MainPage2State extends State<MainPage2> {
                             children: [
                               Wrap(
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      BigText(
-                                        content: widget.fullName,
-                                        color: AppColors.niceWhite,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      MediumText(
-                                        content: widget.job,
-                                        color: AppColors.niceWhite,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                  GestureDetector(
+                                    onLongPress: () {
+                                      Clipboard.setData(ClipboardData(text: widget.fullName));
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                        content: Text('copied'.tr),
+                                        duration: const Duration(seconds: 1),
+                                        behavior: SnackBarBehavior.floating,
+                                      ));
+                                    },
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        BigText(
+                                          content: widget.fullName,
+                                          color: AppColors.niceWhite,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        MediumText(
+                                          content: widget.job,
+                                          color: AppColors.niceWhite,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   Row(
                                     children: [
