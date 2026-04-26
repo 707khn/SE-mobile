@@ -260,7 +260,10 @@ class _AdminPageState extends State<AdminPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: Dimensions.width20,

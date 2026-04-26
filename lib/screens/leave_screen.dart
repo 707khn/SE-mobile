@@ -287,15 +287,39 @@ class _LeavePageState extends State<LeavePage> {
                     ),
                   )
                 else
-                  ...([..._leaveData!.history]
-                    ..sort((a, b) {
-                      try {
-                        return DateTime.parse(b.startDate).compareTo(DateTime.parse(a.startDate));
-                      } catch (_) {
-                        return 0;
+                  ...() {
+                    final sorted = [..._leaveData!.history]
+                      ..sort((a, b) {
+                        try {
+                          return DateTime.parse(b.startDate).compareTo(DateTime.parse(a.startDate));
+                        } catch (_) {
+                          return 0;
+                        }
+                      });
+                    final widgets = <Widget>[];
+                    int? lastYear;
+                    for (final r in sorted) {
+                      int? year;
+                      try { year = DateTime.parse(r.startDate).year; } catch (_) {}
+                      if (year != null && year != lastYear) {
+                        lastYear = year;
+                        widgets.add(Padding(
+                          padding: const EdgeInsets.only(top: 8, bottom: 4, left: 4),
+                          child: Text(
+                            '$year',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade500,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ));
                       }
-                    }))
-                    .map((r) => _buildHistoryCard(r)),
+                      widgets.add(_buildHistoryCard(r));
+                    }
+                    return widgets;
+                  }(),
                 SizedBox(height: Dimensions.height30),
               ],
             ],

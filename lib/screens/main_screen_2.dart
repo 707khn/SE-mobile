@@ -578,16 +578,9 @@ class _MainPage2State extends State<MainPage2> {
                                         title: Text(employee),
                                         onTap: () async {
                                           if (startDate.isAfter(endDate)) {
-                                            Navigator.pop(context);
-                                            setState(() => _dateError = true);
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('date_range_error'.tr),
-                                                behavior: SnackBarBehavior.floating,
-                                                backgroundColor: Colors.red.shade700,
-                                              ),
-                                            );
-                                            return;
+                                            final tmp = startDate;
+                                            startDate = endDate;
+                                            endDate = tmp;
                                           }
                                           employees.add(employee);
                                           prefs.setStringList("emp_snames", employees);
@@ -981,15 +974,31 @@ class _MainPage2State extends State<MainPage2> {
       }
     }
     if (counts.isEmpty) return const SizedBox.shrink();
+    final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: counts.entries.map((entry) {
+        children: sorted.map((entry) {
+          final lower = entry.key.toLowerCase();
+          final isEntry = lower.contains('вход') || lower.contains('кіру') || lower.contains('entry');
+          final isExit = lower.contains('выход') || lower.contains('шығу') || lower.contains('exit');
+          final chipColor = isEntry
+              ? Colors.green.shade700
+              : isExit
+                  ? AppColors.niceRed
+                  : AppColors.mainColor;
           return Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Chip(
+              avatar: Icon(
+                isEntry ? Icons.login : isExit ? Icons.logout : Icons.event_note,
+                size: 14,
+                color: chipColor,
+              ),
               label: Text('${entry.key}: ${entry.value}',
-                  style: const TextStyle(fontSize: 11)),
+                  style: TextStyle(fontSize: 11, color: chipColor)),
+              backgroundColor: chipColor.withOpacity(0.08),
+              side: BorderSide(color: chipColor.withOpacity(0.3)),
               padding: EdgeInsets.zero,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
