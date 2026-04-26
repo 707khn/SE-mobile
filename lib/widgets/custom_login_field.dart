@@ -29,18 +29,22 @@ class CustomLoginField extends StatefulWidget {
 class _CustomLoginFieldState extends State<CustomLoginField> {
   late FocusNode _focusNode;
   bool _isFocused = false;
+  bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode();
     _focusNode.addListener(_onFocusChange);
+    widget.controller?.addListener(_onTextChange);
+    _hasText = widget.controller?.text.isNotEmpty ?? false;
   }
 
   @override
   void dispose() {
     _focusNode.removeListener(_onFocusChange);
     _focusNode.dispose();
+    widget.controller?.removeListener(_onTextChange);
     super.dispose();
   }
 
@@ -48,6 +52,13 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
     setState(() {
       _isFocused = _focusNode.hasFocus;
     });
+  }
+
+  void _onTextChange() {
+    final newHasText = widget.controller?.text.isNotEmpty ?? false;
+    if (newHasText != _hasText) {
+      setState(() => _hasText = newHasText);
+    }
   }
 
   @override
@@ -79,7 +90,12 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
             enabledBorder: InputBorder.none,
             hintText: widget.hintText,
             hintStyle: const TextStyle(color: Colors.grey),
-            suffixIcon: widget.suffixIcon,
+            suffixIcon: _hasText
+                ? IconButton(
+                    icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
+                    onPressed: () => widget.controller?.clear(),
+                  )
+                : widget.suffixIcon,
             suffixIconConstraints: const BoxConstraints(),
           ),
         ),

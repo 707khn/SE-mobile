@@ -53,7 +53,7 @@ Future<void> loginToAccount(String login, BuildContext context) async {
                     width: Dimensions.height60 * 1.5,
                   ),
                   Text(
-                    'Данный логин не зарегистрирован!',
+                    'login_not_registered'.tr,
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: Dimensions.fontSize16),
                   ),
@@ -77,12 +77,12 @@ Future<void> loginToAccount(String login, BuildContext context) async {
         );
       }
     } else {
-      _showNetworkError(context, 'Ошибка сервера (${response.statusCode})');
+      _showNetworkError(context, '${'server_error'.tr} (${response.statusCode})');
     }
   } on TimeoutException {
-    _showNetworkError(context, 'Сервер не отвечает. Проверьте подключение.');
+    _showNetworkError(context, 'server_not_responding'.tr);
   } catch (e) {
-    _showNetworkError(context, 'Ошибка подключения к серверу');
+    _showNetworkError(context, 'connection_error'.tr);
   }
 }
 
@@ -91,7 +91,7 @@ void _showNetworkError(BuildContext context, String message) {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Ошибка'),
+      title: Text('error'.tr),
       content: Text(message),
       actions: [
         TextButton(

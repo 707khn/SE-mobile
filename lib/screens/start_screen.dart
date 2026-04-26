@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../widgets/custom_login_field.dart';
 import '../widgets/custom_text.dart';
@@ -66,6 +67,10 @@ class CustomFormState extends State<CustomForm> {
     setState(() {
       _lang = prefs.getString(AppValues.LANG)!;
     });
+    final savedLogin = await SecureStorageHelper.instance.getLogin();
+    if (savedLogin != null && savedLogin.isNotEmpty && loginController.text.isEmpty) {
+      loginController.text = savedLogin;
+    }
   }
 
   @override
