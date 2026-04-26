@@ -63,14 +63,11 @@ Future<PayslipData?> getPayslip(BuildContext context, String month, String year)
         netPay: (p['net_pay'] as num).toDouble(),
       );
     } else {
-      print('Ошибка HTTP-запроса: ${response.statusCode}');
       return null;
     }
   } on TimeoutException {
-    print('Превышено время ожидания запроса');
     return null;
   } catch (e) {
-    print('Ошибка: $e');
     return null;
   }
 }

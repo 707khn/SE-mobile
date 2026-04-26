@@ -85,14 +85,11 @@ Future<LeaveData?> getLeaves(BuildContext context) async {
             .toList(),
       );
     } else {
-      print('Ошибка HTTP-запроса: ${response.statusCode}');
       return null;
     }
   } on TimeoutException {
-    print('Превышено время ожидания запроса');
     return null;
   } catch (e) {
-    print('Ошибка: $e');
     return null;
   }
 }
