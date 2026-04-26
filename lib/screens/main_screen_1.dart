@@ -36,6 +36,7 @@ class MainPage1 extends StatefulWidget {
 
 class _MainPage1State extends State<MainPage1> {
   static String _lang = "";
+  String? _login;
   late SharedPreferences prefs;
   final _recordCount = ValueNotifier<int>(0);
   final _dateRange = ValueNotifier<String>('');
@@ -58,8 +59,10 @@ class _MainPage1State extends State<MainPage1> {
     if (prefs.getString(AppValues.LANG) == null) {
       prefs.setString(AppValues.LANG, "KZ");
     }
+    final login = await SecureStorageHelper.instance.getLogin();
     setState(() {
       _lang = prefs.getString(AppValues.LANG)!;
+      _login = login;
     });
   }
 
@@ -153,6 +156,34 @@ class _MainPage1State extends State<MainPage1> {
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                        if (_login != null && _login!.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          GestureDetector(
+                                            onTap: () {
+                                              Clipboard.setData(ClipboardData(text: _login!));
+                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                                content: Text('copied'.tr),
+                                                duration: const Duration(seconds: 1),
+                                                behavior: SnackBarBehavior.floating,
+                                              ));
+                                            },
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.badge_outlined, size: 12, color: Colors.white54),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _login!,
+                                                  style: const TextStyle(
+                                                    color: Colors.white54,
+                                                    fontSize: 12,
+                                                    letterSpacing: 1,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
