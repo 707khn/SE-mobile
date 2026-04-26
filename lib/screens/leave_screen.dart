@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../requests/leave_request.dart';
 import '../utils/colors.dart';
@@ -45,6 +46,26 @@ class _LeavePageState extends State<LeavePage> {
     });
   }
 
+  void _shareLeave() {
+    if (_leaveData == null) return;
+    final buffer = StringBuffer();
+    buffer.writeln(_leaveData!.employee);
+    buffer.writeln('');
+    buffer.writeln('${'leave_balances'.tr}:');
+    for (final b in _leaveData!.balances) {
+      buffer.writeln('  ${b.type}: ${b.remainingDays}/${'${b.totalDays}'} ${'days_short'.tr}');
+    }
+    if (_leaveData!.history.isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('${'leave_history'.tr}:');
+      for (final r in _leaveData!.history) {
+        buffer.writeln('  ${r.type}: ${_fmtDate(r.startDate)} — ${_fmtDate(r.endDate)} (${r.days} ${'days_short'.tr}) [${r.status}]');
+      }
+    }
+    HapticFeedback.lightImpact();
+    Share.share(buffer.toString());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -52,6 +73,12 @@ class _LeavePageState extends State<LeavePage> {
         title: BigText(content: 'leave_sick_days'.tr, fontWeight: FontWeight.bold),
         centerTitle: true,
         actions: [
+          if (_leaveData != null)
+            IconButton(
+              icon: const Icon(Icons.share),
+              tooltip: 'share'.tr,
+              onPressed: _shareLeave,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'refresh'.tr,
@@ -166,7 +193,15 @@ class _LeavePageState extends State<LeavePage> {
                     ),
                   )
                 else
-                  ..._leaveData!.history.map((r) => _buildHistoryCard(r)),
+                  ...([..._leaveData!.history]
+                    ..sort((a, b) {
+                      try {
+                        return DateTime.parse(b.startDate).compareTo(DateTime.parse(a.startDate));
+                      } catch (_) {
+                        return 0;
+                      }
+                    }))
+                    .map((r) => _buildHistoryCard(r)),
                 SizedBox(height: Dimensions.height30),
               ],
             ],

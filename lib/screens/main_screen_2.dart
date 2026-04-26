@@ -370,7 +370,16 @@ class _MainPage2State extends State<MainPage2> {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('—', style: TextStyle(color: Colors.grey.shade600)),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('—', style: TextStyle(color: Colors.grey.shade600)),
+                        Text(
+                          '${endDate.difference(startDate).inDays + 1} ${'days_short'.tr}',
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                        ),
+                      ],
+                    ),
                   ),
                   Expanded(
                     child: InkWell(
@@ -636,8 +645,12 @@ class _MainPage2State extends State<MainPage2> {
                           prefs.setStringList("emp_snames", employees);
                           if (employees.isNotEmpty) {
                             prefs.setString("emp_sname", employees.last);
+                            if (reportsEntriesForMsg.isNotEmpty) {
+                              reportsEntries = reportsEntriesForMsg.last;
+                            }
                           } else {
                             prefs.setString("emp_sname", "");
+                            reportsEntries = [["", "", "", ""]];
                           }
                         });
                         ScaffoldMessenger.of(context).clearSnackBars();
@@ -656,6 +669,9 @@ class _MainPage2State extends State<MainPage2> {
                                   }
                                   prefs.setStringList("emp_snames", employees);
                                   prefs.setString("emp_sname", employees.last);
+                                  if (reportsEntriesForMsg.isNotEmpty) {
+                                    reportsEntries = reportsEntriesForMsg.last;
+                                  }
                                 });
                               },
                             ),
