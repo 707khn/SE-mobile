@@ -1,6 +1,7 @@
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
@@ -11,14 +12,14 @@ Future<void> generateTable(List<List<String>> data, BuildContext context) async 
   try {
     final directory = await getExternalStorageDirectories();
     if (directory == null || directory.isEmpty) {
-      _showError(context, 'Нет доступа к хранилищу');
+      _showError(context, 'url_error'.tr);
       return;
     }
     final path = directory[0].path;
     List<List<dynamic>> rows = [];
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? name = prefs.getString("fullName");
-    rows.add(['Дата', 'Время', 'Событие', 'Дверь']);
+    rows.add(['col_date'.tr, 'col_time'.tr, 'col_event'.tr, 'col_door'.tr]);
     for (var entry in data) {
       rows.add(entry);
     }
@@ -29,7 +30,7 @@ Future<void> generateTable(List<List<String>> data, BuildContext context) async 
     await File(csvFilePath).writeAsString(csv);
     await File(savePath).writeAsString(csv);
     HapticFeedback.lightImpact();
-    Share.shareFiles([csvFilePath], text: 'Отправка файла');
+    Share.shareFiles([csvFilePath], text: 'send_report_tooltip'.tr);
   } catch (e) {
     _showError(context, 'Ошибка экспорта CSV: $e');
   }
@@ -39,7 +40,7 @@ Future<void> generateTableEmp(List<List<List<String>>> data, BuildContext contex
   try {
     final directory = await getExternalStorageDirectories();
     if (directory == null || directory.isEmpty) {
-      _showError(context, 'Нет доступа к хранилищу');
+      _showError(context, 'url_error'.tr);
       return;
     }
     final path = directory[0].path;
@@ -50,7 +51,7 @@ Future<void> generateTableEmp(List<List<List<String>>> data, BuildContext contex
     for (var i = 0; i < data.length; i++) {
       String? name = names?[i];
       rows.add(['$name', '', '', '']);
-      rows.add(['Дата', 'Время', 'Событие', 'Дверь']);
+      rows.add(['col_date'.tr, 'col_time'.tr, 'col_event'.tr, 'col_door'.tr]);
       for (var entry in data[i]) {
         rows.add(entry);
       }
@@ -64,7 +65,7 @@ Future<void> generateTableEmp(List<List<List<String>>> data, BuildContext contex
     await File(csvFilePath).writeAsString(csv);
     await File(savePath).writeAsString(csv);
     HapticFeedback.lightImpact();
-    Share.shareFiles([csvFilePath], text: 'Отправка файла');
+    Share.shareFiles([csvFilePath], text: 'send_report_tooltip'.tr);
   } catch (e) {
     _showError(context, 'Ошибка экспорта CSV: $e');
   }
