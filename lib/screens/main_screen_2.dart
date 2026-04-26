@@ -556,7 +556,10 @@ class _MainPage2State extends State<MainPage2> {
                               future: _getEmployeesCached(),
                               builder: (BuildContext context, snapshot) {
                                 if (snapshot.hasData) {
-                                  allEmployees = [...snapshot.data!]..sort((a, b) => a.compareTo(b));
+                                  final raw = snapshot.data!;
+                                  allEmployees = ([...raw]
+                                    ..removeWhere((e) => e == 'no' || e.isEmpty)
+                                    ..sort((a, b) => a.compareTo(b)));
                                   final displayed = searchText.isEmpty
                                       ? allEmployees
                                       : filteredEmployees;
@@ -614,8 +617,10 @@ class _MainPage2State extends State<MainPage2> {
                                   );
                                 } else if (snapshot.connectionState == ConnectionState.waiting) {
                                   return const Center(child: CircularProgressIndicator());
+                                } else if (snapshot.hasError) {
+                                  return Center(child: Text('load_error'.tr, style: const TextStyle(color: Colors.grey)));
                                 } else {
-                                  return Center(child: Text('no_records'.tr, style: const TextStyle(color: Colors.grey)));
+                                  return Center(child: Text('load_error'.tr, style: const TextStyle(color: Colors.grey)));
                                 }
                               },
                             ),
