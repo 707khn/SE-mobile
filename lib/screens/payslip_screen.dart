@@ -54,6 +54,7 @@ class _PayslipPageState extends State<PayslipPage> {
   Future<void> _pickMonth() async {
     int selectedYear = _selectedDate.year;
     int selectedMonth = _selectedDate.month;
+    final now = DateTime.now();
 
     await showDialog(
       context: context,
@@ -62,6 +63,8 @@ class _PayslipPageState extends State<PayslipPage> {
           title: Text('choose period'.tr),
           content: StatefulBuilder(
             builder: (context, setInnerState) {
+              final isCurrentYear = selectedYear == now.year;
+              final isFutureYear = selectedYear > now.year;
               return SizedBox(
                 width: double.maxFinite,
                 child: Column(
@@ -71,7 +74,14 @@ class _PayslipPageState extends State<PayslipPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         IconButton(
-                          onPressed: () => setInnerState(() => selectedYear--),
+                          onPressed: selectedYear > now.year - 5
+                              ? () => setInnerState(() {
+                                    selectedYear--;
+                                    if (isFutureYear && selectedMonth > now.month) {
+                                      selectedMonth = now.month;
+                                    }
+                                  })
+                              : null,
                           icon: const Icon(Icons.arrow_back_ios),
                         ),
                         Text(
@@ -79,7 +89,9 @@ class _PayslipPageState extends State<PayslipPage> {
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         IconButton(
-                          onPressed: () => setInnerState(() => selectedYear++),
+                          onPressed: selectedYear < now.year
+                              ? () => setInnerState(() => selectedYear++)
+                              : null,
                           icon: const Icon(Icons.arrow_forward_ios),
                         ),
                       ],
@@ -94,20 +106,29 @@ class _PayslipPageState extends State<PayslipPage> {
                       itemCount: 12,
                       itemBuilder: (ctx, index) {
                         final m = index + 1;
-                        final isSelected = m == selectedMonth;
+                        final isSelected = m == selectedMonth && selectedYear == _selectedDate.year;
+                        final isFuture = isCurrentYear && m > now.month;
                         return GestureDetector(
-                          onTap: () => setInnerState(() => selectedMonth = m),
+                          onTap: isFuture ? null : () => setInnerState(() => selectedMonth = m),
                           child: Container(
                             margin: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              color: isSelected ? AppColors.mainColor : Colors.transparent,
+                              color: isSelected
+                                  ? AppColors.mainColor
+                                  : isFuture
+                                      ? Colors.grey.shade100
+                                      : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Center(
                               child: Text(
                                 DateFormat('MMM', 'ru').format(DateTime(selectedYear, m)),
                                 style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.black87,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : isFuture
+                                          ? Colors.grey.shade400
+                                          : Colors.black87,
                                   fontSize: 13,
                                 ),
                               ),
@@ -311,9 +332,26 @@ class _PayslipPageState extends State<PayslipPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
+                ),
+                if (items.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${items.length}',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+                    ),
+                  ),
+              ],
             ),
             const Divider(),
             if (items.isEmpty)
