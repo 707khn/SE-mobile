@@ -22,14 +22,11 @@ Future<List<String>> getAllEmployees(BuildContext context) async {
       List<String> employeeNames = List<String>.from(responseBody['fio']);
       return employeeNames;
     } else {
-      print('Ошибка HTTP-запроса');
       return ["no"];
     }
   } on TimeoutException {
-    print('Превышено время ожидания запроса');
     return ["no"];
   } catch (e) {
-    print('Ошибка: $e');
     return ["no"];
   }
 }

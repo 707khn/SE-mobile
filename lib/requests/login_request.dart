@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:se_mobile/screens/admin_screen.dart';
 import '../screens/main_screen_1.dart';
 import '../utils/dimensions.dart';
+import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
@@ -31,7 +32,7 @@ Future<void> loginToAccount(String login, BuildContext context) async {
           fullName: fullName,
           job: job,
         );
-        if (job.contains("Руководитель") || job.contains("руководитель") || job.contains("Начальник") || job.contains("начальник") || job.contains("Директор") || job.contains("директор") || job.contains("Главный") || job.contains("главный") || job.contains("Заместитель") || job.contains("заместитель")) {
+        if (isAdminRole(job)) {
           Get.to(() => AdminPage(fullName: fullName, job: job));
         } else {
           Get.to(() => MainPage1(fullName: fullName, job: job));
@@ -53,7 +54,7 @@ Future<void> loginToAccount(String login, BuildContext context) async {
                     width: Dimensions.height60 * 1.5,
                   ),
                   Text(
-                    'Данный логин не зарегистрирован!',
+                    'login_not_registered'.tr,
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: Dimensions.fontSize16),
                   ),
@@ -77,12 +78,12 @@ Future<void> loginToAccount(String login, BuildContext context) async {
         );
       }
     } else {
-      _showNetworkError(context, 'Ошибка сервера (${response.statusCode})');
+      _showNetworkError(context, '${'server_error'.tr} (${response.statusCode})');
     }
   } on TimeoutException {
-    _showNetworkError(context, 'Сервер не отвечает. Проверьте подключение.');
+    _showNetworkError(context, 'server_not_responding'.tr);
   } catch (e) {
-    _showNetworkError(context, 'Ошибка подключения к серверу');
+    _showNetworkError(context, 'connection_error'.tr);
   }
 }
 
@@ -91,7 +92,7 @@ void _showNetworkError(BuildContext context, String message) {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Ошибка'),
+      title: Text('error'.tr),
       content: Text(message),
       actions: [
         TextButton(

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../widgets/custom_login_field.dart';
 import '../widgets/custom_text.dart';
@@ -14,9 +15,13 @@ class StartPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-        appBar: null,
-        body: CustomForm());
+    return Scaffold(
+      appBar: null,
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: const CustomForm(),
+      ),
+    );
   }
 }
 
@@ -31,25 +36,30 @@ class CustomFormState extends State<CustomForm> {
   static TextEditingController loginController = TextEditingController();
   static TextEditingController passwordController = TextEditingController();
 
+  final _loginButtonKey = GlobalKey<LoginButtonState>();
+
   static String _lang = "";
   late SharedPreferences prefs;
 
   @override
   void initState() {
     super.initState();
-    initializeSharedPreferences();
+    _initPrefs();
     loginController.addListener(_onLoginTextChanged);
   }
 
   void _onLoginTextChanged() {
     final text = loginController.text;
-    loginController.value = loginController.value.copyWith(
-      text: text.toUpperCase(),
-      selection: TextSelection.collapsed(offset: text.length),
-    );
+    final upper = text.toUpperCase();
+    if (text != upper) {
+      loginController.value = loginController.value.copyWith(
+        text: upper,
+        selection: TextSelection.collapsed(offset: upper.length),
+      );
+    }
   }
 
-  Future<void> initializeSharedPreferences() async {
+  Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
       prefs.setString(AppValues.LANG, "KZ");
@@ -57,6 +67,10 @@ class CustomFormState extends State<CustomForm> {
     setState(() {
       _lang = prefs.getString(AppValues.LANG)!;
     });
+    final savedLogin = await SecureStorageHelper.instance.getLogin();
+    if (savedLogin != null && savedLogin.isNotEmpty && loginController.text.isEmpty) {
+      loginController.text = savedLogin;
+    }
   }
 
   @override
@@ -69,78 +83,86 @@ class CustomFormState extends State<CustomForm> {
           fit: BoxFit.cover,
         ),
       ),
-      child: Container(
-        height: Dimensions.height120*3,
-        width: Dimensions.width120*2.6,
-        decoration: BoxDecoration(color: AppColors.niceWhite,
-          boxShadow:const [
-            BoxShadow(
-              color: Colors.black87,
-              offset: Offset(0,0),
-              blurRadius: 20,
-              spreadRadius: 3,
-            )
-          ],
-          borderRadius:
-          BorderRadius.all(Radius.circular((Dimensions.radius25*0.8))),
-        ),
-        child: Column(children: [
-          Padding(
-            padding: EdgeInsets.only(top: Dimensions.height30 / 1.5,
-                right: Dimensions.width40 / 1.5),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: GestureDetector(
-                  onTap: _changeLanguage,
-                  child: _lang == "KZ" ? SizedBox(width:Dimensions.width20*1.25,height: Dimensions.height30*1.25, child: Image.asset('assets/ru.png')) : Container(child: Image.asset('assets/kz.png'), width:Dimensions.width20*1.25,height: Dimensions.height30*1.25)),
-            ),
+      child: SingleChildScrollView(
+        child: Container(
+          margin: EdgeInsets.symmetric(horizontal: Dimensions.width20),
+          padding: EdgeInsets.symmetric(
+            horizontal: Dimensions.width20,
+            vertical: Dimensions.height30,
           ),
-          Padding(
-              padding: EdgeInsets.only(left: Dimensions.width40, right: Dimensions.width40),
-              child: SizedBox(
+          decoration: BoxDecoration(
+            color: AppColors.niceWhite,
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black87,
+                offset: Offset(0, 0),
+                blurRadius: 20,
+                spreadRadius: 3,
+              )
+            ],
+            borderRadius: BorderRadius.all(Radius.circular(Dimensions.radius25 * 0.8)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: _changeLanguage,
+                  child: _lang == "KZ"
+                      ? SizedBox(
+                          width: Dimensions.width20 * 1.25,
+                          height: Dimensions.height30 * 1.25,
+                          child: Image.asset('assets/ru.png'),
+                        )
+                      : SizedBox(
+                          width: Dimensions.width20 * 1.25,
+                          height: Dimensions.height30 * 1.25,
+                          child: Image.asset('assets/kz.png'),
+                        ),
+                ),
+              ),
+              SizedBox(height: Dimensions.height30 / 2),
+              SizedBox(
                 height: Dimensions.height100 * 1.3,
                 child: Image.asset('assets/logo.png'),
-              )
-          ),
-          Padding(
-              padding: EdgeInsets.only(top: Dimensions.height60/6, left: Dimensions.width40, right: Dimensions.width40),
-              child: CustomLoginField(
+              ),
+              SizedBox(height: Dimensions.height30),
+              CustomLoginField(
                 hintText: 'login'.tr,
                 obscureText: false,
                 controller: loginController,
                 fontSize: Dimensions.fontSize20,
                 backgroundColor: AppColors.loginField,
-              )),
-          Padding(
-              padding: EdgeInsets.only(top: Dimensions.height30, left: Dimensions.width40, right: Dimensions.width40),
-              child: LoginButton(
-                  inButton: BigText(
-                    fontWeight: FontWeight.bold,
-                    overflow: TextOverflow.visible,
-                    content: "log in".tr,
-                    color: AppColors.niceWhite,
-                  )
-              )),
-        ]),
+                onSubmitted: () => _loginButtonKey.currentState?.submit(),
+              ),
+              SizedBox(height: Dimensions.height30),
+              LoginButton(
+                key: _loginButtonKey,
+                inButton: BigText(
+                  fontWeight: FontWeight.bold,
+                  overflow: TextOverflow.visible,
+                  content: "log in".tr,
+                  color: AppColors.niceWhite,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
+
   _changeLanguage() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (_lang == "KZ") {
       prefs.setString(AppValues.LANG, "RU");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-      });
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
+      setState(() => _lang = prefs.getString(AppValues.LANG)!);
     } else if (_lang == "RU") {
       prefs.setString(AppValues.LANG, "KZ");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-      });
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
+      setState(() => _lang = prefs.getString(AppValues.LANG)!);
     }
   }
 }

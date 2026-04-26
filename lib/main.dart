@@ -6,6 +6,7 @@ import 'package:se_mobile/screens/admin_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/colors.dart';
 import 'package:se_mobile/utils/localization.dart';
+import 'package:se_mobile/utils/role_helper.dart';
 import 'package:se_mobile/utils/variables.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -61,21 +62,32 @@ class MyApp extends StatelessWidget {
         future: authCheck(),
         builder: (context, res){
           if (res.connectionState == ConnectionState.waiting){
-            return const Scaffold(
-                appBar: null,
-                body: Center(
-                  child: CircularProgressIndicator(),
-                )
+            return Scaffold(
+              appBar: null,
+              backgroundColor: AppColors.mainColor,
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset('assets/logo.png', height: 100, color: Colors.white),
+                    const SizedBox(height: 24),
+                    const CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ],
+                ),
+              ),
             );
           } else {
             final data = res.data;
             if (data != null && data['loggedIn'] == 'true'){
               String fullName = data['fullName'] ?? '';
               String job = data['job'] ?? '';
-              if (job.contains("Руководитель") || job.contains("руководитель") || job.contains("Начальник") || job.contains("начальник") || job.contains("Директор") || job.contains("директор")){
-                return AdminPage(fullName: fullName, job: job,);
+              if (isAdminRole(job)){
+                return AdminPage(fullName: fullName, job: job);
               } else {
-                return MainPage1(fullName: fullName, job: job,);
+                return MainPage1(fullName: fullName, job: job);
               }
             } else {
               return const StartPage();

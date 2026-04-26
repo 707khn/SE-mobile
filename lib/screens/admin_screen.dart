@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:se_mobile/screens/main_screen_1.dart';
 import 'package:se_mobile/utils/dimensions.dart';
@@ -7,9 +8,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/colors.dart';
+import '../utils/logout_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../widgets/icon_button_drawer.dart';
+import 'leave_screen.dart';
 import 'main_screen_2.dart';
 import 'payslip_screen.dart';
 import 'start_screen.dart';
@@ -25,23 +28,25 @@ class AdminPage extends StatefulWidget {
 }
 
 class _AdminPageState extends State<AdminPage> {
-
   static String _lang = "";
+  String? _login;
   late SharedPreferences prefs;
 
   @override
   void initState() {
     super.initState();
-    initializeSharedPreferences();
+    _initPrefs();
   }
 
-  Future<void> initializeSharedPreferences() async {
+  Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
       prefs.setString(AppValues.LANG, "KZ");
     }
+    final login = await SecureStorageHelper.instance.getLogin();
     setState(() {
       _lang = prefs.getString(AppValues.LANG)!;
+      _login = login;
     });
   }
 
@@ -49,7 +54,8 @@ class _AdminPageState extends State<AdminPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold,),
+        title: BigText(content: "main_menu".tr, fontWeight: FontWeight.bold),
+        centerTitle: true,
       ),
       drawer: Theme(
         data: Theme.of(context).copyWith(
@@ -76,23 +82,60 @@ class _AdminPageState extends State<AdminPage> {
                             children: [
                               Wrap(
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      BigText(
-                                        content: widget.fullName,
-                                        color: AppColors.niceWhite,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      MediumText(
-                                        content: widget.job,
-                                        color: AppColors.niceWhite,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                  GestureDetector(
+                                    onLongPress: () {
+                                      Clipboard.setData(ClipboardData(text: widget.fullName));
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                        content: Text('copied'.tr),
+                                        duration: const Duration(seconds: 1),
+                                        behavior: SnackBarBehavior.floating,
+                                      ));
+                                    },
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        BigText(
+                                          content: widget.fullName,
+                                          color: AppColors.niceWhite,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        MediumText(
+                                          content: widget.job,
+                                          color: AppColors.niceWhite,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (_login != null && _login!.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          GestureDetector(
+                                            onTap: () {
+                                              Clipboard.setData(ClipboardData(text: _login!));
+                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                                content: Text('copied'.tr),
+                                                duration: const Duration(seconds: 1),
+                                                behavior: SnackBarBehavior.floating,
+                                              ));
+                                            },
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.badge_outlined, size: 12, color: Colors.white54),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _login!,
+                                                  style: const TextStyle(
+                                                    color: Colors.white54,
+                                                    fontSize: 12,
+                                                    letterSpacing: 1,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ),
-
                                   Row(
                                     children: [
                                       Padding(
@@ -101,15 +144,15 @@ class _AdminPageState extends State<AdminPage> {
                                           onTap: _changeLanguage,
                                           child: _lang == "KZ"
                                               ? SizedBox(
-                                            width: Dimensions.width20 * 1.25,
-                                            height: Dimensions.height30 * 1.25,
-                                            child: Image.asset('assets/ru.png'),
-                                          )
-                                              : Container(
-                                            width: Dimensions.width20 * 1.25,
-                                            height: Dimensions.height30 * 1.25,
-                                            child: Image.asset('assets/kz.png'),
-                                          ),
+                                                  width: Dimensions.width20 * 1.25,
+                                                  height: Dimensions.height30 * 1.25,
+                                                  child: Image.asset('assets/ru.png'),
+                                                )
+                                              : SizedBox(
+                                                  width: Dimensions.width20 * 1.25,
+                                                  height: Dimensions.height30 * 1.25,
+                                                  child: Image.asset('assets/kz.png'),
+                                                ),
                                         ),
                                       ),
                                       GestureDetector(
@@ -128,118 +171,107 @@ class _AdminPageState extends State<AdminPage> {
                           ),
                         ),
                       ),
+                      ListTile(
+                        leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
+                        title: BigText(content: 'payslip'.tr),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const PayslipPage());
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.calendar_today, color: AppColors.mainColor),
+                        title: BigText(content: 'leave_sick_days'.tr),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const LeavePage());
+                        },
+                      ),
                     ],
                   ),
                 ),
-
-
                 Container(
                   height: Dimensions.height30 / 15,
                   width: Dimensions.width120 * 2,
                   color: Colors.black26,
                 ),
                 Container(
-                    padding: EdgeInsets.only(
-                        bottom: Dimensions.height30,
-                        top: Dimensions.height30 / 2),
-                    height: Dimensions.height60 * 1.5,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/youtube.png'),
-                          function: () async {
-                            const url = 'https://www.youtube.com/@semeyengineering4367';
-                            await launch(url);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/instagram.png'),
-                          function: () async {
-                            const url = 'https://www.instagram.com/jscsemeyengineering/';
-                            await launch(url);
-                          },
-                        ),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/facebook.png'),
-                          function: () async {
-                            const url = 'https://www.facebook.com/semeybtrz/';
-                            await launch(url);
-                          },),
-                        IconButtonDrawer(
-                          icon: Image.asset('assets/web.png'),
-                          function: () async {
-                            const url = 'https://se-btrz.com/';
-                            await launch(url);
-                          },
-                        ),
-                      ],
-                    )),
+                  padding: EdgeInsets.only(
+                    bottom: Dimensions.height30,
+                    top: Dimensions.height30 / 2,
+                  ),
+                  height: Dimensions.height60 * 1.5,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/youtube.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.youtube.com/@semeyengineering4367'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/instagram.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.instagram.com/jscsemeyengineering/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/facebook.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://www.facebook.com/semeybtrz/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                      IconButtonDrawer(
+                        icon: Image.asset('assets/web.png'),
+                        function: () async {
+                          await launchUrl(Uri.parse('https://se-btrz.com/'), mode: LaunchMode.externalApplication);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
       body: SingleChildScrollView(
-        child: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: Dimensions.width20,
+            vertical: Dimensions.height30,
+          ),
           child: Column(
             children: [
-              SizedBox(
-                height: Dimensions.height60 * 1.25,
+              _buildGreeting(),
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.person,
+                label: "self report".tr,
+                subtitle: "self_report_subtitle".tr,
+                onTap: () => Get.to(() => MainPage1(fullName: widget.fullName, job: widget.job)),
               ),
-              Icon(Icons.person, size: Dimensions.height120,),
-              Container(
-                padding: EdgeInsets.only(left: Dimensions.width20, right: Dimensions.width20),
-                decoration: BoxDecoration(
-                  borderRadius:  BorderRadius.all(Radius.circular(Dimensions.radius50))
-                ),
-                child: ElevatedButton(
-                    onPressed: (){
-                      Get.to(() => MainPage1(fullName: widget.fullName, job: widget.job,));
-                    },
-                    child: Container(
-                        padding: EdgeInsets.only(top: Dimensions.height30 /2, bottom: Dimensions.height30 / 2),
-                        child: BigText(content: "self report".tr, fontWeight: FontWeight.bold, overflow: TextOverflow.visible,)
-                    )
-                ),
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.groups,
+                label: "employee report".tr,
+                subtitle: "employee_report_subtitle".tr,
+                onTap: () => Get.to(() => MainPage2(fullName: widget.fullName, job: widget.job)),
               ),
-              SizedBox(
-                height: Dimensions.height60,
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.receipt_long,
+                label: "payslip".tr,
+                subtitle: "payslip_subtitle".tr,
+                onTap: () => Get.to(() => const PayslipPage()),
               ),
-              Icon(Icons.groups, size: Dimensions.height120,),
-              Container(
-                padding: EdgeInsets.only(left: Dimensions.width20, right: Dimensions.width20),
-                decoration: BoxDecoration(
-                    borderRadius:  BorderRadius.all(Radius.circular(Dimensions.radius50))
-                ),
-                child: ElevatedButton(
-                    onPressed: (){
-                      Get.to(() => MainPage2(fullName: widget.fullName, job: widget.job,));
-                    },
-                    child: Container(
-                        padding: EdgeInsets.only(top: Dimensions.height30 /2, bottom: Dimensions.height30 / 2),
-                        child: BigText(content: "employee report".tr, fontWeight: FontWeight.bold, overflow: TextOverflow.visible,)
-                    )
-                ),
-              ),
-              SizedBox(
-                height: Dimensions.height60,
-              ),
-              Icon(Icons.receipt_long, size: Dimensions.height120,),
-              Container(
-                padding: EdgeInsets.only(left: Dimensions.width20, right: Dimensions.width20),
-                decoration: BoxDecoration(
-                    borderRadius:  BorderRadius.all(Radius.circular(Dimensions.radius50))
-                ),
-                child: ElevatedButton(
-                    onPressed: (){
-                      Get.to(() => const PayslipPage());
-                    },
-                    child: Container(
-                        padding: EdgeInsets.only(top: Dimensions.height30 /2, bottom: Dimensions.height30 / 2),
-                        child: BigText(content: "payslip".tr, fontWeight: FontWeight.bold, overflow: TextOverflow.visible,)
-                    )
-                ),
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.beach_access,
+                label: "leave_sick_days".tr,
+                subtitle: "leave_subtitle".tr,
+                onTap: () => Get.to(() => const LeavePage()),
               ),
             ],
           ),
@@ -248,29 +280,138 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
+  Widget _buildMenuCard({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: Dimensions.width20,
+            vertical: Dimensions.height30 * 0.7,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.mainColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: AppColors.mainColor, size: 32),
+              ),
+              SizedBox(width: Dimensions.width20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGreeting() {
+    final now = DateTime.now();
+    final hour = now.hour;
+    final String greetKey;
+    if (hour < 12) {
+      greetKey = 'greeting_morning';
+    } else if (hour < 18) {
+      greetKey = 'greeting_afternoon';
+    } else {
+      greetKey = 'greeting_evening';
+    }
+    final firstName = widget.fullName.split(' ').first.isNotEmpty
+        ? widget.fullName.split(' ').first
+        : widget.fullName;
+    final dateStr =
+        '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}';
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Dimensions.width20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.mainColor, AppColors.gradientColor2],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$greetKey'.tr,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            firstName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.job,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                dateStr,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   _changeLanguage() async {
+    Navigator.pop(context);
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (_lang == "KZ") {
       prefs.setString(AppValues.LANG, "RU");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-      });
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
+      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
     } else if (_lang == "RU") {
       prefs.setString(AppValues.LANG, "KZ");
-      var locale = Locale(prefs.getString(AppValues.LANG)!);
-      Get.updateLocale(locale);
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-      });
+      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
+      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
     }
   }
 
-  _exit() async{
-    await SecureStorageHelper.instance.clearCredentials();
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    Get.offAll(() => const StartPage());
-  }
+  _exit() => confirmAndLogout(context);
 }
