@@ -691,6 +691,21 @@ class _MainMenu1State extends State<MainMenu1> {
                     _buildWorkSummary(filtered),
                     _buildEventSummary(filtered),
                     const SizedBox(height: 4),
+                    if (filtered.isEmpty && _filterText.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Column(
+                          children: [
+                            Icon(Icons.search_off, size: 40, color: Colors.grey.shade400),
+                            const SizedBox(height: 8),
+                            Text(
+                              '"$_filterText"',
+                              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (filtered.isNotEmpty || _filterText.isEmpty)
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: SizedBox(
