@@ -283,7 +283,8 @@ class _MainMenu1State extends State<MainMenu1> {
 
   bool get _hasData =>
       reportsEntries.isNotEmpty &&
-      !(reportsEntries.length == 1 && reportsEntries[0][0].isEmpty);
+      !(reportsEntries.length == 1 &&
+          (reportsEntries[0][0].isEmpty || reportsEntries[0][0] == 'no'));
 
   @override
   Widget build(BuildContext context) {
@@ -531,6 +532,8 @@ class _MainMenu1State extends State<MainMenu1> {
                 ],
               ),
               const SizedBox(height: 4),
+              _buildEventSummary(reportsEntries),
+              const SizedBox(height: 4),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: SizedBox(
@@ -607,6 +610,33 @@ class _MainMenu1State extends State<MainMenu1> {
     } catch (_) {
       return raw;
     }
+  }
+
+  Widget _buildEventSummary(List<List<String>> data) {
+    final counts = <String, int>{};
+    for (final e in data) {
+      if (e.length > 2 && e[2].isNotEmpty) {
+        counts[e[2]] = (counts[e[2]] ?? 0) + 1;
+      }
+    }
+    if (counts.isEmpty) return const SizedBox.shrink();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: counts.entries.map((entry) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Chip(
+              label: Text('${entry.key}: ${entry.value}',
+                  style: const TextStyle(fontSize: 11)),
+              padding: EdgeInsets.zero,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   Widget _buildPresetChip(String label, VoidCallback onTap) {
