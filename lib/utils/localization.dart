@@ -74,6 +74,14 @@ class LocaleString extends Translations {
           'employee_report_subtitle': 'Қызметкерлер бойынша есеп',
           'payslip_subtitle': 'Есептеулер мен ұстамалар',
           'leave_subtitle': 'Демалыс күндері мен ауру парағы',
+          'share': 'Бөлісу',
+          'greeting_morning': 'Қайырлы таң,',
+          'greeting_afternoon': 'Қайырлы күн,',
+          'greeting_evening': 'Қайырлы кеш,',
+          'viewing_employee': 'Дерек:',
+          'info_title': 'Ақпарат',
+          'info_hint': 'Есеп туралы ақпарат...',
+          'undo': 'Болдырмау',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -146,6 +154,14 @@ class LocaleString extends Translations {
           'employee_report_subtitle': 'Отчёт по сотрудникам',
           'payslip_subtitle': 'Начисления и удержания',
           'leave_subtitle': 'Дни отпуска и больничные',
+          'share': 'Поделиться',
+          'greeting_morning': 'Доброе утро,',
+          'greeting_afternoon': 'Добрый день,',
+          'greeting_evening': 'Добрый вечер,',
+          'viewing_employee': 'Данные:',
+          'info_title': 'Справка',
+          'info_hint': 'Как работает отчёт...',
+          'undo': 'Отмена',
         }
       };
 }

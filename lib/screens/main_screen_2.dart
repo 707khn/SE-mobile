@@ -624,6 +624,10 @@ class _MainPage2State extends State<MainPage2> {
                         child: const Icon(Icons.delete_outline, color: Colors.white),
                       ),
                       onDismissed: (_) {
+                        final removedName = employees[index];
+                        final removedData = index < reportsEntriesForMsg.length
+                            ? reportsEntriesForMsg[index]
+                            : null;
                         setState(() {
                           employees.removeAt(index);
                           if (index < reportsEntriesForMsg.length) {
@@ -636,6 +640,27 @@ class _MainPage2State extends State<MainPage2> {
                             prefs.setString("emp_sname", "");
                           }
                         });
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(removedName),
+                            duration: const Duration(seconds: 3),
+                            behavior: SnackBarBehavior.floating,
+                            action: SnackBarAction(
+                              label: 'undo'.tr,
+                              onPressed: () {
+                                setState(() {
+                                  employees.insert(index, removedName);
+                                  if (removedData != null) {
+                                    reportsEntriesForMsg.insert(index, removedData);
+                                  }
+                                  prefs.setStringList("emp_snames", employees);
+                                  prefs.setString("emp_sname", employees.last);
+                                });
+                              },
+                            ),
+                          ),
+                        );
                       },
                       child: Card(
                         child: ListTile(
@@ -650,9 +675,42 @@ class _MainPage2State extends State<MainPage2> {
                 const SizedBox(height: 8),
               ],
               const SizedBox(height: 8.0),
-              Text(
-                "info".tr,
-                style: const TextStyle(fontSize: 14, color: Colors.black54),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: AppColors.mainColor),
+                          const SizedBox(width: 8),
+                          Text('info_title'.tr),
+                        ],
+                      ),
+                      content: Text("info".tr),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: Text('cancel'.tr),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Text(
+                        'info_hint'.tr,
+                        style: const TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 8.0),
               if (_loadingReport)
@@ -661,6 +719,30 @@ class _MainPage2State extends State<MainPage2> {
                   child: CircularProgressIndicator(),
                 ))
               else if (_hasData) ...[
+                if (employees.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.mainColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.mainColor.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_outline, size: 16, color: AppColors.mainColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${'viewing_employee'.tr} ${employees.last}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.mainColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

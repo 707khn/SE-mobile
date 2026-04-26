@@ -213,6 +213,8 @@ class _AdminPageState extends State<AdminPage> {
           ),
           child: Column(
             children: [
+              _buildGreeting(),
+              SizedBox(height: Dimensions.height30 / 2),
               _buildMenuCard(
                 icon: Icons.person,
                 label: "self report".tr,
@@ -294,6 +296,56 @@ class _AdminPageState extends State<AdminPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildGreeting() {
+    final hour = DateTime.now().hour;
+    final String greetKey;
+    if (hour < 12) {
+      greetKey = 'greeting_morning';
+    } else if (hour < 18) {
+      greetKey = 'greeting_afternoon';
+    } else {
+      greetKey = 'greeting_evening';
+    }
+    final firstName = widget.fullName.split(' ').first;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Dimensions.width20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.mainColor, AppColors.gradientColor2],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$greetKey'.tr,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            firstName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            widget.job,
+            style: const TextStyle(color: Colors.white60, fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

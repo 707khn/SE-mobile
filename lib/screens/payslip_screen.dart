@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../requests/payslip_request.dart';
 import '../utils/colors.dart';
@@ -69,6 +70,29 @@ class _PayslipPageState extends State<PayslipPage> {
       _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1);
     });
     _fetchPayslip();
+  }
+
+  void _sharePayslip() {
+    if (_payslip == null) return;
+    final buffer = StringBuffer();
+    buffer.writeln(_payslip!.employee);
+    buffer.writeln(_payslip!.period);
+    buffer.writeln('');
+    buffer.writeln('${'accruals'.tr}:');
+    for (final item in _payslip!.accruals) {
+      buffer.writeln('  ${item.name}: ${_numberFormat.format(item.amount)} ₸');
+    }
+    buffer.writeln('${'total'.tr}: ${_numberFormat.format(_payslip!.totalAccruals)} ₸');
+    buffer.writeln('');
+    buffer.writeln('${'deductions'.tr}:');
+    for (final item in _payslip!.deductions) {
+      buffer.writeln('  ${item.name}: ${_numberFormat.format(item.amount)} ₸');
+    }
+    buffer.writeln('${'total'.tr}: ${_numberFormat.format(_payslip!.totalDeductions)} ₸');
+    buffer.writeln('');
+    buffer.writeln('${'net pay'.tr}: ${_numberFormat.format(_payslip!.netPay)} ₸');
+    HapticFeedback.lightImpact();
+    Share.share(buffer.toString());
   }
 
   Future<void> _pickMonth() async {
@@ -190,6 +214,12 @@ class _PayslipPageState extends State<PayslipPage> {
         title: BigText(content: 'payslip'.tr, fontWeight: FontWeight.bold),
         centerTitle: true,
         actions: [
+          if (_payslip != null)
+            IconButton(
+              icon: const Icon(Icons.share),
+              tooltip: 'share'.tr,
+              onPressed: _sharePayslip,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'refresh'.tr,
