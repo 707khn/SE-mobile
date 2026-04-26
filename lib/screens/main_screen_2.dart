@@ -748,15 +748,16 @@ class _MainPage2State extends State<MainPage2> {
   }
 
   _changeLanguage() async {
+    Navigator.pop(context);
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (_lang == "KZ") {
       prefs.setString(AppValues.LANG, "RU");
       Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      setState(() => _lang = prefs.getString(AppValues.LANG)!);
+      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
     } else if (_lang == "RU") {
       prefs.setString(AppValues.LANG, "KZ");
       Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      setState(() => _lang = prefs.getString(AppValues.LANG)!);
+      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
     }
   }
 

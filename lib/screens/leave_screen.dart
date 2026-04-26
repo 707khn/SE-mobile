@@ -309,9 +309,20 @@ class _LeavePageState extends State<LeavePage> {
             color: statusBg,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            record.status,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isApproved ? Icons.check_circle_outline : Icons.access_time_outlined,
+                size: 12,
+                color: statusColor,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                record.status,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+              ),
+            ],
           ),
         ),
       ),
