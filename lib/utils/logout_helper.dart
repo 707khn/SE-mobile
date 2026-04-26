@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,6 +29,7 @@ Future<void> confirmAndLogout(BuildContext context) async {
 
   if (confirmed != true) return;
 
+  HapticFeedback.mediumImpact();
   await SecureStorageHelper.instance.clearCredentials();
   final prefs = await SharedPreferences.getInstance();
   await prefs.clear();

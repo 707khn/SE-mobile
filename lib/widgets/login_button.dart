@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:se_mobile/requests/login_request.dart';
 import '../screens/start_screen.dart';
@@ -22,6 +23,7 @@ class LoginButtonState extends State<LoginButton> {
   Future<void> submit() async {
     final login = loginController.text.trim();
     if (login.isEmpty) {
+      HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('login_empty'.tr),
@@ -30,6 +32,7 @@ class LoginButtonState extends State<LoginButton> {
       );
       return;
     }
+    HapticFeedback.lightImpact();
     setState(() => _loading = true);
     await loginToAccount(login, context);
     if (mounted) setState(() => _loading = false);

@@ -1,5 +1,6 @@
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
@@ -27,6 +28,7 @@ Future<void> generateTable(List<List<String>> data, BuildContext context) async 
     String savePath = '$path/saved_report.csv';
     await File(csvFilePath).writeAsString(csv);
     await File(savePath).writeAsString(csv);
+    HapticFeedback.lightImpact();
     Share.shareFiles([csvFilePath], text: 'Отправка файла');
   } catch (e) {
     _showError(context, 'Ошибка экспорта CSV: $e');
@@ -61,6 +63,7 @@ Future<void> generateTableEmp(List<List<List<String>>> data, BuildContext contex
     String savePath = '$path/saved_report.csv';
     await File(csvFilePath).writeAsString(csv);
     await File(savePath).writeAsString(csv);
+    HapticFeedback.lightImpact();
     Share.shareFiles([csvFilePath], text: 'Отправка файла');
   } catch (e) {
     _showError(context, 'Ошибка экспорта CSV: $e');

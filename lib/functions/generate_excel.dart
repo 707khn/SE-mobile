@@ -1,5 +1,7 @@
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
@@ -35,6 +37,7 @@ Future<void> generateExcel(List<List<String>> data, BuildContext context) async 
     }
     await File(excelFilePath).writeAsBytes(excelBytes);
     await File(savePath).writeAsBytes(excelBytes);
+    HapticFeedback.lightImpact();
     Share.shareFiles([excelFilePath], text: 'Отправка файла');
   } catch (e) {
     _showError(context, 'Ошибка экспорта Excel: $e');
@@ -86,6 +89,7 @@ Future<void> generateExcelEmp(List<List<List<String>>> data, BuildContext contex
     }
     await File(excelFilePath).writeAsBytes(excelBytes);
     await File(savePath).writeAsBytes(excelBytes);
+    HapticFeedback.lightImpact();
     Share.shareFiles([excelFilePath], text: 'Отправка файла');
   } catch (e) {
     _showError(context, 'Ошибка экспорта Excel: $e');

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
@@ -411,7 +412,18 @@ class _MainMenu1State extends State<MainMenu1> {
                           DateFormat('dd.MM.yyyy').format(startDate),
                           DateFormat('dd.MM.yyyy').format(endDate),
                         );
-                        if (mounted) setState(() => _loadingReport = false);
+                        if (!mounted) return;
+                        setState(() => _loadingReport = false);
+                        if (_hasData) {
+                          HapticFeedback.lightImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${reportsEntries.length} ${'records_count'.tr}'),
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
                       },
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: Dimensions.height30 / 2),
