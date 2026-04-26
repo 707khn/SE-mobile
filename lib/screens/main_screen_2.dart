@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/employeedate_request.dart';
 import 'package:se_mobile/requests/get_all_employees.dart';
+import 'package:se_mobile/screens/leave_screen.dart';
+import 'package:se_mobile/screens/payslip_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/logout_helper.dart';
 import 'package:se_mobile/utils/secure_storage_helper.dart';
@@ -176,6 +178,22 @@ class _MainPage2State extends State<MainPage2> {
                             ],
                           ),
                         ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
+                        title: BigText(content: 'payslip'.tr),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const PayslipPage());
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.calendar_today, color: AppColors.mainColor),
+                        title: BigText(content: 'leave_sick_days'.tr),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const LeavePage());
+                        },
                       ),
                     ],
                   ),
