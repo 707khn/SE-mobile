@@ -11,13 +11,29 @@ class LoginButton extends StatefulWidget {
   final Widget inButton;
 
   @override
-  State<LoginButton> createState() => _LoginButtonState();
+  LoginButtonState createState() => LoginButtonState();
 }
 
-class _LoginButtonState extends State<LoginButton> {
+class LoginButtonState extends State<LoginButton> {
   bool _loading = false;
 
   final loginController = CustomFormState.loginController;
+
+  Future<void> submit() async {
+    final login = loginController.text.trim();
+    if (login.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('login_empty'.tr),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    await loginToAccount(login, context);
+    if (mounted) setState(() => _loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +55,7 @@ class _LoginButtonState extends State<LoginButton> {
           ),
           minimumSize: Size(Dimensions.width120 * 1.2, Dimensions.height30),
         ),
-        onPressed: _loading ? null : _submit,
+        onPressed: _loading ? null : submit,
         child: _loading
             ? const SizedBox(
                 height: 20,
@@ -49,21 +65,5 @@ class _LoginButtonState extends State<LoginButton> {
             : widget.inButton,
       ),
     );
-  }
-
-  Future<void> _submit() async {
-    final login = loginController.text.trim();
-    if (login.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('login_empty'.tr),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    setState(() => _loading = true);
-    await loginToAccount(login, context);
-    if (mounted) setState(() => _loading = false);
   }
 }

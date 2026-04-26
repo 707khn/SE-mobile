@@ -35,6 +35,8 @@ class CustomFormState extends State<CustomForm> {
   static TextEditingController loginController = TextEditingController();
   static TextEditingController passwordController = TextEditingController();
 
+  final _loginButtonKey = GlobalKey<LoginButtonState>();
+
   static String _lang = "";
   late SharedPreferences prefs;
 
@@ -127,9 +129,11 @@ class CustomFormState extends State<CustomForm> {
                 controller: loginController,
                 fontSize: Dimensions.fontSize20,
                 backgroundColor: AppColors.loginField,
+                onSubmitted: () => _loginButtonKey.currentState?.submit(),
               ),
               SizedBox(height: Dimensions.height30),
               LoginButton(
+                key: _loginButtonKey,
                 inButton: BigText(
                   fontWeight: FontWeight.bold,
                   overflow: TextOverflow.visible,

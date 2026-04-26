@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/colors.dart';
+import '../utils/logout_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../widgets/icon_button_drawer.dart';
@@ -290,10 +291,5 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
-  _exit() async {
-    await SecureStorageHelper.instance.clearCredentials();
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    Get.offAll(() => const StartPage());
-  }
+  _exit() => confirmAndLogout(context);
 }

@@ -11,6 +11,7 @@ class CustomLoginField extends StatefulWidget {
     this.controller,
     required this.fontSize,
     this.backgroundColor,
+    this.onSubmitted,
   }) : super(key: key);
 
   final String hintText;
@@ -19,6 +20,7 @@ class CustomLoginField extends StatefulWidget {
   final bool obscureText;
   final Color? backgroundColor;
   final double fontSize;
+  final VoidCallback? onSubmitted;
 
   @override
   _CustomLoginFieldState createState() => _CustomLoginFieldState();
@@ -53,26 +55,32 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
     final backgroundColor = _isFocused ? Colors.white : widget.backgroundColor;
 
     return Container(
-      color: backgroundColor,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: Dimensions.width20*0.5), // Добавлен внутренний отступ по горизонтали
+        padding: EdgeInsets.symmetric(horizontal: Dimensions.width20 * 0.5),
         child: TextField(
           keyboardType: TextInputType.text,
+          textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.done,
           obscureText: widget.obscureText,
           controller: widget.controller,
           focusNode: _focusNode,
+          onSubmitted: (_) => widget.onSubmitted?.call(),
           style: TextStyle(
             fontSize: widget.fontSize,
             color: Colors.black,
-            //fontWeight: FontWeight.bold,
             fontFamily: 'Trebuchet MS',
           ),
           decoration: InputDecoration(
             focusedBorder: InputBorder.none,
             enabledBorder: InputBorder.none,
             hintText: widget.hintText,
+            hintStyle: const TextStyle(color: Colors.grey),
             suffixIcon: widget.suffixIcon,
-            suffixIconConstraints: BoxConstraints(),
+            suffixIconConstraints: const BoxConstraints(),
           ),
         ),
       ),

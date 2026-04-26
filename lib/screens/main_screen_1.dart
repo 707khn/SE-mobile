@@ -9,6 +9,7 @@ import 'package:se_mobile/screens/leave_screen.dart';
 import 'package:se_mobile/requests/reportdate_request.dart';
 import 'package:se_mobile/screens/payslip_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
+import 'package:se_mobile/utils/logout_helper.dart';
 import 'package:se_mobile/utils/secure_storage_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -239,13 +240,7 @@ class _MainPage1State extends State<MainPage1> {
     }
   }
 
-  _exit() async {
-    await SecureStorageHelper.instance.clearCredentials();
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    reportsEntries = [["", "", "", ""]];
-    Get.offAll(() => const StartPage());
-  }
+  _exit() => confirmAndLogout(context);
 }
 
 class MainMenu1 extends StatefulWidget {
