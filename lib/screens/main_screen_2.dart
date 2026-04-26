@@ -375,6 +375,7 @@ class _MainPage2State extends State<MainPage2> {
                       return AlertDialog(
                         title: TextField(
                           controller: employeeController,
+                          autofocus: true,
                           onChanged: (value) {
                             setState(() {
                               searchText = value;

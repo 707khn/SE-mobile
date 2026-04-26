@@ -58,6 +58,10 @@ class LocaleString extends Translations {
           'records_count': 'жазба',
           'date_range_error': 'Бастапқы күн соңғы күннен кейін болмауы керек',
           'copied': 'Буферге көшірілді',
+          'self_report_subtitle': 'Жеке кіріп/шығу есебі',
+          'employee_report_subtitle': 'Қызметкерлер бойынша есеп',
+          'payslip_subtitle': 'Есептеулер мен ұстамалар',
+          'leave_subtitle': 'Демалыс күндері мен ауру парағы',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -114,6 +118,10 @@ class LocaleString extends Translations {
           'records_count': 'записей',
           'date_range_error': 'Начальная дата не может быть позже конечной',
           'copied': 'Скопировано',
+          'self_report_subtitle': 'Личный отчёт по турникету',
+          'employee_report_subtitle': 'Отчёт по сотрудникам',
+          'payslip_subtitle': 'Начисления и удержания',
+          'leave_subtitle': 'Дни отпуска и больничные',
         }
       };
 }

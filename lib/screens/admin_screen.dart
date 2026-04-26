@@ -205,28 +205,28 @@ class _AdminPageState extends State<AdminPage> {
               _buildMenuCard(
                 icon: Icons.person,
                 label: "self report".tr,
-                subtitle: "attendance report".tr,
+                subtitle: "self_report_subtitle".tr,
                 onTap: () => Get.to(() => MainPage1(fullName: widget.fullName, job: widget.job)),
               ),
               SizedBox(height: Dimensions.height30 / 2),
               _buildMenuCard(
                 icon: Icons.groups,
                 label: "employee report".tr,
-                subtitle: "attendance report".tr,
+                subtitle: "employee_report_subtitle".tr,
                 onTap: () => Get.to(() => MainPage2(fullName: widget.fullName, job: widget.job)),
               ),
               SizedBox(height: Dimensions.height30 / 2),
               _buildMenuCard(
                 icon: Icons.receipt_long,
                 label: "payslip".tr,
-                subtitle: '',
+                subtitle: "payslip_subtitle".tr,
                 onTap: () => Get.to(() => const PayslipPage()),
               ),
               SizedBox(height: Dimensions.height30 / 2),
               _buildMenuCard(
                 icon: Icons.beach_access,
                 label: "leave_sick_days".tr,
-                subtitle: '',
+                subtitle: "leave_subtitle".tr,
                 onTap: () => Get.to(() => const LeavePage()),
               ),
             ],
@@ -265,9 +265,18 @@ class _AdminPageState extends State<AdminPage> {
               ),
               SizedBox(width: Dimensions.width20),
               Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const Icon(Icons.chevron_right, color: Colors.grey),
