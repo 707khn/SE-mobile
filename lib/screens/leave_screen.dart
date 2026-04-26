@@ -53,7 +53,7 @@ class _LeavePageState extends State<LeavePage> {
     buffer.writeln('');
     buffer.writeln('${'leave_balances'.tr}:');
     for (final b in _leaveData!.balances) {
-      buffer.writeln('  ${b.type}: ${b.remainingDays}/${'${b.totalDays}'} ${'days_short'.tr}');
+      buffer.writeln('  ${b.type}: ${b.remainingDays}/${b.totalDays} ${'days_short'.tr}');
     }
     if (_leaveData!.history.isNotEmpty) {
       buffer.writeln('');
