@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
@@ -541,15 +542,39 @@ class _MainPage2State extends State<MainPage2> {
                       rows: reportsEntries.asMap().entries.map((e) {
                         final idx = e.key;
                         final entry = e.value;
+                        final isToday = _isToday(entry[0]);
                         return DataRow(
                           color: WidgetStateProperty.all(
-                            idx.isEven ? Colors.transparent : Colors.grey.shade50,
+                            isToday
+                                ? AppColors.mainColor.withOpacity(0.08)
+                                : (idx.isEven ? Colors.transparent : Colors.grey.shade50),
                           ),
                           cells: [
-                            DataCell(Text(_formatDate(entry[0]))),
+                            DataCell(
+                              Text(
+                                _formatDate(entry[0]),
+                                style: isToday
+                                    ? const TextStyle(
+                                        color: AppColors.mainColor,
+                                        fontWeight: FontWeight.bold,
+                                      )
+                                    : null,
+                              ),
+                            ),
                             DataCell(Text(entry[1])),
                             DataCell(Text(entry[2])),
-                            DataCell(Text(entry[3])),
+                            DataCell(
+                              Text(entry[3]),
+                              onLongPress: () {
+                                final row = '${_formatDate(entry[0])}  ${entry[1]}  ${entry[2]}  ${entry[3]}';
+                                Clipboard.setData(ClipboardData(text: row));
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text('copied'.tr),
+                                  duration: const Duration(seconds: 1),
+                                  behavior: SnackBarBehavior.floating,
+                                ));
+                              },
+                            ),
                           ],
                         );
                       }).toList(),
@@ -596,6 +621,16 @@ class _MainPage2State extends State<MainPage2> {
       return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
     } catch (_) {
       return raw;
+    }
+  }
+
+  bool _isToday(String raw) {
+    try {
+      final d = DateTime.parse(raw);
+      final now = DateTime.now();
+      return d.year == now.year && d.month == now.month && d.day == now.day;
+    } catch (_) {
+      return false;
     }
   }
 }
