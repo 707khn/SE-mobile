@@ -402,7 +402,36 @@ class _MainPage2State extends State<MainPage2> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16.0),
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildPresetChip('today'.tr, () {
+                      final now = DateTime.now();
+                      setState(() { startDate = now; endDate = now; _dateError = false; });
+                    }),
+                    const SizedBox(width: 6),
+                    _buildPresetChip('last_7_days'.tr, () {
+                      final now = DateTime.now();
+                      setState(() { startDate = now.subtract(const Duration(days: 6)); endDate = now; _dateError = false; });
+                    }),
+                    const SizedBox(width: 6),
+                    _buildPresetChip('this_month'.tr, () {
+                      final now = DateTime.now();
+                      setState(() { startDate = DateTime(now.year, now.month, 1); endDate = now; _dateError = false; });
+                    }),
+                    const SizedBox(width: 6),
+                    _buildPresetChip('last_month'.tr, () {
+                      final now = DateTime.now();
+                      final first = DateTime(now.year, now.month - 1, 1);
+                      final last = DateTime(now.year, now.month, 0);
+                      setState(() { startDate = first; endDate = last; _dateError = false; });
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12.0),
               BigText(content: "choose employee".tr, fontWeight: FontWeight.bold),
               const SizedBox(height: 8.0),
               ElevatedButton.icon(
@@ -673,6 +702,15 @@ class _MainPage2State extends State<MainPage2> {
   }
 
   _exit() => confirmAndLogout(context);
+
+  Widget _buildPresetChip(String label, VoidCallback onTap) {
+    return ActionChip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      onPressed: onTap,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+    );
+  }
 
   String _formatDate(String raw) {
     try {

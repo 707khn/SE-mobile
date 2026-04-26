@@ -434,6 +434,35 @@ class _MainMenu1State extends State<MainMenu1> {
                 ),
               ],
             ),
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildPresetChip('today'.tr, () {
+                    final now = DateTime.now();
+                    setState(() { startDate = now; endDate = now; _dateError = false; });
+                  }),
+                  const SizedBox(width: 6),
+                  _buildPresetChip('last_7_days'.tr, () {
+                    final now = DateTime.now();
+                    setState(() { startDate = now.subtract(const Duration(days: 6)); endDate = now; _dateError = false; });
+                  }),
+                  const SizedBox(width: 6),
+                  _buildPresetChip('this_month'.tr, () {
+                    final now = DateTime.now();
+                    setState(() { startDate = DateTime(now.year, now.month, 1); endDate = now; _dateError = false; });
+                  }),
+                  const SizedBox(width: 6),
+                  _buildPresetChip('last_month'.tr, () {
+                    final now = DateTime.now();
+                    final first = DateTime(now.year, now.month - 1, 1);
+                    final last = DateTime(now.year, now.month, 0);
+                    setState(() { startDate = first; endDate = last; _dateError = false; });
+                  }),
+                ],
+              ),
+            ),
             SizedBox(height: Dimensions.height30 / 5),
             SizedBox(
               width: double.infinity,
@@ -578,6 +607,15 @@ class _MainMenu1State extends State<MainMenu1> {
     } catch (_) {
       return raw;
     }
+  }
+
+  Widget _buildPresetChip(String label, VoidCallback onTap) {
+    return ActionChip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      onPressed: onTap,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+    );
   }
 
   bool _isToday(String raw) {
