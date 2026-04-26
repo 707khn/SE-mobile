@@ -49,6 +49,8 @@ class _MainPage2State extends State<MainPage2> {
   List<String> allEmployees = [];
   List<String> filteredEmployees = [];
   bool _dateError = false;
+  List<String>? _employeesCache;
+  bool _employeesCacheLoading = false;
 
   @override
   void initState() {
@@ -524,7 +526,7 @@ class _MainPage2State extends State<MainPage2> {
                             width: double.maxFinite,
                             height: Dimensions.height120 * 3,
                             child: FutureBuilder(
-                              future: getAllEmployees(context),
+                              future: _getEmployeesCached(),
                               builder: (BuildContext context, snapshot) {
                                 if (snapshot.hasData) {
                                   allEmployees = snapshot.data!;
@@ -762,6 +764,13 @@ class _MainPage2State extends State<MainPage2> {
   }
 
   _exit() => confirmAndLogout(context);
+
+  Future<List<String>> _getEmployeesCached() async {
+    if (_employeesCache != null) return _employeesCache!;
+    final result = await getAllEmployees(context);
+    if (mounted) _employeesCache = result;
+    return result;
+  }
 
   Widget _buildEventSummary(List<List<String>> data) {
     final counts = <String, int>{};

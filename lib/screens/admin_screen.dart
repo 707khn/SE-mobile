@@ -51,7 +51,7 @@ class _AdminPageState extends State<AdminPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: BigText(content: "attendance report".tr, fontWeight: FontWeight.bold),
+        title: BigText(content: "main_menu".tr, fontWeight: FontWeight.bold),
         centerTitle: true,
       ),
       drawer: Theme(
