@@ -150,6 +150,78 @@ class _LeavePageState extends State<LeavePage> {
                   ),
                 ),
                 SizedBox(height: Dimensions.height30 / 2),
+                Builder(builder: (context) {
+                  final now = DateTime.now();
+                  final upcoming = _leaveData!.history.where((r) {
+                    try {
+                      return DateTime.parse(r.startDate).isAfter(now);
+                    } catch (_) {
+                      return false;
+                    }
+                  }).toList();
+                  if (upcoming.isEmpty) return const SizedBox.shrink();
+                  upcoming.sort((a, b) {
+                    try {
+                      return DateTime.parse(a.startDate).compareTo(DateTime.parse(b.startDate));
+                    } catch (_) { return 0; }
+                  });
+                  final next = upcoming.first;
+                  final daysUntil = DateTime.parse(next.startDate).difference(now).inDays;
+                  return Column(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(Dimensions.width20),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.event_available, color: Colors.orange.shade700, size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'upcoming_leave'.tr,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: Colors.orange.shade800,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${next.type}  •  ${_fmtDate(next.startDate)}',
+                                    style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$daysUntil ${'days_short'.tr}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: Dimensions.height30 / 2),
+                    ],
+                  );
+                }),
                 Row(
                   children: [
                     BigText(content: 'leave_balances'.tr, fontWeight: FontWeight.bold),
