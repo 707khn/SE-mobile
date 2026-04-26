@@ -471,7 +471,7 @@ class _PayslipPageState extends State<PayslipPage> {
                 ),
               )
             else
-              ...items.map((item) {
+              ...([...items]..sort((a, b) => b.amount.compareTo(a.amount))).map((item) {
                 final pct = total > 0 ? (item.amount / total * 100) : 0.0;
                 return GestureDetector(
                   onLongPress: () {

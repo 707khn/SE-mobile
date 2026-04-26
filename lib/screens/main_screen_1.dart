@@ -688,6 +688,7 @@ class _MainMenu1State extends State<MainMenu1> {
                       ],
                     ),
                     const SizedBox(height: 4),
+                    _buildWorkSummary(filtered),
                     _buildEventSummary(filtered),
                     const SizedBox(height: 4),
                     SingleChildScrollView(
@@ -858,6 +859,40 @@ class _MainMenu1State extends State<MainMenu1> {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
     );
   }
+
+  Widget _buildWorkSummary(List<List<String>> data) {
+    DateTime? first;
+    DateTime? last;
+    for (final e in data) {
+      if (e.length < 2 || e[0].isEmpty || e[1].isEmpty) continue;
+      try {
+        final dt = DateTime.parse('${e[0]} ${e[1]}');
+        if (first == null || dt.isBefore(first)) first = dt;
+        if (last == null || dt.isAfter(last)) last = dt;
+      } catch (_) {}
+    }
+    if (first == null || last == null || first == last) return const SizedBox.shrink();
+    final span = last.difference(first);
+    final h = span.inHours;
+    final m = span.inMinutes % 60;
+    final timeStr = h > 0 ? '${h}h ${m}m' : '${m}m';
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 2),
+      child: Row(
+        children: [
+          const Icon(Icons.access_time_filled, size: 13, color: AppColors.mainColor),
+          const SizedBox(width: 4),
+          Text(
+            '${_fmtTime(first)} — ${_fmtTime(last)}  ($timeStr)',
+            style: const TextStyle(fontSize: 12, color: AppColors.mainColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmtTime(DateTime dt) =>
+      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
   bool _isToday(String raw) {
     try {
