@@ -300,19 +300,50 @@ class _PayslipPageState extends State<PayslipPage> {
                 ),
               )
             else
-              ...items.map((item) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(child: Text(item.name, style: const TextStyle(fontSize: 14))),
-                        Text(
-                          '${_numberFormat.format(item.amount)} ₸',
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  )),
+              ...items.map((item) {
+                final pct = total > 0 ? (item.amount / total * 100) : 0.0;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(item.name, style: const TextStyle(fontSize: 14)),
+                          ),
+                          Text(
+                            '${_numberFormat.format(item.amount)} ₸',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: LinearProgressIndicator(
+                                value: pct / 100,
+                                minHeight: 3,
+                                backgroundColor: color.withOpacity(0.1),
+                                valueColor: AlwaysStoppedAnimation<Color>(color.withOpacity(0.5)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${pct.toStringAsFixed(1)}%',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
             const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -538,13 +538,20 @@ class _MainPage2State extends State<MainPage2> {
                         DataColumn(label: Text('col_event'.tr)),
                         DataColumn(label: Text('col_door'.tr)),
                       ],
-                      rows: reportsEntries.map((entry) {
-                        return DataRow(cells: [
-                          DataCell(Text(_formatDate(entry[0]))),
-                          DataCell(Text(entry[1])),
-                          DataCell(Text(entry[2])),
-                          DataCell(Text(entry[3])),
-                        ]);
+                      rows: reportsEntries.asMap().entries.map((e) {
+                        final idx = e.key;
+                        final entry = e.value;
+                        return DataRow(
+                          color: WidgetStateProperty.all(
+                            idx.isEven ? Colors.transparent : Colors.grey.shade50,
+                          ),
+                          cells: [
+                            DataCell(Text(_formatDate(entry[0]))),
+                            DataCell(Text(entry[1])),
+                            DataCell(Text(entry[2])),
+                            DataCell(Text(entry[3])),
+                          ],
+                        );
                       }).toList(),
                     ),
                   ),
