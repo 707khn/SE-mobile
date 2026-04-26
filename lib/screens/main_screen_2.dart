@@ -125,16 +125,16 @@ class _MainPage2State extends State<MainPage2> {
             onSelected: (String value) {
               switch (value) {
                 case "Отправить отчёт Excel":
-                  generateExcelEmp(reportsEntriesForMsg);
+                  generateExcelEmp(reportsEntriesForMsg, context);
                   break;
                 case "Есепті Excel бағдарламасына жүктеңіз":
-                  generateExcelEmp(reportsEntriesForMsg);
+                  generateExcelEmp(reportsEntriesForMsg, context);
                   break;
                 case "Отправить отчёт csv":
-                  generateTableEmp(reportsEntriesForMsg);
+                  generateTableEmp(reportsEntriesForMsg, context);
                   break;
                 case "CSV форматындағы ақырғы файлды көру":
-                  generateTableEmp(reportsEntriesForMsg);
+                  generateTableEmp(reportsEntriesForMsg, context);
                   break;
               }
             },
@@ -281,28 +281,22 @@ class _MainPage2State extends State<MainPage2> {
               TextButton(
                 onPressed: () async {
                   final directory = await getExternalStorageDirectories();
+                  if (directory == null || directory.isEmpty) return;
                   try {
-                    OpenFile.open("${directory![0].path}/saved_report.xlsx");
-                  } catch(e){
+                    OpenFile.open("${directory[0].path}/saved_report.xlsx");
+                  } catch (e) {
                     print(e);
                   }
-
-                  /*String? path = await FilesystemPicker.open(
-                  title: 'Open file',
-                  context: context,
-                  rootDirectory: directory![0],
-                  fsType: FilesystemType.file,
-                  fileTileSelectMode: FileTileSelectMode.wholeTile,
-                );*/
                 },
                 child: SmallText(content: "see last Excel".tr,),
               ),
               TextButton(
                 onPressed: () async {
                   final directory = await getExternalStorageDirectories();
+                  if (directory == null || directory.isEmpty) return;
                   try {
-                    OpenFile.open("${directory![0].path}/saved_report.csv");
-                  } catch(e){
+                    OpenFile.open("${directory[0].path}/saved_report.csv");
+                  } catch (e) {
                     print(e);
                   }
                 },

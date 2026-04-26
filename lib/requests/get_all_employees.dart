@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -9,11 +10,13 @@ Future<List<String>> getAllEmployees(BuildContext context) async {
   final keySuffix = await SecureStorageHelper.instance.getLogin();
 
   try {
-    var response = await http.post(
-      Uri.parse('${AppValues.baseUrl}/get_sname'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'key_suffix': keySuffix}),
-    );
+    var response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/get_sname'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'key_suffix': keySuffix}),
+        )
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);
       List<String> employeeNames = List<String>.from(responseBody['fio']);
@@ -22,6 +25,9 @@ Future<List<String>> getAllEmployees(BuildContext context) async {
       print('Ошибка HTTP-запроса');
       return ["no"];
     }
+  } on TimeoutException {
+    print('Превышено время ожидания запроса');
+    return ["no"];
   } catch (e) {
     print('Ошибка: $e');
     return ["no"];

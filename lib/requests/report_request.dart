@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
@@ -9,11 +10,13 @@ Future<List<List<String>>> getReportEntries(BuildContext context) async {
   final login = await SecureStorageHelper.instance.getLogin();
 
   try {
-    var response = await http.post(
-      Uri.parse('${AppValues.baseUrl}/report'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'key_suffix': login}),
-    );
+    var response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/report'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'key_suffix': login}),
+        )
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);
       List<List<String>> report = [];
@@ -39,6 +42,9 @@ Future<List<List<String>>> getReportEntries(BuildContext context) async {
       print('Ошибка HTTP-запроса');
       return [["no"]];
     }
+  } on TimeoutException {
+    print('Превышено время ожидания запроса');
+    return [["no"]];
   } catch (e) {
     print('Ошибка: $e');
     return [["no"]];
