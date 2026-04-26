@@ -372,19 +372,27 @@ class _MainPage2State extends State<MainPage2> {
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('—', style: TextStyle(color: Colors.grey.shade600)),
-                        Text(
-                          '${endDate.difference(startDate).inDays + 1} ${'days_short'.tr}',
-                          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                        ),
-                      ],
-                    ),
-                  ),
+                  Builder(builder: (context) {
+                    final diff = endDate.difference(startDate).inDays + 1;
+                    final isInvalid = diff <= 0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('—', style: TextStyle(color: isInvalid ? Colors.red.shade700 : Colors.grey.shade600)),
+                          Text(
+                            isInvalid ? '!' : '$diff ${'days_short'.tr}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isInvalid ? Colors.red.shade700 : Colors.grey.shade500,
+                              fontWeight: isInvalid ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                   Expanded(
                     child: InkWell(
                       onTap: () async {
@@ -990,7 +998,10 @@ class _MainPage2State extends State<MainPage2> {
   Widget _buildPresetChip(String label, VoidCallback onTap) {
     return ActionChip(
       label: Text(label, style: const TextStyle(fontSize: 12)),
-      onPressed: _loadingReport ? null : onTap,
+      onPressed: _loadingReport ? null : () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
     );
