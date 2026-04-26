@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:se_mobile/screens/admin_screen.dart';
 import '../screens/main_screen_1.dart';
 import '../utils/dimensions.dart';
+import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
@@ -31,7 +32,7 @@ Future<void> loginToAccount(String login, BuildContext context) async {
           fullName: fullName,
           job: job,
         );
-        if (job.contains("Руководитель") || job.contains("руководитель") || job.contains("Начальник") || job.contains("начальник") || job.contains("Директор") || job.contains("директор") || job.contains("Главный") || job.contains("главный") || job.contains("Заместитель") || job.contains("заместитель")) {
+        if (isAdminRole(job)) {
           Get.to(() => AdminPage(fullName: fullName, job: job));
         } else {
           Get.to(() => MainPage1(fullName: fullName, job: job));
