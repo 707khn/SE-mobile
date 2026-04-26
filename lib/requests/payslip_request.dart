@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -35,11 +36,13 @@ Future<PayslipData?> getPayslip(BuildContext context, String month, String year)
   final login = await SecureStorageHelper.instance.getLogin();
 
   try {
-    var response = await http.post(
-      Uri.parse('${AppValues.baseUrl}/payslip'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'key_suffix': login, 'month': month, 'year': year}),
-    );
+    var response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/payslip'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'key_suffix': login, 'month': month, 'year': year}),
+        )
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);
       if (responseBody['message'] == 'Failure') {
@@ -63,6 +66,9 @@ Future<PayslipData?> getPayslip(BuildContext context, String month, String year)
       print('Ошибка HTTP-запроса: ${response.statusCode}');
       return null;
     }
+  } on TimeoutException {
+    print('Превышено время ожидания запроса');
+    return null;
   } catch (e) {
     print('Ошибка: $e');
     return null;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -50,11 +51,13 @@ Future<LeaveData?> getLeaves(BuildContext context) async {
   final login = await SecureStorageHelper.instance.getLogin();
 
   try {
-    var response = await http.post(
-      Uri.parse('${AppValues.baseUrl}/leaves'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'key_suffix': login}),
-    );
+    var response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/leaves'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'key_suffix': login}),
+        )
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);
       if (responseBody['message'] == 'Failure') {
@@ -85,6 +88,9 @@ Future<LeaveData?> getLeaves(BuildContext context) async {
       print('Ошибка HTTP-запроса: ${response.statusCode}');
       return null;
     }
+  } on TimeoutException {
+    print('Превышено время ожидания запроса');
+    return null;
   } catch (e) {
     print('Ошибка: $e');
     return null;

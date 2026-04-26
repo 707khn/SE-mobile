@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
@@ -10,11 +11,13 @@ Future<List<List<String>>> getEmployeeDate(BuildContext context, startdate, endd
   final emp_sname = prefs.getString('emp_sname');
 
   try {
-    var response = await http.post(
-      Uri.parse('${AppValues.baseUrl}/director_report'),
-      headers: {'Content-Type' : 'application/json'},
-      body: jsonEncode({'emp_sname': emp_sname, 'start_date': startdate, 'end_date': enddate}),
-    );
+    var response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/director_report'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'emp_sname': emp_sname, 'start_date': startdate, 'end_date': enddate}),
+        )
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);
       List<List<String>> report = [];
@@ -41,6 +44,9 @@ Future<List<List<String>>> getEmployeeDate(BuildContext context, startdate, endd
       print('Ошибка HTTP-запроса');
       return [["no"]];
     }
+  } on TimeoutException {
+    print('Превышено время ожидания запроса');
+    return [["no"]];
   } catch (e) {
     print('Ошибка: $e');
     return [["no"]];
