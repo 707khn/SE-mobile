@@ -568,7 +568,14 @@ class _MainPage2State extends State<MainPage2> {
                                           );
                                           reportsEntries = data;
                                           reportsEntriesForMsg.add(data);
-                                          if (mounted) setState(() => _loadingReport = false);
+                                          if (mounted) {
+                                            setState(() {
+                                              _loadingReport = false;
+                                              searchText = '';
+                                              filteredEmployees = [];
+                                            });
+                                          }
+                                          employeeController.clear();
                                           Navigator.pop(context);
                                         },
                                       );

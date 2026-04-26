@@ -195,7 +195,9 @@ class _LeavePageState extends State<LeavePage> {
 
   Widget _buildBalanceCard(LeaveBalance balance) {
     final progress = balance.totalDays > 0 ? balance.usedDays / balance.totalDays : 0.0;
-    final color = balance.remainingDays > 0 ? AppColors.mainColor : AppColors.niceRed;
+    final isExhausted = balance.remainingDays <= 0;
+    final isLow = balance.remainingDays > 0 && balance.remainingDays <= 3;
+    final color = isExhausted ? AppColors.niceRed : AppColors.mainColor;
 
     return Card(
       child: Padding(
@@ -203,9 +205,48 @@ class _LeavePageState extends State<LeavePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              balance.type,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    balance.type,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+                if (isLow)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade700.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.shade700.withOpacity(0.4)),
+                    ),
+                    child: Text(
+                      '${balance.remainingDays} ${'days_short'.tr}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade800,
+                      ),
+                    ),
+                  )
+                else if (isExhausted)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.niceRed.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '0 ${'days_short'.tr}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.niceRed,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             SizedBox(height: Dimensions.height30 / 3),
             ClipRRect(
