@@ -406,6 +406,16 @@ class _MainMenu1State extends State<MainMenu1> {
                 onPressed: _loadingReport
                     ? null
                     : () async {
+                        if (startDate.isAfter(endDate)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('date_range_error'.tr),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: Colors.red.shade700,
+                            ),
+                          );
+                          return;
+                        }
                         setState(() => _loadingReport = true);
                         reportsEntries = await getReportDateEntries(
                           context,

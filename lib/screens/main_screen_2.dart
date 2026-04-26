@@ -367,6 +367,18 @@ class _MainPage2State extends State<MainPage2> {
                           decoration: InputDecoration(
                             labelText: 'search'.tr,
                             prefixIcon: const Icon(Icons.search),
+                            suffixIcon: employeeController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      employeeController.clear();
+                                      setState(() {
+                                        searchText = '';
+                                        filteredEmployees = allEmployees;
+                                      });
+                                    },
+                                  )
+                                : null,
                           ),
                         ),
                         content: SingleChildScrollView(
@@ -440,24 +452,37 @@ class _MainPage2State extends State<MainPage2> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemBuilder: (context, index) {
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.person_outline, color: AppColors.mainColor),
-                        title: Text(employees[index]),
-                        trailing: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              employees.removeAt(index);
-                              reportsEntriesForMsg.removeAt(index);
-                              prefs.setStringList("emp_snames", employees);
-                              if (employees.isNotEmpty) {
-                                prefs.setString("emp_sname", employees.last);
-                              } else {
-                                prefs.setString("emp_sname", "");
-                              }
-                            });
-                          },
-                          icon: const Icon(Icons.remove_circle_outline, color: AppColors.niceRed),
+                    return Dismissible(
+                      key: Key('emp_${employees[index]}_$index'),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.niceRed,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.delete_outline, color: Colors.white),
+                      ),
+                      onDismissed: (_) {
+                        setState(() {
+                          employees.removeAt(index);
+                          if (index < reportsEntriesForMsg.length) {
+                            reportsEntriesForMsg.removeAt(index);
+                          }
+                          prefs.setStringList("emp_snames", employees);
+                          if (employees.isNotEmpty) {
+                            prefs.setString("emp_sname", employees.last);
+                          } else {
+                            prefs.setString("emp_sname", "");
+                          }
+                        });
+                      },
+                      child: Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.person_outline, color: AppColors.mainColor),
+                          title: Text(employees[index]),
+                          trailing: const Icon(Icons.swipe_left, size: 16, color: Colors.grey),
                         ),
                       ),
                     );

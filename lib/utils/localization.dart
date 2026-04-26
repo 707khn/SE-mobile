@@ -56,6 +56,7 @@ class LocaleString extends Translations {
           'log_out_title': 'Шығу',
           'log_out_confirm': 'Шынымен шығасыз ба?',
           'records_count': 'жазба',
+          'date_range_error': 'Бастапқы күн соңғы күннен кейін болмауы керек',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -110,6 +111,7 @@ class LocaleString extends Translations {
           'log_out_title': 'Выйти',
           'log_out_confirm': 'Вы уверены, что хотите выйти?',
           'records_count': 'записей',
+          'date_range_error': 'Начальная дата не может быть позже конечной',
         }
       };
 }
