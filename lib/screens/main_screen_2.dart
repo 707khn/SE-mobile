@@ -990,7 +990,7 @@ class _MainPage2State extends State<MainPage2> {
   Widget _buildPresetChip(String label, VoidCallback onTap) {
     return ActionChip(
       label: Text(label, style: const TextStyle(fontSize: 12)),
-      onPressed: onTap,
+      onPressed: _loadingReport ? null : onTap,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
     );

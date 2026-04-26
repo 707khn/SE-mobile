@@ -791,7 +791,7 @@ class _MainMenu1State extends State<MainMenu1> {
   Widget _buildPresetChip(String label, VoidCallback onTap) {
     return ActionChip(
       label: Text(label, style: const TextStyle(fontSize: 12)),
-      onPressed: onTap,
+      onPressed: _loadingReport ? null : onTap,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
     );

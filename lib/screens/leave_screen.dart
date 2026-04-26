@@ -256,7 +256,18 @@ class _LeavePageState extends State<LeavePage> {
     final isLow = balance.remainingDays > 0 && balance.remainingDays <= 3;
     final color = isExhausted ? AppColors.niceRed : AppColors.mainColor;
 
-    return Card(
+    return GestureDetector(
+      onLongPress: () {
+        Clipboard.setData(ClipboardData(
+          text: '${balance.type}: ${balance.remainingDays}/${balance.totalDays} ${'days_short'.tr}',
+        ));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('copied'.tr),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ));
+      },
+      child: Card(
       child: Padding(
         padding: EdgeInsets.all(Dimensions.width20),
         child: Column(
@@ -332,6 +343,7 @@ class _LeavePageState extends State<LeavePage> {
                 style: const TextStyle(fontSize: 12, color: Colors.black38)),
           ],
         ),
+      ),
       ),
     );
   }
