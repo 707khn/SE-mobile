@@ -307,7 +307,14 @@ class _PayslipPageState extends State<PayslipPage> {
                     ),
                   ),
                 ),
-              if (_payslip != null) ...[
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _payslip == null
+                    ? const SizedBox.shrink()
+                    : Column(
+                        key: ValueKey(_payslip!.period),
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                 GestureDetector(
                   onLongPress: () {
                     Clipboard.setData(ClipboardData(
@@ -432,7 +439,9 @@ class _PayslipPageState extends State<PayslipPage> {
                   ),
                 ),
                 SizedBox(height: Dimensions.height30),
-              ],
+                      ],
+                    ),
+              ),
             ],
           ),
         ),

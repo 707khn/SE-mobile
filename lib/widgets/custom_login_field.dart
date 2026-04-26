@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../utils/dimensions.dart';
 
@@ -95,7 +96,19 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
                     icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
                     onPressed: () => widget.controller?.clear(),
                   )
-                : widget.suffixIcon,
+                : IconButton(
+                    icon: const Icon(Icons.content_paste_rounded, size: 18, color: Colors.grey),
+                    onPressed: () async {
+                      final data = await Clipboard.getData(Clipboard.kTextPlain);
+                      final text = data?.text?.trim().toUpperCase() ?? '';
+                      if (text.isNotEmpty && widget.controller != null) {
+                        widget.controller!.value = TextEditingValue(
+                          text: text,
+                          selection: TextSelection.collapsed(offset: text.length),
+                        );
+                      }
+                    },
+                  ),
             suffixIconConstraints: const BoxConstraints(),
           ),
         ),
