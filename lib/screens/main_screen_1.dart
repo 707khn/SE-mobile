@@ -286,6 +286,8 @@ class _MainMenu1State extends State<MainMenu1> {
   bool _loadingReport = false;
   bool _dateError = false;
   bool _initError = false;
+  String _filterText = '';
+  final _filterController = TextEditingController();
 
   @override
   void initState() {
@@ -529,7 +531,9 @@ class _MainMenu1State extends State<MainMenu1> {
                         setState(() {
                           _loadingReport = true;
                           _dateError = false;
+                          _filterText = '';
                         });
+                        _filterController.clear();
                         reportsEntries = await getReportDateEntries(
                           context,
                           DateFormat('dd.MM.yyyy').format(startDate),
@@ -565,39 +569,72 @@ class _MainMenu1State extends State<MainMenu1> {
             ),
             SizedBox(height: Dimensions.height30 / 3),
             if (!_loadingReport && _hasData) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'scroll to right'.tr,
-                    style: const TextStyle(fontSize: 12.0, color: Colors.grey),
-                  ),
-                  Text(
-                    '${reportsEntries.length} ${'records_count'.tr}',
-                    style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
-                  ),
-                ],
+              TextField(
+                controller: _filterController,
+                onChanged: (v) => setState(() => _filterText = v),
+                decoration: InputDecoration(
+                  hintText: 'search'.tr,
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  suffixIcon: _filterText.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _filterController.clear();
+                            setState(() => _filterText = '');
+                          },
+                        )
+                      : null,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  isDense: true,
+                ),
               ),
-              const SizedBox(height: 4),
-              _buildEventSummary(reportsEntries),
-              const SizedBox(height: 4),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: Dimensions.width120 * 4,
-                  child: DataTable(
-                    headingTextStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.mainColor,
-                      fontSize: 13,
+              const SizedBox(height: 6),
+              Builder(builder: (context) {
+                final filtered = _filterText.isEmpty
+                    ? reportsEntries
+                    : reportsEntries
+                        .where((e) => e.any((cell) =>
+                            cell.toLowerCase().contains(_filterText.toLowerCase())))
+                        .toList();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'scroll to right'.tr,
+                          style: const TextStyle(fontSize: 12.0, color: Colors.grey),
+                        ),
+                        Text(
+                          _filterText.isEmpty
+                              ? '${reportsEntries.length} ${'records_count'.tr}'
+                              : '${filtered.length}/${reportsEntries.length} ${'records_count'.tr}',
+                          style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
+                        ),
+                      ],
                     ),
-                    columns: [
-                      DataColumn(label: Text('col_date'.tr)),
-                      DataColumn(label: Text('col_time'.tr)),
-                      DataColumn(label: Text('col_event'.tr)),
-                      DataColumn(label: Text('col_door'.tr)),
-                    ],
-                    rows: reportsEntries.asMap().entries.map((e) {
+                    const SizedBox(height: 4),
+                    _buildEventSummary(filtered),
+                    const SizedBox(height: 4),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: Dimensions.width120 * 4,
+                        child: DataTable(
+                          headingTextStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.mainColor,
+                            fontSize: 13,
+                          ),
+                          columns: [
+                            DataColumn(label: Text('col_date'.tr)),
+                            DataColumn(label: Text('col_time'.tr)),
+                            DataColumn(label: Text('col_event'.tr)),
+                            DataColumn(label: Text('col_door'.tr)),
+                          ],
+                          rows: filtered.asMap().entries.map((e) {
                       final idx = e.key;
                       final entry = e.value;
                       final isToday = _isToday(entry[0]);
@@ -639,6 +676,9 @@ class _MainMenu1State extends State<MainMenu1> {
                   ),
                 ),
               ),
+                  ],
+                );
+              }),
             ] else if (!_loadingReport && _initError) ...[
               const SizedBox(height: 32),
               Icon(Icons.wifi_off, size: 56, color: Colors.grey.shade400),
@@ -675,6 +715,12 @@ class _MainMenu1State extends State<MainMenu1> {
       ),
     ),
     );
+  }
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
   }
 
   String _formatDate(String raw) {

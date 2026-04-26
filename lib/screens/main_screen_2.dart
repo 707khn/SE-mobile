@@ -51,6 +51,8 @@ class _MainPage2State extends State<MainPage2> {
   bool _dateError = false;
   List<String>? _employeesCache;
   bool _employeesCacheLoading = false;
+  String _filterText = '';
+  final _filterController = TextEditingController();
 
   @override
   void initState() {
@@ -590,7 +592,9 @@ class _MainPage2State extends State<MainPage2> {
                                               _loadingReport = false;
                                               searchText = '';
                                               filteredEmployees = [];
+                                              _filterText = '';
                                             });
+                                            _filterController.clear();
                                           }
                                           employeeController.clear();
                                           Navigator.pop(context);
@@ -765,6 +769,37 @@ class _MainPage2State extends State<MainPage2> {
                       ],
                     ),
                   ),
+                TextField(
+                  controller: _filterController,
+                  onChanged: (v) => setState(() => _filterText = v),
+                  decoration: InputDecoration(
+                    hintText: 'search'.tr,
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    suffixIcon: _filterText.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _filterController.clear();
+                              setState(() => _filterText = '');
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Builder(builder: (context) {
+                  final filtered = _filterText.isEmpty
+                      ? reportsEntries
+                      : reportsEntries
+                          .where((e) => e.any((cell) =>
+                              cell.toLowerCase().contains(_filterText.toLowerCase())))
+                          .toList();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -773,13 +808,15 @@ class _MainPage2State extends State<MainPage2> {
                       style: const TextStyle(fontSize: 12.0, color: Colors.grey),
                     ),
                     Text(
-                      '${reportsEntries.length} ${'records_count'.tr}',
+                      _filterText.isEmpty
+                          ? '${reportsEntries.length} ${'records_count'.tr}'
+                          : '${filtered.length}/${reportsEntries.length} ${'records_count'.tr}',
                       style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                _buildEventSummary(reportsEntries),
+                _buildEventSummary(filtered),
                 const SizedBox(height: 4),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -797,7 +834,7 @@ class _MainPage2State extends State<MainPage2> {
                         DataColumn(label: Text('col_event'.tr)),
                         DataColumn(label: Text('col_door'.tr)),
                       ],
-                      rows: reportsEntries.asMap().entries.map((e) {
+                      rows: filtered.asMap().entries.map((e) {
                         final idx = e.key;
                         final entry = e.value;
                         final isToday = _isToday(entry[0]);
@@ -839,6 +876,9 @@ class _MainPage2State extends State<MainPage2> {
                     ),
                   ),
                 ),
+                  ],
+                  );
+                }),
               ] else ...[
                 const SizedBox(height: 24),
                 Icon(Icons.person_search, size: 56, color: Colors.grey.shade400),
@@ -881,6 +921,12 @@ class _MainPage2State extends State<MainPage2> {
   }
 
   _exit() => confirmAndLogout(context);
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
 
   Future<List<String>> _getEmployeesCached() async {
     if (_employeesCache != null) return _employeesCache!;
