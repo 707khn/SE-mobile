@@ -152,6 +152,7 @@ class _PayslipPageState extends State<PayslipPage> {
                         final m = index + 1;
                         final isSelected = m == selectedMonth && selectedYear == _selectedDate.year;
                         final isFuture = isCurrentYear && m > now.month;
+                        final isCurrentMonth = m == now.month && selectedYear == now.year;
                         return GestureDetector(
                           onTap: isFuture ? null : () => setInnerState(() => selectedMonth = m),
                           child: Container(
@@ -163,6 +164,9 @@ class _PayslipPageState extends State<PayslipPage> {
                                       ? Colors.grey.shade100
                                       : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
+                              border: isCurrentMonth && !isSelected
+                                  ? Border.all(color: AppColors.mainColor.withOpacity(0.5))
+                                  : null,
                             ),
                             child: Center(
                               child: Text(
@@ -172,8 +176,11 @@ class _PayslipPageState extends State<PayslipPage> {
                                       ? Colors.white
                                       : isFuture
                                           ? Colors.grey.shade400
-                                          : Colors.black87,
+                                          : isCurrentMonth
+                                              ? AppColors.mainColor
+                                              : Colors.black87,
                                   fontSize: 13,
+                                  fontWeight: isCurrentMonth ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -300,7 +307,14 @@ class _PayslipPageState extends State<PayslipPage> {
                     ),
                   ),
                 ),
-              if (_payslip != null) ...[
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _payslip == null
+                    ? const SizedBox.shrink()
+                    : Column(
+                        key: ValueKey(_payslip!.period),
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                 GestureDetector(
                   onLongPress: () {
                     Clipboard.setData(ClipboardData(
@@ -425,7 +439,9 @@ class _PayslipPageState extends State<PayslipPage> {
                   ),
                 ),
                 SizedBox(height: Dimensions.height30),
-              ],
+                      ],
+                    ),
+              ),
             ],
           ),
         ),

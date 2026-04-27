@@ -435,8 +435,18 @@ class _LeavePageState extends State<LeavePage> {
               ],
             ),
             SizedBox(height: Dimensions.height30 / 6),
-            Text('${'total_days'.tr}: ${balance.totalDays}',
-                style: const TextStyle(fontSize: 12, color: Colors.black38)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('${'total_days'.tr}: ${balance.totalDays}',
+                    style: const TextStyle(fontSize: 12, color: Colors.black38)),
+                if (balance.totalDays > 0)
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}% ${'used_days'.tr.toLowerCase()}',
+                    style: TextStyle(fontSize: 11, color: color.withOpacity(0.6)),
+                  ),
+              ],
+            ),
           ],
         ),
       ),

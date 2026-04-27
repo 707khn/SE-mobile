@@ -1,9 +1,79 @@
 import os
-from datetime import date
+import logging
+from datetime import date, datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from models import (db, Employee, AccessRecord, Payslip,
-                    PayslipAccrual, PayslipDeduction, LeaveBalance, LeaveHistory)
+                    PayslipAccrual, PayslipDeduction, LeaveBalance, LeaveHistory,
+                    FcmToken, TurnstileEvent, MenuDate, MenuItem)
+
+try:
+    import firebase_admin
+    from firebase_admin import credentials, messaging as fb_messaging
+    _FIREBASE_AVAILABLE = True
+except ImportError:
+    _FIREBASE_AVAILABLE = False
+
+_fb_app = None
+
+
+def _get_firebase():
+    global _fb_app
+    if not _FIREBASE_AVAILABLE:
+        return None
+    if _fb_app is None:
+        cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH', 'firebase-credentials.json')
+        if os.path.exists(cred_path):
+            try:
+                cred = credentials.Certificate(cred_path)
+                _fb_app = firebase_admin.initialize_app(cred)
+            except Exception as e:
+                logging.warning(f'Firebase init failed: {e}')
+    return _fb_app
+
+
+def _is_admin_role(job_title: str) -> bool:
+    j = job_title.lower()
+    return any(k in j for k in ('руководитель', 'начальник', 'директор', 'главный', 'заместитель'))
+
+
+def _send_turnstile_notification(employee_name: str, direction: str, timestamp_str: str, employee_id: str):
+    if not _get_firebase():
+        return
+    admin_employee_ids = [
+        e.employee_id for e in Employee.query.all() if _is_admin_role(e.job_title)
+    ]
+    if not admin_employee_ids:
+        return
+    tokens = [
+        t.token for t in FcmToken.query.filter(
+            FcmToken.employee_id.in_(admin_employee_ids)
+        ).all()
+    ]
+    if not tokens:
+        return
+    direction_text = 'вошёл' if direction == 'in' else 'вышел'
+    message = fb_messaging.MulticastMessage(
+        tokens=tokens,
+        notification=fb_messaging.Notification(
+            title='СКУД — проход сотрудника',
+            body=f'{employee_name} {direction_text} в {timestamp_str}',
+        ),
+        data={'type': 'turnstile', 'employee_id': employee_id, 'direction': direction},
+    )
+    try:
+        resp = fb_messaging.send_each_for_multicast(message)
+        invalid_tokens = set()
+        for i, r in enumerate(resp.responses):
+            if not r.success and r.exception:
+                code = getattr(r.exception, 'code', '')
+                if code in ('registration-token-not-registered', 'invalid-argument'):
+                    invalid_tokens.add(tokens[i])
+        if invalid_tokens:
+            FcmToken.query.filter(FcmToken.token.in_(invalid_tokens)).delete(synchronize_session=False)
+            db.session.commit()
+    except Exception as e:
+        logging.warning(f'FCM send failed: {e}')
 
 
 def create_app():
@@ -39,7 +109,7 @@ def register_routes(app):
         return jsonify({
             'status': 'ok',
             'service': 'SE-mobile API',
-            'version': '2.0 (PostgreSQL)',
+            'version': '3.0 (PostgreSQL + FCM + Canteen)',
             'endpoints': [
                 'POST /login',
                 'POST /report',
@@ -47,7 +117,15 @@ def register_routes(app):
                 'POST /director_report',
                 'POST /get_sname',
                 'POST /payslip',
-                'POST /leaves'
+                'POST /leaves',
+                'POST /api/fcm-token',
+                'DELETE /api/fcm-token',
+                'POST /api/turnstile',
+                'GET /api/attendance',
+                'GET /api/attendance/summary',
+                'GET /api/menu',
+                'POST /api/menu',
+                'DELETE /api/menu/<date>',
             ]
         })
 
@@ -207,6 +285,203 @@ def register_routes(app):
                 } for h in history]
             }
         })
+
+
+    # ── FCM token registration ────────────────────────────────────────────────
+
+    @app.route('/api/fcm-token', methods=['POST'])
+    def register_fcm_token():
+        data = request.get_json() or {}
+        employee_id = data.get('employee_id', '').strip()
+        token = data.get('token', '').strip()
+        if not employee_id or not token:
+            return jsonify({'message': 'Failure', 'error': 'employee_id and token required'}), 400
+        emp = Employee.query.get(employee_id)
+        if not emp:
+            return jsonify({'message': 'Failure', 'error': 'Employee not found'}), 404
+        existing = FcmToken.query.filter_by(token=token).first()
+        if existing:
+            existing.employee_id = employee_id
+        else:
+            db.session.add(FcmToken(employee_id=employee_id, token=token))
+        db.session.commit()
+        return jsonify({'message': 'Success'})
+
+    @app.route('/api/fcm-token', methods=['DELETE'])
+    def unregister_fcm_token():
+        data = request.get_json() or {}
+        token = data.get('token', '').strip()
+        if not token:
+            return jsonify({'message': 'Failure', 'error': 'token required'}), 400
+        FcmToken.query.filter_by(token=token).delete()
+        db.session.commit()
+        return jsonify({'message': 'Success'})
+
+    # ── СКУД turnstile webhook ────────────────────────────────────────────────
+
+    @app.route('/api/turnstile', methods=['POST'])
+    def turnstile_event():
+        data = request.get_json() or {}
+        secret = data.get('secret', '')
+        expected = os.environ.get('TURNSTILE_SECRET', '')
+        if expected and secret != expected:
+            return jsonify({'message': 'Failure', 'error': 'Unauthorized'}), 403
+
+        employee_id = data.get('employee_id', '').strip()
+        direction = data.get('direction', '').strip()  # 'in' | 'out'
+        ts_raw = data.get('timestamp')
+
+        if not employee_id or direction not in ('in', 'out'):
+            return jsonify({'message': 'Failure', 'error': 'employee_id and direction required'}), 400
+
+        emp = Employee.query.get(employee_id)
+        if not emp:
+            return jsonify({'message': 'Failure', 'error': 'Employee not found'}), 404
+
+        if ts_raw:
+            try:
+                ts = datetime.fromisoformat(ts_raw)
+            except ValueError:
+                ts = datetime.utcnow()
+        else:
+            ts = datetime.utcnow()
+
+        event = TurnstileEvent(employee_id=employee_id, direction=direction, timestamp=ts)
+        db.session.add(event)
+        db.session.commit()
+
+        ts_str = ts.strftime('%H:%M')
+        _send_turnstile_notification(emp.full_name, direction, ts_str, employee_id)
+
+        return jsonify({'message': 'Success', 'id': event.id})
+
+    # ── Attendance statistics ─────────────────────────────────────────────────
+
+    @app.route('/api/attendance', methods=['GET'])
+    def attendance():
+        date_str = request.args.get('date', date.today().isoformat())
+        try:
+            query_date = date.fromisoformat(date_str)
+        except ValueError:
+            return jsonify({'message': 'Failure', 'error': 'Invalid date'}), 400
+
+        events = TurnstileEvent.query.filter(
+            db.func.date(TurnstileEvent.timestamp) == query_date
+        ).order_by(TurnstileEvent.timestamp).all()
+
+        result = []
+        for e in events:
+            emp = Employee.query.get(e.employee_id)
+            result.append({
+                'id': e.id,
+                'employee_id': e.employee_id,
+                'full_name': emp.full_name if emp else e.employee_id,
+                'direction': e.direction,
+                'timestamp': e.timestamp.isoformat(),
+            })
+        return jsonify({'message': 'Success', 'date': date_str, 'events': result})
+
+    @app.route('/api/attendance/summary', methods=['GET'])
+    def attendance_summary():
+        month_str = request.args.get('month', date.today().strftime('%Y-%m'))
+        try:
+            year, month = (int(x) for x in month_str.split('-'))
+        except (ValueError, AttributeError):
+            return jsonify({'message': 'Failure', 'error': 'Invalid month, use YYYY-MM'}), 400
+
+        events = TurnstileEvent.query.filter(
+            db.extract('year', TurnstileEvent.timestamp) == year,
+            db.extract('month', TurnstileEvent.timestamp) == month,
+        ).order_by(TurnstileEvent.timestamp).all()
+
+        by_day: dict = {}
+        for e in events:
+            day_key = e.timestamp.date().isoformat()
+            emp = Employee.query.get(e.employee_id)
+            name = emp.full_name if emp else e.employee_id
+            entry = by_day.setdefault(day_key, {'date': day_key, 'arrivals': 0, 'departures': 0, 'employees': {}})
+            if e.direction == 'in':
+                entry['arrivals'] += 1
+            else:
+                entry['departures'] += 1
+            entry['employees'].setdefault(e.employee_id, {'full_name': name, 'in': None, 'out': None})
+            if e.direction == 'in' and entry['employees'][e.employee_id]['in'] is None:
+                entry['employees'][e.employee_id]['in'] = e.timestamp.strftime('%H:%M')
+            if e.direction == 'out':
+                entry['employees'][e.employee_id]['out'] = e.timestamp.strftime('%H:%M')
+
+        days_list = []
+        for day_key in sorted(by_day):
+            d = by_day[day_key]
+            d['employees'] = list(d['employees'].values())
+            days_list.append(d)
+
+        return jsonify({'message': 'Success', 'month': month_str, 'days': days_list})
+
+    # ── Canteen menu ──────────────────────────────────────────────────────────
+
+    @app.route('/api/menu', methods=['GET'])
+    def get_menu():
+        date_str = request.args.get('date', date.today().isoformat())
+        try:
+            query_date = date.fromisoformat(date_str)
+        except ValueError:
+            return jsonify({'message': 'Failure', 'error': 'Invalid date'}), 400
+
+        menu = MenuDate.query.filter_by(date=query_date).first()
+        if not menu:
+            return jsonify({'message': 'Success', 'date': date_str, 'items': []})
+
+        items = [{'id': i.id, 'category': i.category, 'name': i.name,
+                  'price': float(i.price) if i.price is not None else None}
+                 for i in menu.items]
+        return jsonify({'message': 'Success', 'date': date_str, 'items': items})
+
+    @app.route('/api/menu', methods=['POST'])
+    def save_menu():
+        data = request.get_json() or {}
+        date_str = data.get('date', '')
+        items_data = data.get('items', [])
+        try:
+            menu_date = date.fromisoformat(date_str)
+        except (ValueError, TypeError):
+            return jsonify({'message': 'Failure', 'error': 'Invalid or missing date'}), 400
+
+        menu = MenuDate.query.filter_by(date=menu_date).first()
+        if menu:
+            MenuItem.query.filter_by(menu_date_id=menu.id).delete()
+        else:
+            menu = MenuDate(date=menu_date)
+            db.session.add(menu)
+            db.session.flush()
+
+        for item in items_data:
+            category = str(item.get('category', '')).strip()
+            name = str(item.get('name', '')).strip()
+            price = item.get('price')
+            if not category or not name:
+                continue
+            db.session.add(MenuItem(
+                menu_date_id=menu.id,
+                category=category,
+                name=name,
+                price=float(price) if price is not None else None,
+            ))
+
+        db.session.commit()
+        return jsonify({'message': 'Success'})
+
+    @app.route('/api/menu/<date_str>', methods=['DELETE'])
+    def delete_menu(date_str):
+        try:
+            menu_date = date.fromisoformat(date_str)
+        except ValueError:
+            return jsonify({'message': 'Failure', 'error': 'Invalid date'}), 400
+        menu = MenuDate.query.filter_by(date=menu_date).first()
+        if menu:
+            db.session.delete(menu)
+            db.session.commit()
+        return jsonify({'message': 'Success'})
 
 
 def _access_to_dict(record):

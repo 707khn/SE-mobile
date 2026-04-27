@@ -729,7 +729,7 @@ class _MainPage2State extends State<MainPage2> {
                       },
                       child: Card(
                         child: ListTile(
-                          leading: const Icon(Icons.person_outline, color: AppColors.mainColor),
+                          leading: _buildInitialsAvatar(employees[index], index),
                           title: Text(employees[index]),
                           trailing: const Icon(Icons.swipe_left, size: 16, color: Colors.grey),
                         ),
@@ -881,6 +881,21 @@ class _MainPage2State extends State<MainPage2> {
                 _buildWorkSummary(filtered),
                 _buildEventSummary(filtered),
                 const SizedBox(height: 4),
+                if (filtered.isEmpty && _filterText.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      children: [
+                        Icon(Icons.search_off, size: 40, color: Colors.grey.shade400),
+                        const SizedBox(height: 8),
+                        Text(
+                          '"$_filterText"',
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (filtered.isNotEmpty || _filterText.isEmpty)
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: SizedBox(
@@ -996,6 +1011,28 @@ class _MainPage2State extends State<MainPage2> {
     final result = await getAllEmployees(context);
     if (mounted) _employeesCache = result;
     return result;
+  }
+
+  static const _avatarColors = [
+    Color(0xFF1565C0), Color(0xFF2E7D32), Color(0xFF6A1B9A),
+    Color(0xFFE65100), Color(0xFF00695C), Color(0xFFC62828),
+    Color(0xFF4527A0), Color(0xFF283593),
+  ];
+
+  Widget _buildInitialsAvatar(String name, int index) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    final initials = parts.length >= 2
+        ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
+        : name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final color = _avatarColors[index % _avatarColors.length];
+    return CircleAvatar(
+      radius: 18,
+      backgroundColor: color,
+      child: Text(
+        initials,
+        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 
   Widget _buildEventSummary(List<List<String>> data) {

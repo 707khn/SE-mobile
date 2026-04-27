@@ -6,3 +6,8 @@ bool isAdminRole(String job) {
       lower.contains('главный') ||
       lower.contains('заместитель');
 }
+
+bool isCanteenTech(String job) {
+  final lower = job.toLowerCase();
+  return lower.contains('технолог') && lower.contains('столов');
+}
