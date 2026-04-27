@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -81,3 +82,35 @@ class LeaveHistory(db.Model):
     end_date = db.Column(db.Date, nullable=False)
     days = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(50), nullable=False)
+
+
+class FcmToken(db.Model):
+    __tablename__ = 'fcm_tokens'
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'), nullable=False)
+    token = db.Column(db.String(512), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class TurnstileEvent(db.Model):
+    __tablename__ = 'turnstile_events'
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'), nullable=False)
+    direction = db.Column(db.String(10), nullable=False)  # 'in' | 'out'
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class MenuDate(db.Model):
+    __tablename__ = 'menu_dates'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False, unique=True)
+    items = db.relationship('MenuItem', backref='menu_date', lazy=True, cascade='all, delete-orphan')
+
+
+class MenuItem(db.Model):
+    __tablename__ = 'menu_items'
+    id = db.Column(db.Integer, primary_key=True)
+    menu_date_id = db.Column(db.Integer, db.ForeignKey('menu_dates.id'), nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    price = db.Column(db.Numeric(10, 2))

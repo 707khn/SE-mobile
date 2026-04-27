@@ -14,10 +14,28 @@ import 'screens/main_screen_1.dart';
 import 'screens/main_screen_2.dart';
 import 'utils/secure_storage_helper.dart';
 
+// Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
+// ignore: depend_on_referenced_packages
+import 'package:firebase_core/firebase_core.dart';
+import 'services/fcm_service.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(dynamic message) async {
+  await Firebase.initializeApp();
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ru');
   await initializeSharedPreferences();
+
+  try {
+    await Firebase.initializeApp();
+    FcmService.setupForegroundHandler();
+  } catch (_) {
+    // Firebase not configured yet — app works without push notifications
+  }
+
   runApp(const MyApp());
 }
 
