@@ -398,43 +398,43 @@ class _PayslipPageState extends State<PayslipPage> {
                                   color: AppColors.mainColor,
                                 ),
                               ),
-                        ],
+                            ],
                           ),
-                        ),
-                        if (_payslip!.totalAccruals > 0) ...[
-                          const SizedBox(height: 8),
-                          Builder(builder: (context) {
-                            final deductPct = (_payslip!.totalDeductions / _payslip!.totalAccruals * 100).clamp(0, 100);
-                            return Column(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(3),
-                                  child: LinearProgressIndicator(
-                                    value: 1.0 - (deductPct / 100),
-                                    minHeight: 6,
-                                    backgroundColor: AppColors.niceRed.withOpacity(0.2),
-                                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.mainColor),
+                          if (_payslip!.totalAccruals > 0) ...[
+                            const SizedBox(height: 8),
+                            Builder(builder: (context) {
+                              final deductPct = (_payslip!.totalDeductions / _payslip!.totalAccruals * 100).clamp(0, 100);
+                              return Column(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(3),
+                                    child: LinearProgressIndicator(
+                                      value: 1.0 - (deductPct / 100),
+                                      minHeight: 6,
+                                      backgroundColor: AppColors.niceRed.withOpacity(0.2),
+                                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.mainColor),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '${'net pay'.tr}: ${(100 - deductPct).toStringAsFixed(1)}%',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.mainColor),
-                                    ),
-                                    Text(
-                                      '${'deductions'.tr}: ${deductPct.toStringAsFixed(1)}%',
-                                      style: TextStyle(fontSize: 11, color: AppColors.niceRed.withOpacity(0.8)),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            );
-                          }),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '${'net pay'.tr}: ${(100 - deductPct).toStringAsFixed(1)}%',
+                                        style: const TextStyle(fontSize: 11, color: AppColors.mainColor),
+                                      ),
+                                      Text(
+                                        '${'deductions'.tr}: ${deductPct.toStringAsFixed(1)}%',
+                                        style: TextStyle(fontSize: 11, color: AppColors.niceRed.withOpacity(0.8)),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            }),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
