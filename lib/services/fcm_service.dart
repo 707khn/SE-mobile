@@ -45,14 +45,14 @@ class FcmService {
       if (token == null) return;
 
       await http.post(
-        Uri.parse('${AppValues.BASE_URL}/api/fcm-token'),
+        Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'employee_id': employeeId, 'token': token}),
       );
 
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
         await http.post(
-          Uri.parse('${AppValues.BASE_URL}/api/fcm-token'),
+          Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'employee_id': employeeId, 'token': newToken}),
         );
@@ -65,7 +65,7 @@ class FcmService {
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
       await http.delete(
-        Uri.parse('${AppValues.BASE_URL}/api/fcm-token'),
+        Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'token': token}),
       );
