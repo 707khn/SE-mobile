@@ -4,8 +4,10 @@ from datetime import date, datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from models import (db, Employee, AccessRecord, Payslip,
-                    PayslipAccrual, PayslipDeduction, LeaveBalance, LeaveHistory,
+                    PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
+                    PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem)
+from parser_1c_xml import parse_1c_xml
 
 try:
     import firebase_admin
@@ -245,12 +247,152 @@ def register_routes(app):
             'payslip': {
                 'period': ps.period_display,
                 'employee': ps.employee.full_name,
-                'accruals': [{'name': a.name, 'amount': a.amount} for a in ps.accruals],
-                'deductions': [{'name': d.name, 'amount': d.amount} for d in ps.deductions],
+                'position': ps.position or '',
+                'department': ps.department or '',
+                'accruals': [
+                    {'name': a.name, 'amount': a.amount,
+                     'period': a.period or '', 'working_days': a.working_days,
+                     'working_hours': a.working_hours}
+                    for a in ps.accruals
+                ],
+                'deductions': [
+                    {'name': d.name, 'amount': d.amount, 'period': d.period or ''}
+                    for d in ps.deductions
+                ],
+                'paid': [
+                    {'payment_type': p.payment_type or '', 'period': p.period or '',
+                     'document': p.document or '', 'date': p.date or '', 'amount': p.amount}
+                    for p in ps.paid
+                ],
+                'benefits': [{'name': b.name, 'amount': b.amount} for b in ps.benefits],
+                'reference': [{'name': r.name, 'amount': r.amount} for r in ps.reference],
                 'total_accruals': ps.total_accruals,
                 'total_deductions': ps.total_deductions,
-                'net_pay': ps.net_pay
+                'total_paid': ps.total_paid or 0.0,
+                'net_pay': ps.net_pay,
+                'debt_start': ps.debt_start or 0.0,
+                'debt_end': ps.debt_end or 0.0,
             }
+        })
+
+    @app.route('/api/admin/upload-payslip-xml', methods=['POST'])
+    def upload_payslip_xml():
+        admin_token = os.environ.get('ADMIN_TOKEN', '')
+        if admin_token:
+            provided = request.headers.get('X-Admin-Token', '')
+            if provided != admin_token:
+                return jsonify({'message': 'Forbidden'}), 403
+
+        if 'file' not in request.files:
+            return jsonify({'message': 'Файл не передан', 'error': True}), 400
+
+        file = request.files['file']
+        if not file.filename.lower().endswith('.xml'):
+            return jsonify({'message': 'Ожидается XML файл', 'error': True}), 400
+
+        try:
+            payslips = parse_1c_xml(file.read())
+        except ValueError as e:
+            return jsonify({'message': str(e), 'error': True}), 422
+
+        imported = []
+        for slip in payslips:
+            emp_id = slip['employee_1c_id']
+
+            emp = Employee.query.get(emp_id)
+            if emp is None:
+                emp = Employee(
+                    employee_id=emp_id,
+                    full_name=slip['full_name'],
+                    job_title=slip['position'] or 'Сотрудник',
+                    iin=None,
+                )
+                db.session.add(emp)
+                db.session.flush()
+            else:
+                if slip['full_name']:
+                    emp.full_name = slip['full_name']
+                if slip['position']:
+                    emp.job_title = slip['position']
+
+            ps = Payslip.query.filter_by(
+                employee_id=emp_id,
+                period_year=slip['period_year'],
+                period_month=slip['period_month'],
+            ).first()
+
+            if ps is None:
+                ps = Payslip(
+                    employee_id=emp_id,
+                    period_month=slip['period_month'],
+                    period_year=slip['period_year'],
+                    period_display=slip['period_display'],
+                    total_accruals=slip['total_accruals'],
+                    total_deductions=slip['total_deductions'],
+                    net_pay=slip['net_pay'],
+                    position=slip['position'],
+                    department=slip['department'],
+                    salary_rate=slip['salary_rate'],
+                    debt_start=slip['debt_start'],
+                    debt_end=slip['debt_end'],
+                    total_paid=slip['total_paid'],
+                )
+                db.session.add(ps)
+                db.session.flush()
+            else:
+                ps.period_display = slip['period_display']
+                ps.total_accruals = slip['total_accruals']
+                ps.total_deductions = slip['total_deductions']
+                ps.net_pay = slip['net_pay']
+                ps.position = slip['position']
+                ps.department = slip['department']
+                ps.salary_rate = slip['salary_rate']
+                ps.debt_start = slip['debt_start']
+                ps.debt_end = slip['debt_end']
+                ps.total_paid = slip['total_paid']
+                PayslipAccrual.query.filter_by(payslip_id=ps.id).delete()
+                PayslipDeduction.query.filter_by(payslip_id=ps.id).delete()
+                PayslipPaid.query.filter_by(payslip_id=ps.id).delete()
+                PayslipBenefit.query.filter_by(payslip_id=ps.id).delete()
+                PayslipReference.query.filter_by(payslip_id=ps.id).delete()
+
+            for a in slip['accruals']:
+                db.session.add(PayslipAccrual(
+                    payslip_id=ps.id, name=a['name'], amount=a['amount'],
+                    period=a['period'], working_days=a['working_days'],
+                    working_hours=a['working_hours'],
+                ))
+            for d in slip['deductions']:
+                db.session.add(PayslipDeduction(
+                    payslip_id=ps.id, name=d['name'], amount=d['amount'],
+                    period=d['period'],
+                ))
+            for p in slip['paid']:
+                db.session.add(PayslipPaid(
+                    payslip_id=ps.id, payment_type=p['payment_type'],
+                    period=p['period'], document=p['document'],
+                    date=p['date'], amount=p['amount'],
+                ))
+            for b in slip['benefits']:
+                db.session.add(PayslipBenefit(
+                    payslip_id=ps.id, name=b['name'], amount=b['amount'],
+                ))
+            for r in slip['reference']:
+                db.session.add(PayslipReference(
+                    payslip_id=ps.id, name=r['name'], amount=r['amount'],
+                ))
+
+            imported.append({
+                'employee_id': emp_id,
+                'full_name': slip['full_name'],
+                'period': slip['period_display'],
+            })
+
+        db.session.commit()
+        return jsonify({
+            'message': 'Success',
+            'imported': len(imported),
+            'employees': imported,
         })
 
     @app.route('/leaves', methods=['POST'])

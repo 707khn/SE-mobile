@@ -10,7 +10,7 @@ class Employee(db.Model):
     employee_id = db.Column(db.String(10), primary_key=True)
     full_name = db.Column(db.String(255), nullable=False)
     job_title = db.Column(db.String(100), nullable=False)
-    iin = db.Column(db.String(12), unique=True, nullable=False)
+    iin = db.Column(db.String(12), unique=True, nullable=True)
 
     access_records = db.relationship('AccessRecord', backref='employee', lazy='dynamic')
     payslips = db.relationship('Payslip', backref='employee', lazy='dynamic')
@@ -38,9 +38,19 @@ class Payslip(db.Model):
     total_accruals = db.Column(db.Float, nullable=False)
     total_deductions = db.Column(db.Float, nullable=False)
     net_pay = db.Column(db.Float, nullable=False)
+    # Extended fields from 1C ZUP
+    position = db.Column(db.String(200))
+    department = db.Column(db.String(200))
+    salary_rate = db.Column(db.Float)
+    debt_start = db.Column(db.Float, default=0.0)
+    debt_end = db.Column(db.Float, default=0.0)
+    total_paid = db.Column(db.Float, default=0.0)
 
     accruals = db.relationship('PayslipAccrual', backref='payslip', lazy='select', cascade='all, delete-orphan')
     deductions = db.relationship('PayslipDeduction', backref='payslip', lazy='select', cascade='all, delete-orphan')
+    paid = db.relationship('PayslipPaid', backref='payslip', lazy='select', cascade='all, delete-orphan')
+    benefits = db.relationship('PayslipBenefit', backref='payslip', lazy='select', cascade='all, delete-orphan')
+    reference = db.relationship('PayslipReference', backref='payslip', lazy='select', cascade='all, delete-orphan')
 
     __table_args__ = (db.UniqueConstraint('employee_id', 'period_year', 'period_month'),)
 
@@ -49,16 +59,47 @@ class PayslipAccrual(db.Model):
     __tablename__ = 'payslip_accruals'
     id = db.Column(db.Integer, primary_key=True)
     payslip_id = db.Column(db.Integer, db.ForeignKey('payslips.id', ondelete='CASCADE'), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
     amount = db.Column(db.Float, nullable=False)
+    period = db.Column(db.String(50))
+    working_days = db.Column(db.Integer)
+    working_hours = db.Column(db.Float)
 
 
 class PayslipDeduction(db.Model):
     __tablename__ = 'payslip_deductions'
     id = db.Column(db.Integer, primary_key=True)
     payslip_id = db.Column(db.Integer, db.ForeignKey('payslips.id', ondelete='CASCADE'), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
     amount = db.Column(db.Float, nullable=False)
+    period = db.Column(db.String(50))
+
+
+class PayslipPaid(db.Model):
+    __tablename__ = 'payslip_paid'
+    id = db.Column(db.Integer, primary_key=True)
+    payslip_id = db.Column(db.Integer, db.ForeignKey('payslips.id', ondelete='CASCADE'), nullable=False)
+    payment_type = db.Column(db.String(200))
+    period = db.Column(db.String(50))
+    document = db.Column(db.String(200))
+    date = db.Column(db.String(20))
+    amount = db.Column(db.Float)
+
+
+class PayslipBenefit(db.Model):
+    __tablename__ = 'payslip_benefits'
+    id = db.Column(db.Integer, primary_key=True)
+    payslip_id = db.Column(db.Integer, db.ForeignKey('payslips.id', ondelete='CASCADE'), nullable=False)
+    name = db.Column(db.String(200))
+    amount = db.Column(db.Float)
+
+
+class PayslipReference(db.Model):
+    __tablename__ = 'payslip_reference'
+    id = db.Column(db.Integer, primary_key=True)
+    payslip_id = db.Column(db.Integer, db.ForeignKey('payslips.id', ondelete='CASCADE'), nullable=False)
+    name = db.Column(db.String(200))
+    amount = db.Column(db.Float)
 
 
 class LeaveBalance(db.Model):
