@@ -365,6 +365,26 @@ class _PayslipPageState extends State<PayslipPage> {
                   _payslip!.totalDeductions,
                   AppColors.niceRed,
                 ),
+                if (_payslip!.paid.isNotEmpty) ...[
+                  SizedBox(height: Dimensions.height30 / 2),
+                  _buildPaidSection(),
+                ],
+                if (_payslip!.benefits.isNotEmpty) ...[
+                  SizedBox(height: Dimensions.height30 / 2),
+                  _buildSimpleSection(
+                    'Льготы',
+                    _payslip!.benefits,
+                    Colors.blue.shade700,
+                  ),
+                ],
+                if (_payslip!.reference.isNotEmpty) ...[
+                  SizedBox(height: Dimensions.height30 / 2),
+                  _buildSimpleSection(
+                    'Справочно',
+                    _payslip!.reference,
+                    Colors.grey.shade600,
+                  ),
+                ],
                 SizedBox(height: Dimensions.height30 / 2),
                 GestureDetector(
                   onLongPress: () {
@@ -400,6 +420,23 @@ class _PayslipPageState extends State<PayslipPage> {
                               ),
                             ],
                           ),
+                          if (_payslip!.debtEnd != 0.0) ...[
+                            const SizedBox(height: 8),
+                            const Divider(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Долг предприятия',
+                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                ),
+                                Text(
+                                  '${_numberFormat.format(_payslip!.debtEnd)} ₸',
+                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                ),
+                              ],
+                            ),
+                          ],
                           if (_payslip!.totalAccruals > 0) ...[
                             const SizedBox(height: 8),
                             Builder(builder: (context) {
@@ -444,6 +481,109 @@ class _PayslipPageState extends State<PayslipPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaidSection() {
+    final items = _payslip!.paid;
+    const color = AppColors.mainColor;
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(Dimensions.width20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Выплачено',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${items.length}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            ...items.map((item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.paymentType, style: const TextStyle(fontSize: 14)),
+                        if (item.document.isNotEmpty)
+                          Text(item.document, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                        if (item.date.isNotEmpty)
+                          Text(item.date, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${_numberFormat.format(item.amount)} ₸',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            )),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Итого', style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+                Text(
+                  '${_numberFormat.format(_payslip!.totalPaid)} ₸',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: color),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleSection(String title, List<PayslipItem> items, Color color) {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(Dimensions.width20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
+            ),
+            const Divider(),
+            ...items.map((item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: Text(item.name, style: const TextStyle(fontSize: 14))),
+                  Text(
+                    '${_numberFormat.format(item.amount)} ₸',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            )),
+          ],
         ),
       ),
     );
