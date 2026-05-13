@@ -18,7 +18,7 @@ Future<void> loginToAccount(String login, BuildContext context) async {
         .post(
           Uri.parse('${AppValues.baseUrl}/login'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'key_suffix': login}),
+          body: jsonEncode({'iin': login}),
         )
         .timeout(const Duration(seconds: 15));
 
@@ -27,10 +27,12 @@ Future<void> loginToAccount(String login, BuildContext context) async {
       if (responseBody['message'] == 'Success' && login != '') {
         String fullName = responseBody['full_name'];
         String job = responseBody['job'];
+        String employeeId = responseBody['employee_id'] ?? '';
         await secureStorage.saveCredentials(
           login: login,
           fullName: fullName,
           job: job,
+          employeeId: employeeId,
         );
         if (isAdminRole(job)) {
           Get.to(() => AdminPage(fullName: fullName, job: job));

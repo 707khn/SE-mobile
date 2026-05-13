@@ -49,15 +49,16 @@ def test_index(client):
 # ---------------------------------------------------------------------------
 
 def test_login_success(client):
-    r = _post(client, '/login', {'key_suffix': '001'})
+    r = _post(client, '/login', {'iin': '900101350123'})
     body = r.get_json()
     assert body['message'] == 'Success'
     assert 'full_name' in body
     assert 'job' in body
+    assert body['employee_id'] == '001'
 
 
 def test_login_failure(client):
-    r = _post(client, '/login', {'key_suffix': 'UNKNOWN'})
+    r = _post(client, '/login', {'iin': '000000000000'})
     assert r.get_json()['message'] == 'Failure'
 
 

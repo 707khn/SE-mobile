@@ -74,8 +74,8 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: Dimensions.width20 * 0.5),
         child: TextField(
-          keyboardType: TextInputType.text,
-          textCapitalization: TextCapitalization.characters,
+          keyboardType: TextInputType.number,
+          maxLength: 12,
           textInputAction: TextInputAction.done,
           obscureText: widget.obscureText,
           controller: widget.controller,
@@ -89,6 +89,7 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
           decoration: InputDecoration(
             focusedBorder: InputBorder.none,
             enabledBorder: InputBorder.none,
+            counterText: '',
             hintText: widget.hintText,
             hintStyle: const TextStyle(color: Colors.grey),
             suffixIcon: _hasText
@@ -100,7 +101,7 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
                     icon: const Icon(Icons.content_paste_rounded, size: 18, color: Colors.grey),
                     onPressed: () async {
                       final data = await Clipboard.getData(Clipboard.kTextPlain);
-                      final text = data?.text?.trim().toUpperCase() ?? '';
+                      final text = data?.text?.trim() ?? '';
                       if (text.isNotEmpty && widget.controller != null) {
                         widget.controller!.value = TextEditingValue(
                           text: text,

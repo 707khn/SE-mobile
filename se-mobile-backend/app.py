@@ -134,14 +134,15 @@ def register_routes(app):
     @app.route('/login', methods=['POST'])
     def login():
         data = request.get_json()
-        key_suffix = data.get('key_suffix', '')
+        iin = data.get('iin', '').strip()
 
-        emp = Employee.query.get(key_suffix)
-        if emp and key_suffix != '':
+        emp = Employee.query.filter_by(iin=iin).first()
+        if emp and iin != '':
             return jsonify({
                 'message': 'Success',
                 'full_name': emp.full_name,
-                'job': emp.job_title
+                'job': emp.job_title,
+                'employee_id': emp.employee_id,
             })
         return jsonify({'message': 'Failure'})
 

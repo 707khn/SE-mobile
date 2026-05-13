@@ -45,18 +45,6 @@ class CustomFormState extends State<CustomForm> {
   void initState() {
     super.initState();
     _initPrefs();
-    loginController.addListener(_onLoginTextChanged);
-  }
-
-  void _onLoginTextChanged() {
-    final text = loginController.text;
-    final upper = text.toUpperCase();
-    if (text != upper) {
-      loginController.value = loginController.value.copyWith(
-        text: upper,
-        selection: TextSelection.collapsed(offset: upper.length),
-      );
-    }
   }
 
   Future<void> _initPrefs() async {
