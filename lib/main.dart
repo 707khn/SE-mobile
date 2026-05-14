@@ -64,7 +64,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
           colorScheme: const ColorScheme(
             primary: AppColors.mainColor,
-            background: Colors.red,
+            background: AppColors.niceWhite,
             onSurface: Colors.black,
             surface: AppColors.niceWhite,
             onPrimary: AppColors.niceWhite,

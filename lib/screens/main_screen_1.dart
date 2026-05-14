@@ -8,6 +8,7 @@ import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/report_request.dart';
 import 'package:se_mobile/screens/leave_screen.dart';
 import 'package:se_mobile/requests/reportdate_request.dart';
+import 'package:se_mobile/screens/menu_screen.dart';
 import 'package:se_mobile/screens/payslip_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/logout_helper.dart';
@@ -221,6 +222,15 @@ class _MainPage1State extends State<MainPage1> {
                             ],
                           ),
                         ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.restaurant_menu, color: AppColors.mainColor),
+                        title: BigText(content: 'canteen_menu'.tr),
+                        subtitle: Text('canteen_subtitle'.tr, style: const TextStyle(fontSize: 11)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const MenuScreen());
+                        },
                       ),
                       ListTile(
                         leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
@@ -582,8 +592,8 @@ class _MainMenu1State extends State<MainMenu1> {
                         _filterController.clear();
                         reportsEntries = await getReportDateEntries(
                           context,
-                          DateFormat('dd.MM.yyyy').format(startDate),
-                          DateFormat('dd.MM.yyyy').format(endDate),
+                          DateFormat('yyyy-MM-dd').format(startDate),
+                          DateFormat('yyyy-MM-dd').format(endDate),
                         );
                         if (!mounted) return;
                         setState(() => _loadingReport = false);

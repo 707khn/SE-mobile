@@ -8,6 +8,7 @@ import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/employeedate_request.dart';
 import 'package:se_mobile/requests/get_all_employees.dart';
 import 'package:se_mobile/screens/leave_screen.dart';
+import 'package:se_mobile/screens/menu_screen.dart';
 import 'package:se_mobile/screens/payslip_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/logout_helper.dart';
@@ -58,8 +59,9 @@ class _MainPage2State extends State<MainPage2> {
   @override
   void initState() {
     super.initState();
-    startDate = DateTime.utc(2023, 5, 1);
-    endDate = DateTime.now();
+    final now = DateTime.now();
+    startDate = DateTime(now.year, now.month, 1);
+    endDate = now;
     _initPrefs();
     employeeController.addListener(() {
       setState(() {
@@ -241,6 +243,15 @@ class _MainPage2State extends State<MainPage2> {
                             ],
                           ),
                         ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.restaurant_menu, color: AppColors.mainColor),
+                        title: BigText(content: 'canteen_menu'.tr),
+                        subtitle: Text('canteen_subtitle'.tr, style: const TextStyle(fontSize: 11)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const MenuScreen());
+                        },
                       ),
                       ListTile(
                         leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
@@ -619,8 +630,8 @@ class _MainPage2State extends State<MainPage2> {
                                           setState(() => _loadingReport = true);
                                           final data = await getEmployeeDate(
                                             context,
-                                            DateFormat('dd.MM.yyyy').format(startDate),
-                                            DateFormat('dd.MM.yyyy').format(endDate),
+                                            DateFormat('yyyy-MM-dd').format(startDate),
+                                            DateFormat('yyyy-MM-dd').format(endDate),
                                           );
                                           reportsEntries = data;
                                           reportsEntriesForMsg.add(data);

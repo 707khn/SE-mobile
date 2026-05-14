@@ -281,7 +281,7 @@ class _PayslipPageState extends State<PayslipPage> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
+                    child: CircularProgressIndicator(color: AppColors.mainColor),
                   ),
                 ),
               if (_error != null)
@@ -372,7 +372,7 @@ class _PayslipPageState extends State<PayslipPage> {
                 if (_payslip!.benefits.isNotEmpty) ...[
                   SizedBox(height: Dimensions.height30 / 2),
                   _buildSimpleSection(
-                    'Льготы',
+                    'payslip_benefits'.tr,
                     _payslip!.benefits,
                     Colors.blue.shade700,
                   ),
@@ -380,7 +380,7 @@ class _PayslipPageState extends State<PayslipPage> {
                 if (_payslip!.reference.isNotEmpty) ...[
                   SizedBox(height: Dimensions.height30 / 2),
                   _buildSimpleSection(
-                    'Справочно',
+                    'payslip_reference'.tr,
                     _payslip!.reference,
                     Colors.grey.shade600,
                   ),
@@ -427,7 +427,7 @@ class _PayslipPageState extends State<PayslipPage> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Долг предприятия',
+                                  'payslip_debt'.tr,
                                   style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                                 ),
                                 Text(
