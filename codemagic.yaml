@@ -18,7 +18,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - your@email.com
+          - batyr.kenov@gmail.com
         notify:
           success: true
           failure: true
