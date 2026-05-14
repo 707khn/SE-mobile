@@ -619,8 +619,8 @@ class _MainPage2State extends State<MainPage2> {
                                           setState(() => _loadingReport = true);
                                           final data = await getEmployeeDate(
                                             context,
-                                            DateFormat('dd.MM.yyyy').format(startDate),
-                                            DateFormat('dd.MM.yyyy').format(endDate),
+                                            DateFormat('yyyy-MM-dd').format(startDate),
+                                            DateFormat('yyyy-MM-dd').format(endDate),
                                           );
                                           reportsEntries = data;
                                           reportsEntriesForMsg.add(data);

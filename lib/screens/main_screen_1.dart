@@ -582,8 +582,8 @@ class _MainMenu1State extends State<MainMenu1> {
                         _filterController.clear();
                         reportsEntries = await getReportDateEntries(
                           context,
-                          DateFormat('dd.MM.yyyy').format(startDate),
-                          DateFormat('dd.MM.yyyy').format(endDate),
+                          DateFormat('yyyy-MM-dd').format(startDate),
+                          DateFormat('yyyy-MM-dd').format(endDate),
                         );
                         if (!mounted) return;
                         setState(() => _loadingReport = false);
