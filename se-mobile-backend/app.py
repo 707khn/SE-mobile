@@ -642,8 +642,8 @@ def _auto_seed():
     if Employee.query.first():
         return
 
-    e1 = Employee(employee_id='001', full_name='Иванов Иван Иванович', job_title='Инженер', iin='900101350123')
-    e2 = Employee(employee_id='002', full_name='Петров Пётр Петрович', job_title='Руководитель отдела', iin='850515400456')
+    e1 = Employee(employee_id='001', full_name='Ахметов Асан Бекович', job_title='Инженер', iin='900101350123')
+    e2 = Employee(employee_id='002', full_name='Касымов Нурлан Серикович', job_title='Руководитель отдела', iin='850515400456')
     e3 = Employee(employee_id='003', full_name='Сидорова Анна Сергеевна', job_title='Бухгалтер', iin='920720450789')
     db.session.add_all([e1, e2, e3])
 

@@ -108,7 +108,7 @@ def test_reportdate_no_records(client):
 
 def test_director_report_success(client):
     r = _post(client, '/director_report', {
-        'emp_sname': 'Иванов',
+        'emp_sname': 'Ахметов',
         'start_date': '2024-01-01',
         'end_date': '2024-01-31',
     })
