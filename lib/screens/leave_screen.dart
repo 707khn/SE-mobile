@@ -98,7 +98,7 @@ class _LeavePageState extends State<LeavePage> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
+                    child: CircularProgressIndicator(color: AppColors.mainColor),
                   ),
                 ),
               if (_error != null)

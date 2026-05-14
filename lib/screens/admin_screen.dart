@@ -173,16 +173,27 @@ class _AdminPageState extends State<AdminPage> {
                         ),
                       ),
                       ListTile(
+                        leading: const Icon(Icons.restaurant_menu, color: AppColors.mainColor),
+                        title: BigText(content: 'canteen_menu'.tr),
+                        subtitle: Text('canteen_subtitle'.tr, style: const TextStyle(fontSize: 11)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const MenuScreen());
+                        },
+                      ),
+                      ListTile(
                         leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
                         title: BigText(content: 'payslip'.tr),
+                        subtitle: Text('payslip_subtitle'.tr, style: const TextStyle(fontSize: 11)),
                         onTap: () {
                           Navigator.pop(context);
                           Get.to(() => const PayslipPage());
                         },
                       ),
                       ListTile(
-                        leading: const Icon(Icons.calendar_today, color: AppColors.mainColor),
+                        leading: const Icon(Icons.beach_access, color: AppColors.mainColor),
                         title: BigText(content: 'leave_sick_days'.tr),
+                        subtitle: Text('leave_subtitle'.tr, style: const TextStyle(fontSize: 11)),
                         onTap: () {
                           Navigator.pop(context);
                           Get.to(() => const LeavePage());

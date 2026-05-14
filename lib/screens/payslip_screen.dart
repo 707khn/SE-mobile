@@ -281,7 +281,7 @@ class _PayslipPageState extends State<PayslipPage> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
+                    child: CircularProgressIndicator(color: AppColors.mainColor),
                   ),
                 ),
               if (_error != null)
