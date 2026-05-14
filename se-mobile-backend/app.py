@@ -96,6 +96,8 @@ def create_app():
     with app.app_context():
         db.create_all()
         _auto_seed()
+        _seed_2024_full()
+        _seed_2025_full()
         _seed_2026()
         _seed_2026_full()
         _seed_leave_2026()
@@ -1065,6 +1067,237 @@ def _seed_leave_2026():
             start_date=date(int(sy), int(sm), int(sday)),
             end_date=date(int(ey), int(em), int(eday)),
             days=days, status=status))
+
+    db.session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Helpers shared by 2024/2025 seeders
+# ---------------------------------------------------------------------------
+
+_MONTH_RU = {
+    1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+    5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+    9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь',
+}
+
+_EMP_META = {
+    '001': ('Инженер',          'Производственный отдел', 'Главный вход'),
+    '002': ('Руководитель отдела', 'Администрация',         'Офис'),
+    '003': ('Бухгалтер',        'Бухгалтерия',            'Бухгалтерия'),
+}
+
+
+def _add_payslip(emp_id, month, year, oklad, standard_deduction, vacation_days=0):
+    """Create Payslip + all child rows for one employee/month."""
+    from datetime import timedelta as td
+
+    pitanie = 9_700
+    worked_days = 22 - vacation_days
+    worked_hours = round(worked_days * 8.0 + worked_days * 0.136)  # ~8h 8m/day → 173h full month
+
+    pay_oklad   = round(oklad / 22 * worked_days)
+    premiya     = round(oklad / 22 * worked_days)
+    ekologia    = round(oklad * 0.017)
+    vac_pay     = round(oklad / 22 * vacation_days) if vacation_days else 0
+    total_accruals = pay_oklad + premiya + ekologia + vac_pay
+
+    opv  = round(total_accruals * 0.10)
+    osms = round(total_accruals * 0.02)
+    ipn_base = max(0, total_accruals - opv - osms - standard_deduction)
+    ipn  = round(ipn_base * 0.10)
+    total_deductions = opv + osms + pitanie + ipn
+    net_pay = total_accruals - total_deductions
+
+    advance = round(net_pay * 0.45)
+    final   = net_pay - advance
+    next_month = month + 1 if month < 12 else 1
+    next_year  = year if month < 12 else year + 1
+    period_str = f'{month:02d}.{year}'
+
+    pos, dept, _ = _EMP_META[emp_id]
+    ps = Payslip(
+        employee_id=emp_id, period_month=month, period_year=year,
+        period_display=f'{_MONTH_RU[month]} {year}',
+        total_accruals=float(total_accruals),
+        total_deductions=float(total_deductions),
+        net_pay=float(net_pay), total_paid=float(net_pay),
+        position=pos, department=dept,
+        salary_rate=float(oklad), debt_start=0.0, debt_end=0.0,
+    )
+    db.session.add(ps)
+    db.session.flush()
+
+    # --- Начислено ---
+    db.session.add(PayslipAccrual(
+        payslip_id=ps.id, name='Оплата по окладу', amount=float(pay_oklad),
+        period=period_str, working_days=worked_days, working_hours=float(worked_hours)))
+    db.session.add(PayslipAccrual(
+        payslip_id=ps.id, name='Премия постоянная', amount=float(premiya),
+        period=period_str))
+    db.session.add(PayslipAccrual(
+        payslip_id=ps.id, name='Выплаты вследствии экологического бедствия',
+        amount=float(ekologia), period=period_str))
+    if vac_pay:
+        db.session.add(PayslipAccrual(
+            payslip_id=ps.id, name='Оплата ежегодного отпуска',
+            amount=float(vac_pay), period=period_str))
+
+    # --- Удержано ---
+    for name, amt in [('ИПН', ipn), ('ОПВ', opv),
+                      ('Взносы ОСМС', osms), ('Питание', pitanie)]:
+        db.session.add(PayslipDeduction(
+            payslip_id=ps.id, name=name, amount=float(amt), period=period_str))
+
+    # --- Выплачено ---
+    db.session.add(PayslipPaid(
+        payslip_id=ps.id, payment_type='Аванс', period=period_str,
+        document=f'Ведомость №{month * 2 - 1}',
+        date=f'15.{month:02d}.{year}', amount=float(advance)))
+    db.session.add(PayslipPaid(
+        payslip_id=ps.id, payment_type='Зарплата за месяц', period=period_str,
+        document=f'Ведомость №{month * 2}',
+        date=f'05.{next_month:02d}.{next_year}', amount=float(final)))
+
+    # --- Льготы ---
+    db.session.add(PayslipBenefit(payslip_id=ps.id, name='Вычет ОПВ', amount=float(opv)))
+    db.session.add(PayslipBenefit(payslip_id=ps.id, name='Вычет ВОСМС', amount=float(osms)))
+    db.session.add(PayslipBenefit(
+        payslip_id=ps.id, name='Стандартный 14 МРП (1 МЗП)', amount=float(standard_deduction)))
+
+    # --- Справочно ---
+    db.session.add(PayslipReference(
+        payslip_id=ps.id, name='Обязательные пенсионные взносы работодателя',
+        amount=float(round(total_accruals * 0.05))))
+    db.session.add(PayslipReference(
+        payslip_id=ps.id, name='Отчисления на ОСМС',
+        amount=float(round(total_accruals * 0.03))))
+    db.session.add(PayslipReference(
+        payslip_id=ps.id, name='Социальные отчисления',
+        amount=float(round(total_accruals * 0.095))))
+    db.session.add(PayslipReference(
+        payslip_id=ps.id, name='Социальный налог',
+        amount=float(round(total_accruals * 0.0525))))
+
+
+def _add_access_days(emp_id, start_date, end_date, holidays, absences=None):
+    """Add Вход/Выход records for every working day in [start_date, end_date]."""
+    from datetime import timedelta
+    absences = absences or set()
+    entry_times = ['08:45', '08:55', '09:05']
+    exit_times  = ['17:45', '18:00', '18:15']
+    _, _, door = _EMP_META[emp_id]
+    records = []
+    d = start_date
+    while d <= end_date:
+        if d.weekday() < 5 and d not in holidays and d not in absences:
+            idx = d.timetuple().tm_yday % 3
+            records.append(AccessRecord(
+                employee_id=emp_id, access_date=d,
+                access_time=entry_times[idx], event_type='Вход', door_location=door))
+            records.append(AccessRecord(
+                employee_id=emp_id, access_date=d,
+                access_time=exit_times[idx], event_type='Выход', door_location=door))
+        d += timedelta(days=1)
+    db.session.add_all(records)
+
+
+# ---------------------------------------------------------------------------
+# Seeding: март–декабрь 2024
+# ---------------------------------------------------------------------------
+
+def _seed_2024_full():
+    if AccessRecord.query.filter(AccessRecord.access_date == date(2024, 3, 4)).first():
+        return
+
+    holidays = {
+        date(2024, 3, 8),   # Международный женский день
+        date(2024, 3, 21),  # Наурыз
+        date(2024, 3, 22),
+        date(2024, 5, 1),   # День единства народа
+        date(2024, 5, 7),   # День защитника Отечества
+        date(2024, 5, 9),   # День Победы
+        date(2024, 7, 8),   # День столицы (6 июл — сб, перенос на пн)
+        date(2024, 8, 30),  # День Конституции
+        date(2024, 10, 25), # День Республики
+        date(2024, 12, 2),  # Первый Президент (1 дек — вс, перенос)
+        date(2024, 12, 16), # День Независимости
+        date(2024, 12, 17),
+    }
+
+    # Отпуск 002: август 5-16 (10 рабочих дней)
+    abs_002 = {date(2024, 8, d) for d in range(5, 17)}
+    # Больничный 003: май 13-17 (5 дней)
+    abs_003 = {date(2024, 5, d) for d in range(13, 18)}
+
+    start = date(2024, 3, 1)
+    end   = date(2024, 12, 31)
+    _add_access_days('001', start, end, holidays)
+    _add_access_days('002', start, end, holidays, abs_002)
+    _add_access_days('003', start, end, holidays, abs_003)
+
+    # Расчётные листки март–декабрь 2024
+    salaries = [('001', 350_000), ('002', 500_000), ('003', 280_000)]
+    std_ded  = 55_048  # 14 МРП × 3 932 тг (МРП 2024)
+
+    for emp_id, oklad in salaries:
+        for month in range(3, 13):
+            vac = 10 if (emp_id == '002' and month == 8) else \
+                   5 if (emp_id == '003' and month == 5) else 0
+            _add_payslip(emp_id, month, 2024, oklad, std_ded, vacation_days=vac)
+
+    db.session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Seeding: январь–декабрь 2025
+# ---------------------------------------------------------------------------
+
+def _seed_2025_full():
+    if AccessRecord.query.filter(AccessRecord.access_date == date(2025, 1, 3)).first():
+        return
+
+    holidays = {
+        date(2025, 1, 1),   # Новый год
+        date(2025, 1, 2),
+        date(2025, 1, 7),   # Рождество
+        date(2025, 3, 10),  # Международный женский день (8 мар — сб, перенос на пн)
+        date(2025, 3, 21),  # Наурыз
+        date(2025, 3, 24),  # Наурыз (21 пт; 22 сб; 23 вс → 24 пн перенос)
+        date(2025, 5, 1),   # День единства народа
+        date(2025, 5, 7),   # День защитника Отечества
+        date(2025, 5, 9),   # День Победы
+        date(2025, 7, 7),   # День столицы (6 июл — вс, перенос на пн)
+        date(2025, 9, 1),   # День Конституции (30 авг — сб, перенос на пн)
+        date(2025, 10, 27), # День Республики (25 окт — сб, перенос на пн)
+        date(2025, 12, 1),  # Первый Президент
+        date(2025, 12, 16), # День Независимости
+        date(2025, 12, 17),
+    }
+
+    # Отпуск 001: июль 8-18 (10 рабочих дней; 7 — праздник)
+    abs_001 = {date(2025, 7, d) for d in range(8, 19)}
+    # Отпуск 002: август 4-15 (10 рабочих дней)
+    abs_002 = {date(2025, 8, d) for d in range(4, 16)}
+    # Больничный 003: март 10-14 (перекрывается с праздником 10 мар; реальных 4 дня)
+    abs_003 = {date(2025, 3, d) for d in range(10, 15)}
+
+    start = date(2025, 1, 1)
+    end   = date(2025, 12, 31)
+    _add_access_days('001', start, end, holidays, abs_001)
+    _add_access_days('002', start, end, holidays, abs_002)
+    _add_access_days('003', start, end, holidays, abs_003)
+
+    # Расчётные листки январь–декабрь 2025 (+5% индексация)
+    salaries = [('001', 367_500), ('002', 525_000), ('003', 294_000)]
+    std_ded  = 57_120  # 14 МРП × 4 080 тг (МРП 2025 приблизительно)
+
+    for emp_id, oklad in salaries:
+        for month in range(1, 13):
+            vac = 10 if (emp_id == '001' and month == 7) else \
+                  10 if (emp_id == '002' and month == 8) else \
+                   4 if (emp_id == '003' and month == 3) else 0
+            _add_payslip(emp_id, month, 2025, oklad, std_ded, vacation_days=vac)
 
     db.session.commit()
 
