@@ -270,3 +270,61 @@ def test_fcm_delete(client):
                       content_type='application/json')
     assert r.status_code == 200
     assert r.get_json()['message'] == 'Success'
+
+
+# ---------------------------------------------------------------------------
+# /api/menu
+# ---------------------------------------------------------------------------
+
+_MENU_DATE = '2026-01-15'
+_MENU_ITEMS = [
+    {'category': 'Первое блюдо', 'name': 'Борщ', 'price': 600.0},
+    {'category': 'Второе блюдо', 'name': 'Котлета с гарниром', 'price': 900.0},
+    {'category': 'Напиток', 'name': 'Компот', 'price': 150.0},
+]
+
+
+def test_menu_get_empty(client):
+    r = client.get(f'/api/menu?date={_MENU_DATE}')
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body['message'] == 'Success'
+    assert body['items'] == []
+
+
+def test_menu_post(client):
+    r = _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
+    assert r.status_code == 200
+    assert r.get_json()['message'] == 'Success'
+
+
+def test_menu_get_after_post(client):
+    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
+    r = client.get(f'/api/menu?date={_MENU_DATE}')
+    body = r.get_json()
+    assert body['message'] == 'Success'
+    assert len(body['items']) == 3
+    names = {i['name'] for i in body['items']}
+    assert 'Борщ' in names
+
+
+def test_menu_post_idempotent(client):
+    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
+    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
+    r = client.get(f'/api/menu?date={_MENU_DATE}')
+    assert len(r.get_json()['items']) == 3
+
+
+def test_menu_delete(client):
+    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
+    r = client.delete(f'/api/menu/{_MENU_DATE}')
+    assert r.status_code == 200
+    assert r.get_json()['message'] == 'Success'
+    r2 = client.get(f'/api/menu?date={_MENU_DATE}')
+    assert r2.get_json()['items'] == []
+
+
+def test_menu_default_date(client):
+    r = client.get('/api/menu')
+    assert r.status_code == 200
+    assert 'date' in r.get_json()

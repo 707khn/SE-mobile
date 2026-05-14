@@ -14,6 +14,7 @@ import '../utils/variables.dart';
 import '../widgets/icon_button_drawer.dart';
 import 'leave_screen.dart';
 import 'main_screen_2.dart';
+import 'attendance_screen.dart';
 import 'menu_screen.dart';
 import 'payslip_screen.dart';
 import 'start_screen.dart';
@@ -291,6 +292,13 @@ class _AdminPageState extends State<AdminPage> {
                 label: "canteen_menu".tr,
                 subtitle: "canteen_subtitle".tr,
                 onTap: () => Get.to(() => const MenuScreen()),
+              ),
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.badge_outlined,
+                label: "attendance".tr,
+                subtitle: "attendance_subtitle".tr,
+                onTap: () => Get.to(() => const AttendanceScreen()),
               ),
             ],
           ),

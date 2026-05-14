@@ -34,7 +34,6 @@ class CustomForm extends StatefulWidget {
 
 class CustomFormState extends State<CustomForm> {
   static TextEditingController loginController = TextEditingController();
-  static TextEditingController passwordController = TextEditingController();
 
   final _loginButtonKey = GlobalKey<LoginButtonState>();
 
