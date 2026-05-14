@@ -7,7 +7,7 @@ import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
 Future<List<List<String>>> getReportDateEntries(BuildContext context, startdate, enddate) async {
-  final login = await SecureStorageHelper.instance.getLogin();
+  final login = await SecureStorageHelper.instance.getEmployeeId();
 
   try {
     var response = await http

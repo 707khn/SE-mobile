@@ -7,7 +7,7 @@ import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
 Future<List<String>> getAllEmployees(BuildContext context) async {
-  final keySuffix = await SecureStorageHelper.instance.getLogin();
+  final keySuffix = await SecureStorageHelper.instance.getEmployeeId();
 
   try {
     var response = await http

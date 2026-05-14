@@ -12,8 +12,10 @@ class SecureStorageHelper {
     required String login,
     required String fullName,
     required String job,
+    required String employeeId,
   }) async {
     await _storage.write(key: 'login', value: login);
+    await _storage.write(key: 'employeeId', value: employeeId);
     await _storage.write(key: 'fullName', value: fullName);
     await _storage.write(key: 'job', value: job);
     await _storage.write(key: 'loggedIn', value: 'true');
@@ -21,6 +23,10 @@ class SecureStorageHelper {
 
   Future<String?> getLogin() async {
     return await _storage.read(key: 'login');
+  }
+
+  Future<String?> getEmployeeId() async {
+    return await _storage.read(key: 'employeeId');
   }
 
   Future<String?> getFullName() async {
