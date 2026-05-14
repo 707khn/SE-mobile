@@ -14,6 +14,7 @@ import '../utils/variables.dart';
 import '../widgets/icon_button_drawer.dart';
 import 'leave_screen.dart';
 import 'main_screen_2.dart';
+import 'menu_screen.dart';
 import 'payslip_screen.dart';
 import 'start_screen.dart';
 
@@ -272,6 +273,13 @@ class _AdminPageState extends State<AdminPage> {
                 label: "leave_sick_days".tr,
                 subtitle: "leave_subtitle".tr,
                 onTap: () => Get.to(() => const LeavePage()),
+              ),
+              SizedBox(height: Dimensions.height30 / 2),
+              _buildMenuCard(
+                icon: Icons.restaurant_menu,
+                label: "canteen_menu".tr,
+                subtitle: "canteen_subtitle".tr,
+                onTap: () => Get.to(() => const MenuScreen()),
               ),
             ],
           ),

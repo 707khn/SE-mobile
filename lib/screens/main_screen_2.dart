@@ -8,6 +8,7 @@ import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/employeedate_request.dart';
 import 'package:se_mobile/requests/get_all_employees.dart';
 import 'package:se_mobile/screens/leave_screen.dart';
+import 'package:se_mobile/screens/menu_screen.dart';
 import 'package:se_mobile/screens/payslip_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/logout_helper.dart';
@@ -241,6 +242,15 @@ class _MainPage2State extends State<MainPage2> {
                             ],
                           ),
                         ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.restaurant_menu, color: AppColors.mainColor),
+                        title: BigText(content: 'canteen_menu'.tr),
+                        subtitle: Text('canteen_subtitle'.tr, style: const TextStyle(fontSize: 11)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Get.to(() => const MenuScreen());
+                        },
                       ),
                       ListTile(
                         leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
