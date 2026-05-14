@@ -39,12 +39,12 @@ class LoginButtonState extends State<LoginButton> with SingleTickerProviderState
 
   Future<void> submit() async {
     final login = loginController.text.trim();
-    if (login.isEmpty) {
+    if (login.isEmpty || login.length != 12 || int.tryParse(login) == null) {
       HapticFeedback.mediumImpact();
       _shakeController.forward(from: 0);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('login_empty'.tr),
+          content: Text(login.isEmpty ? 'login_empty'.tr : 'login_not_registered'.tr),
           behavior: SnackBarBehavior.floating,
         ),
       );

@@ -111,6 +111,9 @@ class LocaleString extends Translations {
           'menu_saved': 'Мәзір сақталды',
           'menu_deleted': 'Мәзір жойылды',
           'canteen_subtitle': 'Бүгінгі тамақ мәзірі',
+          'payslip_benefits': 'Жеңілдіктер',
+          'payslip_reference': 'Анықтама',
+          'payslip_debt': 'Кәсіпорын қарызы',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -220,6 +223,9 @@ class LocaleString extends Translations {
           'menu_saved': 'Меню сохранено',
           'menu_deleted': 'Меню удалено',
           'canteen_subtitle': 'Меню столовой на сегодня',
+          'payslip_benefits': 'Льготы',
+          'payslip_reference': 'Справочно',
+          'payslip_debt': 'Долг предприятия',
         }
       };
 }

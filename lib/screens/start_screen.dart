@@ -117,12 +117,36 @@ class CustomFormState extends State<CustomForm> {
               ),
               SizedBox(height: Dimensions.height30),
               CustomLoginField(
-                hintText: 'login'.tr,
+                hintText: 'employee ID'.tr,
                 obscureText: false,
                 controller: loginController,
                 fontSize: Dimensions.fontSize20,
                 backgroundColor: AppColors.loginField,
                 onSubmitted: () => _loginButtonKey.currentState?.submit(),
+              ),
+              const SizedBox(height: 4),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: loginController,
+                builder: (_, val, __) {
+                  final len = val.text.length;
+                  final done = len == 12;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$len / 12',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: done ? AppColors.mainColor : Colors.grey.shade500,
+                            fontWeight: done ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
               SizedBox(height: Dimensions.height30),
               LoginButton(

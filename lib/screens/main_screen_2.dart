@@ -59,8 +59,9 @@ class _MainPage2State extends State<MainPage2> {
   @override
   void initState() {
     super.initState();
-    startDate = DateTime.utc(2023, 5, 1);
-    endDate = DateTime.now();
+    final now = DateTime.now();
+    startDate = DateTime(now.year, now.month, 1);
+    endDate = now;
     _initPrefs();
     employeeController.addListener(() {
       setState(() {
