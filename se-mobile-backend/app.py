@@ -78,6 +78,30 @@ def _send_turnstile_notification(employee_name: str, direction: str, timestamp_s
         logging.warning(f'FCM send failed: {e}')
 
 
+def _migrate_schema():
+    """Add columns missing from existing tables without dropping data."""
+    from sqlalchemy import text, inspect
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+
+    if 'payslips' in tables:
+        existing = {c['name'] for c in inspector.get_columns('payslips')}
+        missing = {
+            'position':    'VARCHAR(200)',
+            'department':  'VARCHAR(200)',
+            'salary_rate': 'FLOAT DEFAULT 0',
+            'debt_start':  'FLOAT DEFAULT 0',
+            'debt_end':    'FLOAT DEFAULT 0',
+            'total_paid':  'FLOAT DEFAULT 0',
+        }
+        with db.engine.connect() as conn:
+            for col, typedef in missing.items():
+                if col not in existing:
+                    conn.execute(text(f'ALTER TABLE payslips ADD COLUMN "{col}" {typedef}'))
+                    logging.info(f'Migration: added payslips.{col}')
+            conn.commit()
+
+
 def create_app():
     app = Flask(__name__)
     CORS(app)
@@ -99,6 +123,7 @@ def create_app():
     with app.app_context():
         logging.info('Running db.create_all()...')
         db.create_all()
+        _migrate_schema()
         logging.info('db.create_all() done')
         try:
             _auto_seed()
