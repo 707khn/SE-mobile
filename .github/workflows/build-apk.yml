@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "claude/analyze-formatapp-sMSt8" ]
+    branches: [ "claude/analyze-se-mobile-9T0lJ" ]
   workflow_dispatch:
 
 jobs:
