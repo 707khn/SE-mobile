@@ -17,7 +17,12 @@ class PayslipPage extends StatefulWidget {
 }
 
 class _PayslipPageState extends State<PayslipPage> {
-  DateTime _selectedDate = DateTime(DateTime.now().year, DateTime.now().month);
+  // Default to previous month — current month payslip is usually not ready yet
+  static DateTime _prevMonth() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month - 1);
+  }
+  DateTime _selectedDate = _prevMonth();
   PayslipData? _payslip;
   bool _loading = false;
   String? _error;

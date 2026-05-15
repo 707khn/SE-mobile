@@ -131,6 +131,8 @@ def create_app():
             _seed_2025_full()
             _seed_2026()
             _seed_2026_full()
+            _seed_may_2026()
+            _seed_turnstile_events()
             _seed_leave_2026()
         except Exception as e:
             logging.error(f'Seeding failed (non-fatal): {e}', exc_info=True)
@@ -1331,6 +1333,93 @@ def _seed_2025_full():
                   10 if (emp_id == '002' and month == 8) else \
                    4 if (emp_id == '003' and month == 3) else 0
             _add_payslip(emp_id, month, 2025, oklad, std_ded, vacation_days=vac)
+
+    db.session.commit()
+
+
+def _seed_may_2026():
+    """Расчётные листы и записи турникета за май 2026 (текущий месяц)."""
+    if Payslip.query.filter_by(employee_id='001', period_month=5, period_year=2026).first():
+        return
+
+    salaries = [
+        ('001', 386_500, 'Инженер',              'Производственный отдел'),
+        ('002', 558_000, 'Руководитель отдела',   'Производственный отдел'),
+        ('003', 303_000, 'Бухгалтер',             'Бухгалтерия'),
+    ]
+    for emp_id, oklad, position, dept in salaries:
+        ta = round(oklad * 1.05, 2)   # оклад + 5% премия условно
+        ipn  = round(ta * 0.10, 2)
+        opv  = round(ta * 0.10, 2)
+        osms = round(ta * 0.02, 2)
+        td   = ipn + opv + osms
+        np_  = round(ta - td, 2)
+        ps = Payslip(employee_id=emp_id, period_month=5, period_year=2026,
+                     period_display='Май 2026',
+                     total_accruals=ta, total_deductions=td, net_pay=np_,
+                     position=position, department=dept,
+                     salary_rate=float(oklad), debt_start=0.0, debt_end=0.0,
+                     total_paid=np_)
+        db.session.add(ps)
+        db.session.flush()
+        db.session.add(PayslipAccrual(payslip_id=ps.id, name='Оплата по окладу', amount=float(oklad)))
+        db.session.add(PayslipAccrual(payslip_id=ps.id, name='Премия постоянная', amount=round(oklad * 0.05, 2)))
+        db.session.add(PayslipDeduction(payslip_id=ps.id, name='ИПН (10%)', amount=ipn))
+        db.session.add(PayslipDeduction(payslip_id=ps.id, name='ОПВ (10%)', amount=opv))
+        db.session.add(PayslipDeduction(payslip_id=ps.id, name='ВОСМС (2%)', amount=osms))
+
+    # Записи турникета за 1-15 мая 2026
+    work_days = [1,5,6,7,8,12,13,14,15]
+    times = [('001','08:52','18:10'), ('002','08:30','18:45'), ('003','08:42','17:50')]
+    for emp_id, t_in, t_out in times:
+        for d in work_days:
+            db.session.add(AccessRecord(
+                employee_id=emp_id,
+                access_date=date(2026, 5, d),
+                access_time=t_in,
+                event_type='Вход',
+                door_name='Главный вход'))
+            db.session.add(AccessRecord(
+                employee_id=emp_id,
+                access_date=date(2026, 5, d),
+                access_time=t_out,
+                event_type='Выход',
+                door_name='Главный вход'))
+
+    db.session.commit()
+
+
+def _seed_turnstile_events():
+    """TurnstileEvent — демо-данные для экрана «Проходы сотрудников»."""
+    if TurnstileEvent.query.filter(
+        TurnstileEvent.timestamp >= datetime(2026, 5, 1)
+    ).first():
+        return
+
+    employees = [
+        ('001', 'Ахметов Асан Бекович'),
+        ('002', 'Касымов Нурлан Серикович'),
+        ('003', 'Сидорова Анна Сергеевна'),
+    ]
+    work_days = [1, 5, 6, 7, 8, 12, 13, 14, 15]
+    in_times  = ['08:52', '08:30', '08:42', '08:55', '08:35', '08:45',
+                 '08:58', '08:28', '08:50']
+    out_times = ['18:10', '18:45', '17:50', '18:05', '19:00', '17:55',
+                 '18:12', '18:50', '17:48']
+    for emp_id, _ in employees:
+        for i, d in enumerate(work_days):
+            t_in  = in_times[i % len(in_times)]
+            t_out = out_times[i % len(out_times)]
+            h_in,  m_in  = map(int, t_in.split(':'))
+            h_out, m_out = map(int, t_out.split(':'))
+            db.session.add(TurnstileEvent(
+                employee_id=emp_id,
+                direction='in',
+                timestamp=datetime(2026, 5, d, h_in, m_in)))
+            db.session.add(TurnstileEvent(
+                employee_id=emp_id,
+                direction='out',
+                timestamp=datetime(2026, 5, d, h_out, m_out)))
 
     db.session.commit()
 
