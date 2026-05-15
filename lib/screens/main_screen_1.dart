@@ -378,6 +378,36 @@ class _MainMenu1State extends State<MainMenu1> {
       !(reportsEntries.length == 1 &&
           (reportsEntries[0][0].isEmpty || reportsEntries[0][0] == 'no'));
 
+  Future<void> _loadDateReport() async {
+    if (_loadingReport) return;
+    if (startDate.isAfter(endDate)) {
+      final tmp = startDate; startDate = endDate; endDate = tmp;
+    }
+    setState(() { _loadingReport = true; _dateError = false; _filterText = ''; });
+    _filterController.clear();
+    reportsEntries = await getReportDateEntries(
+      context,
+      DateFormat('yyyy-MM-dd').format(startDate),
+      DateFormat('yyyy-MM-dd').format(endDate),
+    );
+    if (!mounted) return;
+    setState(() => _loadingReport = false);
+    if (_hasData) {
+      widget.recordCount.value = reportsEntries.length;
+      final fmt = DateFormat('dd.MM.yyyy');
+      widget.dateRange.value = '${fmt.format(startDate)} — ${fmt.format(endDate)}';
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${reportsEntries.length} ${'records_count'.tr}'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } else {
+      widget.recordCount.value = 0;
+      widget.dateRange.value = '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -555,22 +585,19 @@ class _MainMenu1State extends State<MainMenu1> {
                   _buildPresetChip('today'.tr, () {
                     final now = DateTime.now();
                     setState(() { startDate = now; endDate = now; _dateError = false; });
-                  }),
-                  const SizedBox(width: 6),
-                  _buildPresetChip('this_week'.tr, () {
-                    final now = DateTime.now();
-                    final monday = now.subtract(Duration(days: now.weekday - 1));
-                    setState(() { startDate = DateTime(monday.year, monday.month, monday.day); endDate = now; _dateError = false; });
+                    _loadDateReport();
                   }),
                   const SizedBox(width: 6),
                   _buildPresetChip('last_7_days'.tr, () {
                     final now = DateTime.now();
                     setState(() { startDate = now.subtract(const Duration(days: 6)); endDate = now; _dateError = false; });
+                    _loadDateReport();
                   }),
                   const SizedBox(width: 6),
                   _buildPresetChip('this_month'.tr, () {
                     final now = DateTime.now();
                     setState(() { startDate = DateTime(now.year, now.month, 1); endDate = now; _dateError = false; });
+                    _loadDateReport();
                   }),
                   const SizedBox(width: 6),
                   _buildPresetChip('last_month'.tr, () {
@@ -578,6 +605,7 @@ class _MainMenu1State extends State<MainMenu1> {
                     final first = DateTime(now.year, now.month - 1, 1);
                     final last = DateTime(now.year, now.month, 0);
                     setState(() { startDate = first; endDate = last; _dateError = false; });
+                    _loadDateReport();
                   }),
                 ],
               ),
@@ -586,44 +614,7 @@ class _MainMenu1State extends State<MainMenu1> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _loadingReport
-                    ? null
-                    : () async {
-                        if (startDate.isAfter(endDate)) {
-                          final tmp = startDate;
-                          startDate = endDate;
-                          endDate = tmp;
-                        }
-                        setState(() {
-                          _loadingReport = true;
-                          _dateError = false;
-                          _filterText = '';
-                        });
-                        _filterController.clear();
-                        reportsEntries = await getReportDateEntries(
-                          context,
-                          DateFormat('yyyy-MM-dd').format(startDate),
-                          DateFormat('yyyy-MM-dd').format(endDate),
-                        );
-                        if (!mounted) return;
-                        setState(() => _loadingReport = false);
-                        if (_hasData) {
-                          widget.recordCount.value = reportsEntries.length;
-                          final fmt = DateFormat('dd.MM.yyyy');
-                          widget.dateRange.value = '${fmt.format(startDate)} — ${fmt.format(endDate)}';
-                          HapticFeedback.lightImpact();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${reportsEntries.length} ${'records_count'.tr}'),
-                              duration: const Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        } else {
-                          widget.recordCount.value = 0;
-                          widget.dateRange.value = '';
-                        }
-                      },
+                onPressed: _loadingReport ? null : _loadDateReport,
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: Dimensions.height30 / 2),
                 ),

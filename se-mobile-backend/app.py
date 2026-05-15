@@ -78,6 +78,25 @@ def _send_turnstile_notification(employee_name: str, direction: str, timestamp_s
         logging.warning(f'FCM send failed: {e}')
 
 
+def _update_employee_names():
+    """Sync employee display names to current seed values (non-destructive)."""
+    name_map = {
+        '001': ('Ахметов Асан Бекович',       'Инженер'),
+        '002': ('Касымов Нурлан Серикович',    'Руководитель отдела'),
+        '003': ('Сидорова Анна Сергеевна',     'Бухгалтер'),
+    }
+    changed = False
+    for emp_id, (name, job) in name_map.items():
+        emp = Employee.query.filter_by(employee_id=emp_id).first()
+        if emp and (emp.full_name != name or emp.job_title != job):
+            emp.full_name = name
+            emp.job_title = job
+            changed = True
+            logging.info(f'Updated employee {emp_id} name → {name}')
+    if changed:
+        db.session.commit()
+
+
 def _migrate_schema():
     """Add columns missing from existing tables without dropping data."""
     from sqlalchemy import text, inspect
@@ -127,6 +146,7 @@ def create_app():
         logging.info('db.create_all() done')
         try:
             _auto_seed()
+            _update_employee_names()
             _seed_2024_full()
             _seed_2025_full()
             _seed_2026()
