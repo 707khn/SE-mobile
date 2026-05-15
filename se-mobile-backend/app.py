@@ -82,23 +82,33 @@ def create_app():
     app = Flask(__name__)
     CORS(app)
 
+    logging.basicConfig(level=logging.INFO)
+
     db_url = os.environ.get('DATABASE_URL', 'sqlite:///se_mobile.db')
     # Render выдаёт postgres://, SQLAlchemy требует postgresql://
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    # Маскируем пароль в логе
+    safe_url = db_url.split('@')[-1] if '@' in db_url else db_url
+    logging.info(f'DB backend: {safe_url}')
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
 
     with app.app_context():
+        logging.info('Running db.create_all()...')
         db.create_all()
-        _auto_seed()
-        _seed_2024_full()
-        _seed_2025_full()
-        _seed_2026()
-        _seed_2026_full()
-        _seed_leave_2026()
+        logging.info('db.create_all() done')
+        try:
+            _auto_seed()
+            _seed_2024_full()
+            _seed_2025_full()
+            _seed_2026()
+            _seed_2026_full()
+            _seed_leave_2026()
+        except Exception as e:
+            logging.error(f'Seeding failed (non-fatal): {e}', exc_info=True)
 
     register_routes(app)
     return app
