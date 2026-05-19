@@ -151,6 +151,7 @@ def create_app():
             _seed_2025_full()
             _seed_2026()
             _seed_2026_full()
+            _ensure_payslips_jan_apr_2026()
             _seed_may_2026()
             _seed_turnstile_events()
             _seed_leave_2026()
@@ -1398,15 +1399,33 @@ def _seed_may_2026():
                 access_date=date(2026, 5, d),
                 access_time=t_in,
                 event_type='Вход',
-                door_name='Главный вход'))
+                door_location='Главный вход'))
             db.session.add(AccessRecord(
                 employee_id=emp_id,
                 access_date=date(2026, 5, d),
                 access_time=t_out,
                 event_type='Выход',
-                door_name='Главный вход'))
+                door_location='Главный вход'))
 
     db.session.commit()
+
+
+def _ensure_payslips_jan_apr_2026():
+    """Backfill Jan–Apr 2026 payslips for all employees if any were missed."""
+    salaries = [('001', 380_000), ('002', 550_000), ('003', 300_000)]
+    std_ded = 60_536  # 14 МРП × 4 324 тг (МРП 2026)
+    added = False
+    for emp_id, oklad in salaries:
+        for month in range(1, 5):
+            exists = Payslip.query.filter_by(
+                employee_id=emp_id, period_year=2026, period_month=month
+            ).first()
+            if not exists:
+                _add_payslip(emp_id, month, 2026, oklad, std_ded)
+                added = True
+                logging.info(f'Backfilled payslip {emp_id}/{month}/2026')
+    if added:
+        db.session.commit()
 
 
 def _seed_turnstile_events():
