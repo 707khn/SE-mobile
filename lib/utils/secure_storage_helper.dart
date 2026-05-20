@@ -29,6 +29,10 @@ class SecureStorageHelper {
     return await _storage.read(key: 'employeeId');
   }
 
+  Future<void> saveEmployeeId(String id) async {
+    await _storage.write(key: 'employeeId', value: id);
+  }
+
   Future<String?> getFullName() async {
     return await _storage.read(key: 'fullName');
   }
