@@ -47,8 +47,34 @@ class LeaveData {
   });
 }
 
+Future<String?> _resolveEmployeeId() async {
+  var id = await SecureStorageHelper.instance.getEmployeeId();
+  if (id != null && id.isNotEmpty) return id;
+  final iin = await SecureStorageHelper.instance.getLogin();
+  if (iin == null || iin.isEmpty) return null;
+  try {
+    final r = await http.post(
+      Uri.parse('${AppValues.baseUrl}/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'iin': iin}),
+    ).timeout(const Duration(seconds: 10));
+    if (r.statusCode == 200) {
+      final b = jsonDecode(r.body) as Map<String, dynamic>;
+      if (b['message'] == 'Success') {
+        final fresh = (b['employee_id'] as String?) ?? '';
+        if (fresh.isNotEmpty) {
+          await SecureStorageHelper.instance.saveEmployeeId(fresh);
+          return fresh;
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
 Future<LeaveData?> getLeaves(BuildContext context) async {
-  final login = await SecureStorageHelper.instance.getEmployeeId();
+  final login = await _resolveEmployeeId();
+  if (login == null || login.isEmpty) return null;
 
   try {
     var response = await http
