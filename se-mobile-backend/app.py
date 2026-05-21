@@ -144,19 +144,23 @@ def create_app():
         db.create_all()
         _migrate_schema()
         logging.info('db.create_all() done')
-        try:
-            _auto_seed()
-            _update_employee_names()
-            _seed_2024_full()
-            _seed_2025_full()
-            _seed_2026()
-            _seed_2026_full()
-            _ensure_payslips_jan_apr_2026()
-            _seed_may_2026()
-            _seed_turnstile_events()
-            _seed_leave_2026()
-        except Exception as e:
-            logging.error(f'Seeding failed (non-fatal): {e}', exc_info=True)
+        for _fn in [
+            _auto_seed,
+            _update_employee_names,
+            _seed_2024_full,
+            _seed_2025_full,
+            _seed_2026,
+            _seed_2026_full,
+            _ensure_payslips_jan_apr_2026,
+            _seed_may_2026,
+            _seed_turnstile_events,
+            _seed_leave_2026,
+        ]:
+            try:
+                _fn()
+            except Exception as e:
+                db.session.rollback()
+                logging.error(f'{_fn.__name__} failed (non-fatal): {e}', exc_info=True)
 
     register_routes(app)
     return app
