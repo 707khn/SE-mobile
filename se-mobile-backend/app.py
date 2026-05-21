@@ -1364,38 +1364,27 @@ def _seed_2025_full():
 
 def _seed_may_2026():
     """Расчётные листы и записи турникета за май 2026 (текущий месяц)."""
-    if Payslip.query.filter_by(employee_id='001', period_month=5, period_year=2026).first():
+    std_ded = 60_536  # 14 МРП × 4 324 тг (МРП 2026)
+    salaries = [('001', 386_500), ('002', 558_000), ('003', 303_000)]
+    added = False
+    for emp_id, oklad in salaries:
+        if not Payslip.query.filter_by(
+            employee_id=emp_id, period_month=5, period_year=2026
+        ).first():
+            _add_payslip(emp_id, 5, 2026, oklad, std_ded)
+            added = True
+    if added:
+        db.session.commit()
+
+    # Записи турникета за 1-15 мая 2026 (только если ещё нет)
+    if AccessRecord.query.filter(
+        AccessRecord.access_date == date(2026, 5, 1),
+        AccessRecord.employee_id == '001'
+    ).first():
         return
 
-    salaries = [
-        ('001', 386_500, 'Инженер',              'Производственный отдел'),
-        ('002', 558_000, 'Руководитель отдела',   'Производственный отдел'),
-        ('003', 303_000, 'Бухгалтер',             'Бухгалтерия'),
-    ]
-    for emp_id, oklad, position, dept in salaries:
-        ta = round(oklad * 1.05, 2)   # оклад + 5% премия условно
-        ipn  = round(ta * 0.10, 2)
-        opv  = round(ta * 0.10, 2)
-        osms = round(ta * 0.02, 2)
-        td   = ipn + opv + osms
-        np_  = round(ta - td, 2)
-        ps = Payslip(employee_id=emp_id, period_month=5, period_year=2026,
-                     period_display='Май 2026',
-                     total_accruals=ta, total_deductions=td, net_pay=np_,
-                     position=position, department=dept,
-                     salary_rate=float(oklad), debt_start=0.0, debt_end=0.0,
-                     total_paid=np_)
-        db.session.add(ps)
-        db.session.flush()
-        db.session.add(PayslipAccrual(payslip_id=ps.id, name='Оплата по окладу', amount=float(oklad)))
-        db.session.add(PayslipAccrual(payslip_id=ps.id, name='Премия постоянная', amount=round(oklad * 0.05, 2)))
-        db.session.add(PayslipDeduction(payslip_id=ps.id, name='ИПН (10%)', amount=ipn))
-        db.session.add(PayslipDeduction(payslip_id=ps.id, name='ОПВ (10%)', amount=opv))
-        db.session.add(PayslipDeduction(payslip_id=ps.id, name='ВОСМС (2%)', amount=osms))
-
-    # Записи турникета за 1-15 мая 2026
-    work_days = [1,5,6,7,8,12,13,14,15]
-    times = [('001','08:52','18:10'), ('002','08:30','18:45'), ('003','08:42','17:50')]
+    work_days = [1, 5, 6, 7, 8, 12, 13, 14, 15]
+    times = [('001', '08:52', '18:10'), ('002', '08:30', '18:45'), ('003', '08:42', '17:50')]
     for emp_id, t_in, t_out in times:
         for d in work_days:
             db.session.add(AccessRecord(
@@ -1410,7 +1399,6 @@ def _seed_may_2026():
                 access_time=t_out,
                 event_type='Выход',
                 door_location='Главный вход'))
-
     db.session.commit()
 
 
