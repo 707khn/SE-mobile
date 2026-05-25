@@ -193,6 +193,29 @@ def register_routes(app):
             ]
         })
 
+    @app.route('/api/debug/payslips', methods=['GET'])
+    def debug_payslips():
+        """Diagnostic: show payslip counts per employee per year."""
+        from sqlalchemy import func
+        rows = db.session.query(
+            Payslip.employee_id,
+            Payslip.period_year,
+            func.count(Payslip.id).label('cnt')
+        ).group_by(Payslip.employee_id, Payslip.period_year).order_by(
+            Payslip.employee_id, Payslip.period_year
+        ).all()
+        result = {}
+        for emp_id, year, cnt in rows:
+            emp = Employee.query.get(emp_id)
+            key = f'{emp_id} ({emp.full_name if emp else "?"})'
+            result.setdefault(key, {})[str(year)] = cnt
+        months_002_2026 = [
+            ps.period_month for ps in Payslip.query.filter_by(
+                employee_id='002', period_year=2026
+            ).order_by(Payslip.period_month).all()
+        ]
+        return jsonify({'payslips': result, 'months_002_2026': months_002_2026})
+
     @app.route('/login', methods=['POST'])
     def login():
         data = request.get_json()
