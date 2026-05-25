@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:se_mobile/screens/admin_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
@@ -121,6 +123,10 @@ class MyApp extends StatelessWidget {
     final secure = SecureStorageHelper.instance;
     final isLogged = await secure.isLoggedIn();
     if (isLogged) {
+      final empId = await secure.getEmployeeId();
+      if (empId == null || empId.isEmpty) {
+        await _refreshEmployeeId(secure);
+      }
       return {
         'loggedIn': 'true',
         'fullName': await secure.getFullName(),
@@ -130,5 +136,25 @@ class MyApp extends StatelessWidget {
       return {'loggedIn': 'false'};
     }
   }
-}
 
+  Future<void> _refreshEmployeeId(SecureStorageHelper secure) async {
+    final iin = await secure.getLogin();
+    if (iin == null || iin.isEmpty) return;
+    try {
+      final r = await http.post(
+        Uri.parse('${AppValues.baseUrl}/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'iin': iin}),
+      ).timeout(const Duration(seconds: 10));
+      if (r.statusCode == 200) {
+        final b = jsonDecode(r.body) as Map<String, dynamic>;
+        if (b['message'] == 'Success') {
+          final fresh = (b['employee_id'] as String?) ?? '';
+          if (fresh.isNotEmpty) {
+            await secure.saveEmployeeId(fresh);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+}
