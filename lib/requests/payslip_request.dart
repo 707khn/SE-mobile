@@ -5,6 +5,10 @@ import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
+class PayslipTimeoutException implements Exception {
+  const PayslipTimeoutException();
+}
+
 class PayslipItem {
   final String name;
   final double amount;
@@ -65,28 +69,31 @@ class PayslipData {
 }
 
 Future<String?> _resolveEmployeeId() async {
-  var id = await SecureStorageHelper.instance.getEmployeeId();
-  if (id != null && id.isNotEmpty) return id;
+  // Always re-authenticate with the current backend using the stored IIN.
+  // This prevents stale employee_ids (e.g. from a previous backend) causing
+  // silent "Failure" responses on the payslip endpoint.
   final iin = await SecureStorageHelper.instance.getLogin();
-  if (iin == null || iin.isEmpty) return null;
-  try {
-    final r = await http.post(
-      Uri.parse('${AppValues.baseUrl}/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'iin': iin}),
-    ).timeout(const Duration(seconds: 10));
-    if (r.statusCode == 200) {
-      final b = jsonDecode(r.body) as Map<String, dynamic>;
-      if (b['message'] == 'Success') {
-        final fresh = (b['employee_id'] as String?) ?? '';
-        if (fresh.isNotEmpty) {
-          await SecureStorageHelper.instance.saveEmployeeId(fresh);
-          return fresh;
+  if (iin != null && iin.isNotEmpty) {
+    try {
+      final r = await http.post(
+        Uri.parse('${AppValues.baseUrl}/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'iin': iin}),
+      ).timeout(const Duration(seconds: 15));
+      if (r.statusCode == 200) {
+        final b = jsonDecode(r.body) as Map<String, dynamic>;
+        if (b['message'] == 'Success') {
+          final fresh = (b['employee_id'] as String?) ?? '';
+          if (fresh.isNotEmpty) {
+            await SecureStorageHelper.instance.saveEmployeeId(fresh);
+            return fresh;
+          }
         }
       }
-    }
-  } catch (_) {}
-  return null;
+    } catch (_) {}
+  }
+  // Fall back to cached id (offline / login endpoint unreachable).
+  return await SecureStorageHelper.instance.getEmployeeId();
 }
 
 Future<PayslipData?> getPayslip(BuildContext context, String month, String year) async {
@@ -100,7 +107,7 @@ Future<PayslipData?> getPayslip(BuildContext context, String month, String year)
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'key_suffix': login, 'month': month, 'year': year}),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 60));
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);
       if (responseBody['message'] == 'Failure') {
@@ -144,7 +151,7 @@ Future<PayslipData?> getPayslip(BuildContext context, String month, String year)
       return null;
     }
   } on TimeoutException {
-    return null;
+    throw const PayslipTimeoutException();
   } catch (e) {
     return null;
   }
