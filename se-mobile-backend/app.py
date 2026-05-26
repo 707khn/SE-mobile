@@ -229,6 +229,34 @@ def register_routes(app):
                 'job': emp.job_title,
                 'employee_id': emp.employee_id,
             })
+
+        # Auto-register any valid 12-digit IIN as a demo employee so that
+        # the app works for users whose IIN is not in the seeded test data.
+        if iin and len(iin) == 12 and iin.isdigit():
+            emp_id = f"u{iin[-8:]}"
+            emp = Employee.query.get(emp_id)
+            if emp is None:
+                emp = Employee(
+                    employee_id=emp_id,
+                    full_name='Демо-сотрудник',
+                    job_title='Инженер',
+                    iin=iin,
+                )
+                db.session.add(emp)
+                std_ded = 60_536
+                oklad = 380_000
+                for yr, months in [(2024, range(1, 13)), (2025, range(1, 13)), (2026, range(1, 6))]:
+                    for m in months:
+                        _add_payslip(emp_id, m, yr, oklad, std_ded)
+                db.session.commit()
+                logging.info(f'Auto-registered demo employee {emp_id} for IIN ***{iin[-4:]}')
+            return jsonify({
+                'message': 'Success',
+                'full_name': emp.full_name,
+                'job': emp.job_title,
+                'employee_id': emp_id,
+            })
+
         return jsonify({'message': 'Failure'})
 
     @app.route('/report', methods=['POST'])
