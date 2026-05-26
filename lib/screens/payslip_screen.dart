@@ -24,7 +24,7 @@ class _PayslipPageState extends State<PayslipPage> {
   }
   DateTime _selectedDate = _prevMonth();
   PayslipData? _payslip;
-  bool _loading = false;
+  bool _loading = true;
   String? _error;
 
   final _numberFormat = NumberFormat('#,##0.00', 'ru_RU');
@@ -44,17 +44,30 @@ class _PayslipPageState extends State<PayslipPage> {
 
     final month = _selectedDate.month.toString().padLeft(2, '0');
     final year = _selectedDate.year.toString();
-    final data = await getPayslip(context, month, year);
-
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-      if (data == null) {
-        _error = 'payslip not found'.tr;
-      } else {
-        _payslip = data;
-      }
-    });
+    try {
+      final data = await getPayslip(context, month, year);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        if (data == null) {
+          _error = 'payslip not found'.tr;
+        } else {
+          _payslip = data;
+        }
+      });
+    } on PayslipTimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'server_timeout'.tr;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'connection_error'.tr;
+      });
+    }
   }
 
   bool get _isCurrentOrFutureMonth {
