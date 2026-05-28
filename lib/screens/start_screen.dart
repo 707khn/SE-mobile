@@ -147,6 +147,24 @@ class CustomFormState extends State<CustomForm> {
                   );
                 },
               ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => loginController.text = '900101350123',
+                  child: Text(
+                    'Демо: 900101350123',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.mainColor,
+                    ),
+                  ),
+                ),
+              ),
               SizedBox(height: Dimensions.height30),
               LoginButton(
                 key: _loginButtonKey,
