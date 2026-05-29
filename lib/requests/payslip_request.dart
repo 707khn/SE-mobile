@@ -1,19 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
-class PayslipTimeoutException implements Exception {
-  const PayslipTimeoutException();
+enum PayslipErrorKind { timeout, network, notFound }
+
+class PayslipException implements Exception {
+  final PayslipErrorKind kind;
+  const PayslipException(this.kind);
 }
 
 class PayslipItem {
   final String name;
   final double amount;
-
-  PayslipItem({required this.name, required this.amount});
+  const PayslipItem({required this.name, required this.amount});
 }
 
 class PayslipPaidItem {
@@ -22,8 +23,7 @@ class PayslipPaidItem {
   final String document;
   final String date;
   final double amount;
-
-  PayslipPaidItem({
+  const PayslipPaidItem({
     required this.paymentType,
     required this.period,
     required this.document,
@@ -49,110 +49,117 @@ class PayslipData {
   final double debtStart;
   final double debtEnd;
 
-  PayslipData({
+  const PayslipData({
     required this.period,
     required this.employee,
-    this.position = '',
-    this.department = '',
+    required this.position,
+    required this.department,
     required this.accruals,
     required this.deductions,
-    this.paid = const [],
-    this.benefits = const [],
-    this.reference = const [],
+    required this.paid,
+    required this.benefits,
+    required this.reference,
     required this.totalAccruals,
     required this.totalDeductions,
-    this.totalPaid = 0.0,
+    required this.totalPaid,
     required this.netPay,
-    this.debtStart = 0.0,
-    this.debtEnd = 0.0,
+    required this.debtStart,
+    required this.debtEnd,
   });
 }
 
-Future<String?> _resolveEmployeeId() async {
-  // Always re-authenticate with the current backend using the stored IIN.
-  // This prevents stale employee_ids (e.g. from a previous backend) causing
-  // silent "Failure" responses on the payslip endpoint.
+// Re-authenticates via /login to get a fresh employee_id for the current backend.
+// Falls back to the cached value if the network call fails.
+Future<String?> _freshEmployeeId() async {
   final iin = await SecureStorageHelper.instance.getLogin();
   if (iin != null && iin.isNotEmpty) {
     try {
-      final r = await http.post(
-        Uri.parse('${AppValues.baseUrl}/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'iin': iin}),
-      ).timeout(const Duration(seconds: 15));
+      final r = await http
+          .post(
+            Uri.parse('${AppValues.baseUrl}/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'iin': iin}),
+          )
+          .timeout(const Duration(seconds: 15));
       if (r.statusCode == 200) {
         final b = jsonDecode(r.body) as Map<String, dynamic>;
         if (b['message'] == 'Success') {
-          final fresh = (b['employee_id'] as String?) ?? '';
-          if (fresh.isNotEmpty) {
-            await SecureStorageHelper.instance.saveEmployeeId(fresh);
-            return fresh;
+          final id = (b['employee_id'] as String?) ?? '';
+          if (id.isNotEmpty) {
+            await SecureStorageHelper.instance.saveEmployeeId(id);
+            return id;
           }
         }
       }
     } catch (_) {}
   }
-  // Fall back to cached id (offline / login endpoint unreachable).
-  return await SecureStorageHelper.instance.getEmployeeId();
+  return SecureStorageHelper.instance.getEmployeeId();
 }
 
-Future<PayslipData?> getPayslip(BuildContext context, String month, String year) async {
-  final login = await _resolveEmployeeId();
-  if (login == null || login.isEmpty) return null;
+PayslipItem _toItem(dynamic e) {
+  final m = e as Map;
+  return PayslipItem(
+    name: m['name'] as String,
+    amount: (m['amount'] as num).toDouble(),
+  );
+}
 
+Future<PayslipData> fetchPayslip(String month, String year) async {
+  final employeeId = await _freshEmployeeId();
+  if (employeeId == null || employeeId.isEmpty) {
+    throw const PayslipException(PayslipErrorKind.notFound);
+  }
+
+  final http.Response response;
   try {
-    var response = await http
+    response = await http
         .post(
           Uri.parse('${AppValues.baseUrl}/payslip'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'key_suffix': login, 'month': month, 'year': year}),
+          body: jsonEncode({'key_suffix': employeeId, 'month': month, 'year': year}),
         )
         .timeout(const Duration(seconds: 60));
-    if (response.statusCode == 200) {
-      var responseBody = jsonDecode(response.body);
-      if (responseBody['message'] == 'Failure') {
-        return null;
-      }
-      var p = responseBody['payslip'];
-      return PayslipData(
-        period: p['period'],
-        employee: p['employee'],
-        position: p['position'] ?? '',
-        department: p['department'] ?? '',
-        accruals: (p['accruals'] as List)
-            .map((e) => PayslipItem(name: e['name'], amount: (e['amount'] as num).toDouble()))
-            .toList(),
-        deductions: (p['deductions'] as List)
-            .map((e) => PayslipItem(name: e['name'], amount: (e['amount'] as num).toDouble()))
-            .toList(),
-        paid: ((p['paid'] ?? []) as List)
-            .map((e) => PayslipPaidItem(
-                  paymentType: e['payment_type'] ?? '',
-                  period: e['period'] ?? '',
-                  document: e['document'] ?? '',
-                  date: e['date'] ?? '',
-                  amount: (e['amount'] as num).toDouble(),
-                ))
-            .toList(),
-        benefits: ((p['benefits'] ?? []) as List)
-            .map((e) => PayslipItem(name: e['name'], amount: (e['amount'] as num).toDouble()))
-            .toList(),
-        reference: ((p['reference'] ?? []) as List)
-            .map((e) => PayslipItem(name: e['name'], amount: (e['amount'] as num).toDouble()))
-            .toList(),
-        totalAccruals: (p['total_accruals'] as num).toDouble(),
-        totalDeductions: (p['total_deductions'] as num).toDouble(),
-        totalPaid: ((p['total_paid'] ?? 0) as num).toDouble(),
-        netPay: (p['net_pay'] as num).toDouble(),
-        debtStart: ((p['debt_start'] ?? 0) as num).toDouble(),
-        debtEnd: ((p['debt_end'] ?? 0) as num).toDouble(),
-      );
-    } else {
-      return null;
-    }
   } on TimeoutException {
-    throw const PayslipTimeoutException();
-  } catch (e) {
-    return null;
+    throw const PayslipException(PayslipErrorKind.timeout);
+  } catch (_) {
+    throw const PayslipException(PayslipErrorKind.network);
   }
+
+  if (response.statusCode != 200) {
+    throw const PayslipException(PayslipErrorKind.network);
+  }
+
+  final body = jsonDecode(response.body) as Map<String, dynamic>;
+  if (body['message'] != 'Success') {
+    throw const PayslipException(PayslipErrorKind.notFound);
+  }
+
+  final p = body['payslip'] as Map<String, dynamic>;
+
+  return PayslipData(
+    period: p['period'] as String,
+    employee: p['employee'] as String,
+    position: (p['position'] as String?) ?? '',
+    department: (p['department'] as String?) ?? '',
+    accruals: (p['accruals'] as List).map(_toItem).toList(),
+    deductions: (p['deductions'] as List).map(_toItem).toList(),
+    paid: ((p['paid'] ?? []) as List).map((e) {
+      final m = e as Map;
+      return PayslipPaidItem(
+        paymentType: (m['payment_type'] as String?) ?? '',
+        period: (m['period'] as String?) ?? '',
+        document: (m['document'] as String?) ?? '',
+        date: (m['date'] as String?) ?? '',
+        amount: (m['amount'] as num).toDouble(),
+      );
+    }).toList(),
+    benefits: ((p['benefits'] ?? []) as List).map(_toItem).toList(),
+    reference: ((p['reference'] ?? []) as List).map(_toItem).toList(),
+    totalAccruals: (p['total_accruals'] as num).toDouble(),
+    totalDeductions: (p['total_deductions'] as num).toDouble(),
+    totalPaid: ((p['total_paid'] ?? 0) as num).toDouble(),
+    netPay: (p['net_pay'] as num).toDouble(),
+    debtStart: ((p['debt_start'] ?? 0) as num).toDouble(),
+    debtEnd: ((p['debt_end'] ?? 0) as num).toDouble(),
+  );
 }
