@@ -10,7 +10,11 @@ import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 
 sealed class _State {}
-final class _Loading extends _State {}
+final class _Loading extends _State {
+  // Non-null during automatic retry — shown as a subtitle under the spinner.
+  final String? hint;
+  _Loading([this.hint]);
+}
 final class _Error extends _State {
   final PayslipErrorKind kind;
   _Error(this.kind);
@@ -44,6 +48,14 @@ class _PayslipPageState extends State<PayslipPage> {
 
   Future<void> _fetch() async {
     setState(() => _state = _Loading());
+
+    // Show a hint after 5 s so the user knows the server is waking up.
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _state is _Loading) {
+        setState(() => _state = _Loading('server_timeout'.tr));
+      }
+    });
+
     try {
       final data = await fetchPayslip(
         _selected.month.toString().padLeft(2, '0'),
@@ -241,10 +253,23 @@ class _PayslipPageState extends State<PayslipPage> {
               _periodBar(loading),
               SizedBox(height: Dimensions.height30 / 2),
               switch (_state) {
-                _Loading() => const Center(
+                _Loading(hint: final hint) => Center(
                     child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: CircularProgressIndicator(color: AppColors.mainColor),
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(color: AppColors.mainColor),
+                          if (hint != null) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              hint,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 _Error(kind: final k) => _errorView(k),

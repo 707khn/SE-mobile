@@ -104,7 +104,8 @@ PayslipItem _toItem(dynamic e) {
   );
 }
 
-Future<PayslipData> fetchPayslip(String month, String year) async {
+Future<PayslipData> fetchPayslip(String month, String year, {int _attempt = 0}) async {
+  // Re-authenticate on every attempt so a fresh employee_id is used after wake-up.
   final employeeId = await _freshEmployeeId();
   if (employeeId == null || employeeId.isEmpty) {
     throw const PayslipException(PayslipErrorKind.notFound);
@@ -118,10 +119,16 @@ Future<PayslipData> fetchPayslip(String month, String year) async {
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'key_suffix': employeeId, 'month': month, 'year': year}),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 50));
   } on TimeoutException {
     throw const PayslipException(PayslipErrorKind.timeout);
   } catch (_) {
+    // Render.com free tier closes connections during cold-start.
+    // One automatic retry after 20 s gives the server time to wake up.
+    if (_attempt < 1) {
+      await Future.delayed(const Duration(seconds: 20));
+      return fetchPayslip(month, year, _attempt: _attempt + 1);
+    }
     throw const PayslipException(PayslipErrorKind.network);
   }
 
