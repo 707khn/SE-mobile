@@ -69,7 +69,8 @@ class PayslipData {
 }
 
 // Re-authenticates via /login to get a fresh employee_id for the current backend.
-// Falls back to the cached value if the network call fails.
+// Returns null if the backend explicitly rejects the IIN (IIN not registered).
+// Falls back to the cached value only on network errors (offline / server sleeping).
 Future<String?> _freshEmployeeId() async {
   final iin = await SecureStorageHelper.instance.getLogin();
   if (iin != null && iin.isNotEmpty) {
@@ -89,9 +90,15 @@ Future<String?> _freshEmployeeId() async {
             await SecureStorageHelper.instance.saveEmployeeId(id);
             return id;
           }
+        } else {
+          // Backend explicitly says this IIN is unknown.
+          // Do NOT fall back to a stale cached id from another backend.
+          return null;
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Network error — fall back to cached id for offline / cold-start scenarios.
+    }
   }
   return SecureStorageHelper.instance.getEmployeeId();
 }
@@ -126,9 +133,9 @@ Future<PayslipData> _fetchPayslip(String month, String year, int attempt) async 
   } on TimeoutException {
     throw const PayslipException(PayslipErrorKind.timeout);
   } catch (_) {
-    // Render.com free tier closes connections during cold-start.
-    // One automatic retry after 20 s gives the server time to wake up.
-    if (attempt < 1) {
+    // Render.com free tier closes connections during cold-start (~40-60 s).
+    // Retry up to 3 times (20 s apart) so the total wait covers the full wake-up window.
+    if (attempt < 3) {
       await Future.delayed(const Duration(seconds: 20));
       return _fetchPayslip(month, year, attempt + 1);
     }

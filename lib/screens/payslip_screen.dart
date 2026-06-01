@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'start_screen.dart';
 
 import '../requests/payslip_request.dart';
 import '../utils/colors.dart';
@@ -343,11 +344,29 @@ class _PayslipPageState extends State<PayslipPage> {
               icon: const Icon(Icons.refresh),
               label: Text('refresh'.tr),
             ),
+            if (kind == PayslipErrorKind.notFound) ...[
+              SizedBox(height: Dimensions.height30),
+              const Divider(),
+              SizedBox(height: Dimensions.height30 / 2),
+              Text(
+                'Демо-данные доступны с ИИН:\n900101350123',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+              ),
+              SizedBox(height: Dimensions.height30 / 2),
+              OutlinedButton.icon(
+                onPressed: _goToLogin,
+                icon: const Icon(Icons.person_outline, size: 18),
+                label: const Text('Сменить аккаунт'),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+
+  void _goToLogin() => Get.offAll(() => const StartPage());
 
   Widget _dataView(PayslipData d) {
     return AnimatedSwitcher(
