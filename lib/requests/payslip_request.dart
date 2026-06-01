@@ -133,9 +133,9 @@ Future<PayslipData> _fetchPayslip(String month, String year, int attempt) async 
   } on TimeoutException {
     throw const PayslipException(PayslipErrorKind.timeout);
   } catch (_) {
-    // Render.com free tier closes connections during cold-start.
-    // One automatic retry after 20 s gives the server time to wake up.
-    if (attempt < 1) {
+    // Render.com free tier closes connections during cold-start (~40-60 s).
+    // Retry up to 3 times (20 s apart) so the total wait covers the full wake-up window.
+    if (attempt < 3) {
       await Future.delayed(const Duration(seconds: 20));
       return _fetchPayslip(month, year, attempt + 1);
     }
