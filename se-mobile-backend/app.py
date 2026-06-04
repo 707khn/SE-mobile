@@ -81,9 +81,9 @@ def _send_turnstile_notification(employee_name: str, direction: str, timestamp_s
 def _update_employee_names():
     """Sync employee display names to current seed values (non-destructive)."""
     name_map = {
-        '001': ('Ахметов Асан Бекович',       'Инженер'),
-        '002': ('Касымов Нурлан Серикович',    'Руководитель отдела'),
-        '003': ('Сидорова Анна Сергеевна',     'Бухгалтер'),
+        '001': ('Сарсекенов Батырхан Арманұлы', 'Техник-программист'),
+        '002': ('Касымов Нурлан Серикович',      'Руководитель отдела'),
+        '003': ('Сидорова Анна Сергеевна',       'Бухгалтер'),
     }
     changed = False
     for emp_id, (name, job) in name_map.items():
@@ -97,28 +97,101 @@ def _update_employee_names():
         db.session.commit()
 
 
+def _update_employee_iins():
+    """Patch IINs for existing employees when seeds change.
+
+    `iin` is UNIQUE, so before assigning a target IIN we must release it from
+    any other row that currently holds it (e.g. a legacy seed or an
+    auto-registered demo user). Otherwise the commit hits an IntegrityError.
+    """
+    iin_map = {
+        '001': '000000002114',
+    }
+    changed = False
+    for emp_id, new_iin in iin_map.items():
+        emp = Employee.query.filter_by(employee_id=emp_id).first()
+        if not emp or emp.iin == new_iin:
+            continue
+        # Free the unique IIN from any other employee holding it.
+        for other in Employee.query.filter(
+                Employee.iin == new_iin,
+                Employee.employee_id != emp_id).all():
+            other.iin = None
+            logging.info(f'Released IIN {new_iin} from employee {other.employee_id}')
+        db.session.flush()
+        emp.iin = new_iin
+        changed = True
+        logging.info(f'Updated employee {emp_id} IIN → {new_iin}')
+    if changed:
+        db.session.commit()
+
+
 def _migrate_schema():
-    """Add columns missing from existing tables without dropping data."""
+    """Add columns missing from existing tables without dropping data.
+
+    db.create_all() only creates whole tables — it never adds new columns to
+    tables that already exist. Columns added to the models after the live
+    database was first created must be back-filled here, otherwise every
+    INSERT that references them fails on strict backends like PostgreSQL
+    (silently rolling back the seeders and leaving payslips empty).
+    """
     from sqlalchemy import text, inspect
     inspector = inspect(db.engine)
     tables = inspector.get_table_names()
 
-    if 'payslips' in tables:
-        existing = {c['name'] for c in inspector.get_columns('payslips')}
-        missing = {
+    # table -> {column: SQL type}. Covers the parent payslips row plus every
+    # child table whose columns were introduced after initial deployment.
+    schema = {
+        'payslips': {
             'position':    'VARCHAR(200)',
             'department':  'VARCHAR(200)',
             'salary_rate': 'FLOAT DEFAULT 0',
             'debt_start':  'FLOAT DEFAULT 0',
             'debt_end':    'FLOAT DEFAULT 0',
             'total_paid':  'FLOAT DEFAULT 0',
-        }
-        with db.engine.connect() as conn:
-            for col, typedef in missing.items():
+        },
+        'payslip_accruals': {
+            'period':        'VARCHAR(50)',
+            'working_days':  'INTEGER',
+            'working_hours': 'FLOAT',
+        },
+        'payslip_deductions': {
+            'period': 'VARCHAR(50)',
+        },
+        'payslip_paid': {
+            'payment_type': 'VARCHAR(200)',
+            'period':       'VARCHAR(50)',
+            'document':     'VARCHAR(200)',
+            'date':         'VARCHAR(20)',
+        },
+    }
+
+    with db.engine.connect() as conn:
+        for table, columns in schema.items():
+            if table not in tables:
+                continue
+            existing = {c['name'] for c in inspector.get_columns(table)}
+            for col, typedef in columns.items():
                 if col not in existing:
-                    conn.execute(text(f'ALTER TABLE payslips ADD COLUMN "{col}" {typedef}'))
-                    logging.info(f'Migration: added payslips.{col}')
-            conn.commit()
+                    conn.execute(text(f'ALTER TABLE {table} ADD COLUMN "{col}" {typedef}'))
+                    logging.info(f'Migration: added {table}.{col}')
+        conn.commit()
+
+
+def _seed_sarseken():
+    """Remove legacy emp_id='2114' to avoid duplicate IIN collision with emp '001'."""
+    legacy = Employee.query.filter_by(employee_id='2114').first()
+    if legacy:
+        # Delete child payslip rows first to satisfy FK constraints
+        for ps in Payslip.query.filter_by(employee_id='2114').all():
+            PayslipAccrual.query.filter_by(payslip_id=ps.id).delete()
+            PayslipDeduction.query.filter_by(payslip_id=ps.id).delete()
+            PayslipPaid.query.filter_by(payslip_id=ps.id).delete()
+            PayslipBenefit.query.filter_by(payslip_id=ps.id).delete()
+            db.session.delete(ps)
+        db.session.delete(legacy)
+        db.session.commit()
+        logging.info('Removed legacy employee 2114 (IIN merged into employee 001)')
 
 
 def create_app():
@@ -141,18 +214,24 @@ def create_app():
 
     with app.app_context():
         logging.info('Running db.create_all()...')
-        db.create_all()
-        _migrate_schema()
+        try:
+            db.create_all()
+        except Exception as e:
+            logging.error(f'db.create_all() failed (non-fatal): {e}', exc_info=True)
         logging.info('db.create_all() done')
         for _fn in [
+            _migrate_schema,
             _auto_seed,
             _update_employee_names,
+            _update_employee_iins,
             _seed_2024_full,
             _seed_2025_full,
             _seed_2026,
             _seed_2026_full,
             _ensure_payslips_jan_apr_2026,
             _seed_may_2026,
+            _ensure_all_payslips,
+            _seed_sarseken,
             _seed_turnstile_events,
             _seed_leave_2026,
         ]:
@@ -218,44 +297,49 @@ def register_routes(app):
 
     @app.route('/login', methods=['POST'])
     def login():
-        data = request.get_json()
-        iin = data.get('iin', '').strip()
+        data = request.get_json(silent=True) or {}
+        iin = (data.get('iin') or '').strip()
 
-        emp = Employee.query.filter_by(iin=iin).first()
-        if emp and iin != '':
-            return jsonify({
-                'message': 'Success',
-                'full_name': emp.full_name,
-                'job': emp.job_title,
-                'employee_id': emp.employee_id,
-            })
+        try:
+            emp = Employee.query.filter_by(iin=iin).first()
+            if emp and iin != '':
+                return jsonify({
+                    'message': 'Success',
+                    'full_name': emp.full_name,
+                    'job': emp.job_title,
+                    'employee_id': emp.employee_id,
+                })
 
-        # Auto-register any valid 12-digit IIN as a demo employee so that
-        # the app works for users whose IIN is not in the seeded test data.
-        if iin and len(iin) == 12 and iin.isdigit():
-            emp_id = f"u{iin[-8:]}"
-            emp = Employee.query.get(emp_id)
-            if emp is None:
-                emp = Employee(
-                    employee_id=emp_id,
-                    full_name='Демо-сотрудник',
-                    job_title='Инженер',
-                    iin=iin,
-                )
-                db.session.add(emp)
-                std_ded = 60_536
-                oklad = 380_000
-                for yr, months in [(2024, range(1, 13)), (2025, range(1, 13)), (2026, range(1, 6))]:
-                    for m in months:
-                        _add_payslip(emp_id, m, yr, oklad, std_ded)
-                db.session.commit()
-                logging.info(f'Auto-registered demo employee {emp_id} for IIN ***{iin[-4:]}')
-            return jsonify({
-                'message': 'Success',
-                'full_name': emp.full_name,
-                'job': emp.job_title,
-                'employee_id': emp_id,
-            })
+            # Auto-register any valid 12-digit IIN as a demo employee so that
+            # the app works for users whose IIN is not in the seeded test data.
+            if iin and len(iin) == 12 and iin.isdigit():
+                emp_id = f"u{iin[-8:]}"
+                emp = Employee.query.get(emp_id)
+                if emp is None:
+                    emp = Employee(
+                        employee_id=emp_id,
+                        full_name='Демо-сотрудник',
+                        job_title='Инженер',
+                        iin=iin,
+                    )
+                    db.session.add(emp)
+                    std_ded = 60_536
+                    oklad = 380_000
+                    for yr, months in [(2024, range(1, 13)), (2025, range(1, 13)), (2026, range(1, 6))]:
+                        for m in months:
+                            _add_payslip(emp_id, m, yr, oklad, std_ded)
+                    db.session.commit()
+                    logging.info(f'Auto-registered demo employee {emp_id} for IIN ***{iin[-4:]}')
+                return jsonify({
+                    'message': 'Success',
+                    'full_name': emp.full_name,
+                    'job': emp.job_title,
+                    'employee_id': emp_id,
+                })
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f'login failed for IIN ***{iin[-4:] if len(iin) >= 4 else iin}: {e}', exc_info=True)
+            return jsonify({'message': 'Failure', 'error': 'internal'}), 200
 
         return jsonify({'message': 'Failure'})
 
@@ -753,7 +837,7 @@ def _auto_seed():
     if Employee.query.first():
         return
 
-    e1 = Employee(employee_id='001', full_name='Ахметов Асан Бекович', job_title='Инженер', iin='900101350123')
+    e1 = Employee(employee_id='001', full_name='Сарсекенов Батырхан Арманұлы', job_title='Техник-программист', iin='000000002114')
     e2 = Employee(employee_id='002', full_name='Касымов Нурлан Серикович', job_title='Руководитель отдела', iin='850515400456')
     e3 = Employee(employee_id='003', full_name='Сидорова Анна Сергеевна', job_title='Бухгалтер', iin='920720450789')
     db.session.add_all([e1, e2, e3])
@@ -1226,7 +1310,7 @@ def _add_payslip(emp_id, month, year, oklad, standard_deduction, vacation_days=0
     next_year  = year if month < 12 else year + 1
     period_str = f'{month:02d}.{year}'
 
-    pos, dept, _ = _EMP_META[emp_id]
+    pos, dept, _ = _EMP_META.get(emp_id, ('Сотрудник', 'Общий отдел', ''))
     ps = Payslip(
         employee_id=emp_id, period_month=month, period_year=year,
         period_display=f'{_MONTH_RU[month]} {year}',
@@ -1297,7 +1381,7 @@ def _add_access_days(emp_id, start_date, end_date, holidays, absences=None):
     absences = absences or set()
     entry_times = ['08:45', '08:55', '09:05']
     exit_times  = ['17:45', '18:00', '18:15']
-    _, _, door = _EMP_META[emp_id]
+    _, _, door = _EMP_META.get(emp_id, ('', '', 'Главный вход'))
     records = []
     d = start_date
     while d <= end_date:
@@ -1453,6 +1537,30 @@ def _seed_may_2026():
     db.session.commit()
 
 
+def _ensure_all_payslips():
+    """Catch-all: adds any missing payslips for 2024-2026 for the three demo employees.
+
+    Runs after other seeders so it fills gaps left by any that failed silently.
+    Fully idempotent — safe to run on every startup.
+    """
+    salaries = [('001', 380_000), ('002', 550_000), ('003', 300_000)]
+    std_ded = 60_536
+    added = 0
+    for year, months in [(2024, range(1, 13)), (2025, range(1, 13)), (2026, range(1, 6))]:
+        for emp_id, oklad in salaries:
+            if not Employee.query.filter_by(employee_id=emp_id).first():
+                continue
+            for month in months:
+                if not Payslip.query.filter_by(
+                    employee_id=emp_id, period_year=year, period_month=month
+                ).first():
+                    _add_payslip(emp_id, month, year, oklad, std_ded)
+                    added += 1
+    if added:
+        db.session.commit()
+        logging.info(f'_ensure_all_payslips: added {added} missing payslip(s)')
+
+
 def _ensure_payslips_jan_apr_2026():
     """Backfill Jan–Apr 2026 payslips for all employees if any were missed."""
     salaries = [('001', 380_000), ('002', 550_000), ('003', 300_000)]
@@ -1479,7 +1587,7 @@ def _seed_turnstile_events():
         return
 
     employees = [
-        ('001', 'Ахметов Асан Бекович'),
+        ('001', 'Сарсекенов Батырхан Арманұлы'),
         ('002', 'Касымов Нурлан Серикович'),
         ('003', 'Сидорова Анна Сергеевна'),
     ]
