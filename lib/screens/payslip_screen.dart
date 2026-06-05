@@ -348,12 +348,6 @@ class _PayslipPageState extends State<PayslipPage> {
               SizedBox(height: Dimensions.height30),
               const Divider(),
               SizedBox(height: Dimensions.height30 / 2),
-              Text(
-                'Демо-данные доступны с ИИН:\n900101350123',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
               OutlinedButton.icon(
                 onPressed: _goToLogin,
                 icon: const Icon(Icons.person_outline, size: 18),
