@@ -10,7 +10,7 @@ import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
-Future<void> loginToAccount(String login, BuildContext context) async {
+Future<void> loginToAccount(String login, String password, BuildContext context) async {
   final secureStorage = SecureStorageHelper.instance;
 
   try {
@@ -18,9 +18,9 @@ Future<void> loginToAccount(String login, BuildContext context) async {
         .post(
           Uri.parse('${AppValues.baseUrl}/login'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'iin': login}),
+          body: jsonEncode({'login': login, 'password': password}),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 60));
 
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);

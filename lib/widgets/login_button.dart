@@ -36,23 +36,30 @@ class LoginButtonState extends State<LoginButton> with SingleTickerProviderState
   }
 
   final loginController = CustomFormState.loginController;
+  final passwordController = CustomFormState.passwordController;
 
   Future<void> submit() async {
     final login = loginController.text.trim();
-    if (login.isEmpty || login.length != 12 || int.tryParse(login) == null) {
+    final password = passwordController.text.trim();
+    if (login.isEmpty) {
       HapticFeedback.mediumImpact();
       _shakeController.forward(from: 0);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(login.isEmpty ? 'login_empty'.tr : 'login_not_registered'.tr),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text('login_empty'.tr), behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
+    if (password.isEmpty) {
+      HapticFeedback.mediumImpact();
+      _shakeController.forward(from: 0);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('password_empty'.tr), behavior: SnackBarBehavior.floating),
       );
       return;
     }
     HapticFeedback.lightImpact();
     setState(() => _loading = true);
-    await loginToAccount(login, context);
+    await loginToAccount(login, password, context);
     if (mounted) setState(() => _loading = false);
   }
 
