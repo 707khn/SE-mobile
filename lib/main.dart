@@ -12,6 +12,7 @@ import 'package:se_mobile/utils/role_helper.dart';
 import 'package:se_mobile/utils/variables.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'screens/home_shell.dart';
 import 'screens/main_screen_1.dart';
 import 'screens/main_screen_2.dart';
 import 'utils/secure_storage_helper.dart';
@@ -107,7 +108,7 @@ class MyApp extends StatelessWidget {
               if (isAdminRole(job)){
                 return AdminPage(fullName: fullName, job: job);
               } else {
-                return MainPage1(fullName: fullName, job: job);
+                return HomeShell(fullName: fullName, job: job);
               }
             } else {
               return const StartPage();
@@ -138,13 +139,14 @@ class MyApp extends StatelessWidget {
   }
 
   Future<void> _refreshEmployeeId(SecureStorageHelper secure) async {
-    final iin = await secure.getLogin();
-    if (iin == null || iin.isEmpty) return;
+    final login = await secure.getLogin();
+    final password = await secure.getPassword();
+    if (login == null || login.isEmpty || password == null || password.isEmpty) return;
     try {
       final r = await http.post(
         Uri.parse('${AppValues.baseUrl}/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'iin': iin}),
+        body: jsonEncode({'login': login, 'password': password}),
       ).timeout(const Duration(seconds: 10));
       if (r.statusCode == 200) {
         final b = jsonDecode(r.body) as Map<String, dynamic>;

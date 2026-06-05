@@ -6,11 +6,7 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/report_request.dart';
-import 'package:se_mobile/screens/leave_screen.dart';
 import 'package:se_mobile/requests/reportdate_request.dart';
-import 'package:se_mobile/screens/attendance_screen.dart';
-import 'package:se_mobile/screens/menu_screen.dart';
-import 'package:se_mobile/screens/payslip_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/logout_helper.dart';
 import 'package:se_mobile/utils/secure_storage_helper.dart';
@@ -223,42 +219,6 @@ class _MainPage1State extends State<MainPage1> {
                             ],
                           ),
                         ),
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.restaurant_menu, color: AppColors.mainColor),
-                        title: BigText(content: 'canteen_menu'.tr),
-                        subtitle: Text('canteen_subtitle'.tr, style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Get.to(() => const MenuScreen());
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.badge_outlined, color: AppColors.mainColor),
-                        title: BigText(content: 'attendance'.tr),
-                        subtitle: Text('attendance_subtitle'.tr, style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Get.to(() => const AttendanceScreen());
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
-                        title: BigText(content: 'payslip'.tr),
-                        subtitle: Text('payslip_subtitle'.tr, style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Get.to(() => const PayslipPage());
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.beach_access, color: AppColors.mainColor),
-                        title: BigText(content: 'leave_sick_days'.tr),
-                        subtitle: Text('leave_subtitle'.tr, style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Get.to(() => const LeavePage());
-                        },
                       ),
                     ],
                   ),
