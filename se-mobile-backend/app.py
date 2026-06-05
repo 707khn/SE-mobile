@@ -240,6 +240,7 @@ def create_app():
             _seed_sarseken,
             _seed_turnstile_events,
             _seed_leave_2026,
+            _update_april_2026_001,
         ]:
             try:
                 _fn()
@@ -1259,7 +1260,7 @@ _MONTH_RU = {
 }
 
 _EMP_META = {
-    '001': ('Инженер',          'Производственный отдел', 'Главный вход'),
+    '001': ('Техник-программист', 'Отдел информационных технологий и связи', 'Главный вход'),
     '002': ('Руководитель отдела', 'Администрация',         'Офис'),
     '003': ('Бухгалтер',        'Бухгалтерия',            'Бухгалтерия'),
 }
@@ -1355,6 +1356,63 @@ def _add_payslip(emp_id, month, year, oklad, standard_deduction, vacation_days=0
     db.session.add(PayslipReference(
         payslip_id=ps.id, name='Социальный налог',
         amount=float(round(total_accruals * 0.0525))))
+
+
+def _update_april_2026_001():
+    """Replace April 2026 payslip for emp 001 with exact data from the official PDF payslip."""
+    existing = Payslip.query.filter_by(employee_id='001', period_year=2026, period_month=4).all()
+    for ps in existing:
+        PayslipAccrual.query.filter_by(payslip_id=ps.id).delete()
+        PayslipDeduction.query.filter_by(payslip_id=ps.id).delete()
+        PayslipPaid.query.filter_by(payslip_id=ps.id).delete()
+        PayslipBenefit.query.filter_by(payslip_id=ps.id).delete()
+        PayslipReference.query.filter_by(payslip_id=ps.id).delete()
+        db.session.delete(ps)
+    db.session.flush()
+
+    ps = Payslip(
+        employee_id='001',
+        period_month=4,
+        period_year=2026,
+        period_display='Апрель 2026',
+        total_accruals=332_608.0,
+        total_deductions=52_249.0,
+        net_pay=280_359.0,
+        total_paid=277_770.0,
+        position='Техник-программист',
+        department='Отдел информационных технологий и связи',
+        salary_rate=326_120.0,
+        debt_start=277_770.0,
+        debt_end=280_359.0,
+    )
+    db.session.add(ps)
+    db.session.flush()
+
+    period = '04.2026'
+
+    db.session.add(PayslipAccrual(
+        payslip_id=ps.id, name='Оклад по дням', amount=326_120.0,
+        period=period, working_days=22, working_hours=176.0))
+    db.session.add(PayslipAccrual(
+        payslip_id=ps.id, name='Выплаты вследствии экологического бедствия',
+        amount=6_488.0, period=period))
+
+    db.session.add(PayslipDeduction(
+        payslip_id=ps.id, name='Профсоюзный сбор', amount=3_261.0, period=period))
+    db.session.add(PayslipDeduction(
+        payslip_id=ps.id, name='ИПН исчисленный', amount=16_376.0, period=period))
+    db.session.add(PayslipDeduction(
+        payslip_id=ps.id, name='ОПВ исчисленные', amount=32_612.0, period=period))
+
+    db.session.add(PayslipPaid(
+        payslip_id=ps.id, payment_type='Перечислено в банк',
+        period=period, document='ЗП000000689', date='09.04.2026', amount=277_770.0))
+
+    db.session.add(PayslipBenefit(payslip_id=ps.id, name='Вычет ОПВ', amount=32_612.0))
+    db.session.add(PayslipBenefit(payslip_id=ps.id, name='Базовый вычет', amount=129_750.0))
+
+    db.session.commit()
+    logging.info('Seeded April 2026 payslip for emp 001 from official PDF')
 
 
 def _add_access_days(emp_id, start_date, end_date, holidays, absences=None):
