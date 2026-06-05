@@ -861,12 +861,8 @@ class _MainPage2State extends State<MainPage2> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Text(
-                      'scroll to right'.tr,
-                      style: const TextStyle(fontSize: 12.0, color: Colors.grey),
-                    ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -917,11 +913,9 @@ class _MainPage2State extends State<MainPage2> {
                     ),
                   ),
                 if (filtered.isNotEmpty || _filterText.isEmpty)
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: Dimensions.width120 * 4,
-                    child: DataTable(
+                DataTable(
+                      columnSpacing: 8,
+                      horizontalMargin: 10,
                       headingTextStyle: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: AppColors.mainColor,
@@ -930,8 +924,8 @@ class _MainPage2State extends State<MainPage2> {
                     columns: [
                         DataColumn(label: Text('col_date'.tr)),
                         DataColumn(label: Text('col_time'.tr)),
-                        DataColumn(label: Text('col_event'.tr)),
                         DataColumn(label: Text('col_door'.tr)),
+                        DataColumn(label: Text('col_event'.tr)),
                       ],
                       rows: filtered.asMap().entries.map((e) {
                         final idx = e.key;
@@ -956,9 +950,12 @@ class _MainPage2State extends State<MainPage2> {
                               ),
                             ),
                             DataCell(Text(entry[1])),
-                            DataCell(Text(entry[2])),
+                            DataCell(Text(
+                              entry[3],
+                              overflow: TextOverflow.ellipsis,
+                            )),
                             DataCell(
-                              Text(entry[3]),
+                              Text(entry[2]),
                               onLongPress: () {
                                 final row = '${_formatDate(entry[0])}  ${entry[1]}  ${entry[2]}  ${entry[3]}';
                                 Clipboard.setData(ClipboardData(text: row));
@@ -973,8 +970,6 @@ class _MainPage2State extends State<MainPage2> {
                         );
                       }).toList(),
                     ),
-                  ),
-                ),
                   ],
                   );
                 }),

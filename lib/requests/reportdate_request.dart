@@ -24,17 +24,12 @@ Future<List<List<String>>> getReportDateEntries(BuildContext context, startdate,
         return report;
       } else {
         for (var entry in responseBody['report']) {
-          List<String> stringEntry = [];
-          entry.forEach((key, value) {
-            if (value is DateTime) {
-              stringEntry.add(value.toString());
-            } else if (value is String) {
-              stringEntry.add(value);
-            } else {
-              stringEntry.add(value.toString());
-            }
-          });
-          report.add(stringEntry);
+          report.add([
+            entry['date'] as String,
+            entry['time'] as String,
+            entry['event'] as String,
+            entry['door'] as String? ?? '',
+          ]);
         }
         return report;
       }
