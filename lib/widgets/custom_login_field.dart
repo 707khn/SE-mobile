@@ -13,6 +13,8 @@ class CustomLoginField extends StatefulWidget {
     required this.fontSize,
     this.backgroundColor,
     this.onSubmitted,
+    this.keyboardType = TextInputType.number,
+    this.maxLength = 12,
   }) : super(key: key);
 
   final String hintText;
@@ -22,6 +24,8 @@ class CustomLoginField extends StatefulWidget {
   final Color? backgroundColor;
   final double fontSize;
   final VoidCallback? onSubmitted;
+  final TextInputType keyboardType;
+  final int maxLength;
 
   @override
   _CustomLoginFieldState createState() => _CustomLoginFieldState();
@@ -74,8 +78,8 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: Dimensions.width20 * 0.5),
         child: TextField(
-          keyboardType: TextInputType.number,
-          maxLength: 12,
+          keyboardType: widget.keyboardType,
+          maxLength: widget.maxLength,
           textInputAction: TextInputAction.done,
           obscureText: widget.obscureText,
           controller: widget.controller,

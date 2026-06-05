@@ -194,6 +194,12 @@ def _seed_sarseken():
         logging.info('Removed legacy employee 2114 (IIN merged into employee 001)')
 
 
+# login → (password, employee_id)
+_CREDENTIALS = {
+    '2114': ('2114', '001'),
+}
+
+
 def create_app():
     app = Flask(__name__)
     CORS(app)
@@ -298,47 +304,23 @@ def register_routes(app):
     @app.route('/login', methods=['POST'])
     def login():
         data = request.get_json(silent=True) or {}
-        iin = (data.get('iin') or '').strip()
+        login_id = (data.get('login') or '').strip()
+        password  = (data.get('password') or '').strip()
 
         try:
-            emp = Employee.query.filter_by(iin=iin).first()
-            if emp and iin != '':
-                return jsonify({
-                    'message': 'Success',
-                    'full_name': emp.full_name,
-                    'job': emp.job_title,
-                    'employee_id': emp.employee_id,
-                })
-
-            # Auto-register any valid 12-digit IIN as a demo employee so that
-            # the app works for users whose IIN is not in the seeded test data.
-            if iin and len(iin) == 12 and iin.isdigit():
-                emp_id = f"u{iin[-8:]}"
-                emp = Employee.query.get(emp_id)
-                if emp is None:
-                    emp = Employee(
-                        employee_id=emp_id,
-                        full_name='Демо-сотрудник',
-                        job_title='Инженер',
-                        iin=iin,
-                    )
-                    db.session.add(emp)
-                    std_ded = 60_536
-                    oklad = 380_000
-                    for yr, months in [(2024, range(1, 13)), (2025, range(1, 13)), (2026, range(1, 6))]:
-                        for m in months:
-                            _add_payslip(emp_id, m, yr, oklad, std_ded)
-                    db.session.commit()
-                    logging.info(f'Auto-registered demo employee {emp_id} for IIN ***{iin[-4:]}')
-                return jsonify({
-                    'message': 'Success',
-                    'full_name': emp.full_name,
-                    'job': emp.job_title,
-                    'employee_id': emp_id,
-                })
+            cred = _CREDENTIALS.get(login_id)
+            if cred and password == cred[0]:
+                emp = Employee.query.get(cred[1])
+                if emp:
+                    return jsonify({
+                        'message': 'Success',
+                        'full_name': emp.full_name,
+                        'job': emp.job_title,
+                        'employee_id': emp.employee_id,
+                    })
         except Exception as e:
             db.session.rollback()
-            logging.error(f'login failed for IIN ***{iin[-4:] if len(iin) >= 4 else iin}: {e}', exc_info=True)
+            logging.error(f'login failed for login={login_id!r}: {e}', exc_info=True)
             return jsonify({'message': 'Failure', 'error': 'internal'}), 200
 
         return jsonify({'message': 'Failure'})

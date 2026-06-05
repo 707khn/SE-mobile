@@ -34,6 +34,7 @@ class CustomForm extends StatefulWidget {
 
 class CustomFormState extends State<CustomForm> {
   static TextEditingController loginController = TextEditingController();
+  static TextEditingController passwordController = TextEditingController();
 
   final _loginButtonKey = GlobalKey<LoginButtonState>();
 
@@ -116,37 +117,27 @@ class CustomFormState extends State<CustomForm> {
               ),
               SizedBox(height: Dimensions.height30),
               CustomLoginField(
-                hintText: 'employee ID'.tr,
+                hintText: 'login'.tr,
                 obscureText: false,
                 controller: loginController,
                 fontSize: Dimensions.fontSize20,
                 backgroundColor: AppColors.loginField,
+                keyboardType: TextInputType.text,
+                maxLength: 20,
+                onSubmitted: () => _loginButtonKey.currentState?.submit(),
+              ),
+              SizedBox(height: Dimensions.height30 / 3),
+              CustomLoginField(
+                hintText: 'password'.tr,
+                obscureText: true,
+                controller: passwordController,
+                fontSize: Dimensions.fontSize20,
+                backgroundColor: AppColors.loginField,
+                keyboardType: TextInputType.text,
+                maxLength: 50,
                 onSubmitted: () => _loginButtonKey.currentState?.submit(),
               ),
               const SizedBox(height: 4),
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: loginController,
-                builder: (_, val, __) {
-                  final len = val.text.length;
-                  final done = len == 12;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          '$len / 12',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: done ? AppColors.mainColor : Colors.grey.shade500,
-                            fontWeight: done ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(
@@ -155,9 +146,12 @@ class CustomFormState extends State<CustomForm> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  onPressed: () => loginController.text = '000000002114',
+                  onPressed: () {
+                    loginController.text = '2114';
+                    passwordController.text = '2114';
+                  },
                   child: Text(
-                    'Демо: 000000002114',
+                    'Демо: 2114 / 2114',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.mainColor,
