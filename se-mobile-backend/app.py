@@ -81,9 +81,10 @@ def _send_turnstile_notification(employee_name: str, direction: str, timestamp_s
 def _update_employee_names():
     """Sync employee display names to current seed values (non-destructive)."""
     name_map = {
-        '001': ('Сарсекенов Батырхан Арманұлы', 'Техник-программист'),
-        '002': ('Касымов Нурлан Серикович',      'Руководитель отдела'),
-        '003': ('Сидорова Анна Сергеевна',       'Бухгалтер'),
+        '001':  ('Сарсекенов Батырхан Арманұлы', 'Техник-программист'),
+        '002':  ('Касымов Нурлан Серикович',      'Руководитель отдела'),
+        '003':  ('Сидорова Анна Сергеевна',       'Бухгалтер'),
+        '1874': ('Кумарова Мадина Кумаровна',     'Специалист по кадрам'),
     }
     changed = False
     for emp_id, (name, job) in name_map.items():
@@ -197,6 +198,7 @@ def _seed_sarseken():
 # login → (password, employee_id)
 _CREDENTIALS = {
     '2114': ('2114', '001'),
+    '1874': ('1874', '1874'),
 }
 
 
@@ -242,6 +244,7 @@ def create_app():
             _seed_leave_2026,
             _update_april_2026_001,
             _seed_april_2026_access_001,
+            _seed_kumarova,
         ]:
             try:
                 _fn()
@@ -1357,6 +1360,119 @@ def _add_payslip(emp_id, month, year, oklad, standard_deduction, vacation_days=0
     db.session.add(PayslipReference(
         payslip_id=ps.id, name='Социальный налог',
         amount=float(round(total_accruals * 0.0525))))
+
+
+def _seed_kumarova():
+    """Add employee 1874 (Кумарова), Sep 2025 payslip, and Sep 2025 access records."""
+    from datetime import date as _date
+
+    # ── Employee ──────────────────────────────────────────────────────────────
+    if not Employee.query.filter_by(employee_id='1874').first():
+        db.session.add(Employee(
+            employee_id='1874',
+            full_name='Кумарова Мадина Кумаровна',
+            job_title='Специалист по кадрам',
+        ))
+        db.session.flush()
+
+    # ── Payslip September 2025 ────────────────────────────────────────────────
+    if not Payslip.query.filter_by(employee_id='1874', period_year=2025, period_month=9).first():
+        ps = Payslip(
+            employee_id='1874',
+            period_month=9,
+            period_year=2025,
+            period_display='Сентябрь 2025',
+            total_accruals=684_780.0,
+            total_deductions=145_514.0,
+            net_pay=539_266.0,
+            total_paid=392_682.0,
+            position='Специалист по кадрам',
+            department='Отдел правового и административного обеспечения',
+            salary_rate=334_464.0,
+            debt_start=122_281.0,
+            debt_end=268_865.0,
+        )
+        db.session.add(ps)
+        db.session.flush()
+
+        p = '09.2025'
+        db.session.add(PayslipAccrual(
+            payslip_id=ps.id, name='Выплаты вследствии экологического бедствия',
+            amount=5_898.0, period=p))
+        db.session.add(PayslipAccrual(
+            payslip_id=ps.id, name='Премия постоянная для ср (доп)',
+            amount=334_464.0, period=p))
+        db.session.add(PayslipAccrual(
+            payslip_id=ps.id, name='Оплата по окладу',
+            amount=344_418.0, period=p, working_days=22, working_hours=173.0))
+
+        for name, amt in [
+            ('ИПН',          54_225.0),
+            ('ОПВ',          67_888.0),
+            ('Взносы ОСМС',  13_696.0),
+            ('Питание',       9_705.0),
+        ]:
+            db.session.add(PayslipDeduction(payslip_id=ps.id, name=name, amount=amt, period=p))
+
+        db.session.add(PayslipPaid(
+            payslip_id=ps.id, payment_type='За первую половину месяца',
+            period=p, document='вед. № 2', date='03.09.2025', amount=2_000.0))
+        db.session.add(PayslipPaid(
+            payslip_id=ps.id, payment_type='Зарплата за месяц',
+            period='08.2025', document='вед. № 1', date='08.09.2025', amount=122_281.0))
+        db.session.add(PayslipPaid(
+            payslip_id=ps.id, payment_type='Премии, межрасчет',
+            period=p, document='вед. № 18', date='26.09.2025', amount=268_401.0))
+
+        db.session.add(PayslipBenefit(payslip_id=ps.id, name='Вычет ОПВ',                    amount=67_888.0))
+        db.session.add(PayslipBenefit(payslip_id=ps.id, name='Вычет ВОСМС',                  amount=13_696.0))
+        db.session.add(PayslipBenefit(payslip_id=ps.id, name='Стандартный 14 МРП (1 МЗП)',   amount=55_048.0))
+
+        db.session.add(PayslipReference(payslip_id=ps.id, name='Обязательные пенсионные взносы работодателя', amount=16_972.0))
+        db.session.add(PayslipReference(payslip_id=ps.id, name='Отчисления на ОСМС',         amount=20_543.0))
+        db.session.add(PayslipReference(payslip_id=ps.id, name='Социальные отчисления',      amount=29_750.0))
+        db.session.add(PayslipReference(payslip_id=ps.id, name='Социальный налог',           amount=35_953.0))
+
+    # ── Access records September 2025 ─────────────────────────────────────────
+    if not AccessRecord.query.filter_by(
+        employee_id='1874'
+    ).filter(
+        AccessRecord.access_date >= _date(2025, 9, 1),
+        AccessRecord.access_date <= _date(2025, 9, 30),
+    ).first():
+        _SEP_2025 = [
+            (_date(2025, 9,  2), '07:38', 'Вход'),   (_date(2025, 9,  2), '17:06', 'Выход'),
+            (_date(2025, 9,  3), '07:41', 'Вход'),   (_date(2025, 9,  3), '17:10', 'Выход'),
+            (_date(2025, 9,  4), '07:39', 'Вход'),   (_date(2025, 9,  4), '17:10', 'Выход'),
+            (_date(2025, 9,  5), '12:09', 'Вход'),   (_date(2025, 9,  5), '17:57', 'Выход'),
+            (_date(2025, 9,  8), '07:41', 'Вход'),   (_date(2025, 9,  8), '17:07', 'Выход'),
+            (_date(2025, 9,  9), '07:35', 'Вход'),   (_date(2025, 9,  9), '17:07', 'Выход'),
+            (_date(2025, 9, 10), '07:43', 'Вход'),   (_date(2025, 9, 10), '17:48', 'Выход'),
+            (_date(2025, 9, 11), '07:32', 'Вход'),   (_date(2025, 9, 11), '17:09', 'Выход'),
+            (_date(2025, 9, 12), '07:28', 'Вход'),   (_date(2025, 9, 12), '17:08', 'Выход'),
+            (_date(2025, 9, 15), '07:41', 'Вход'),   (_date(2025, 9, 15), '17:09', 'Выход'),
+            (_date(2025, 9, 16), '07:39', 'Вход'),   (_date(2025, 9, 16), '17:03', 'Выход'),
+            (_date(2025, 9, 17), '07:39', 'Вход'),   (_date(2025, 9, 17), '17:07', 'Выход'),
+            (_date(2025, 9, 18), '07:34', 'Вход'),   (_date(2025, 9, 18), '17:11', 'Выход'),
+            (_date(2025, 9, 19), '07:40', 'Вход'),   (_date(2025, 9, 19), '17:06', 'Выход'),
+            (_date(2025, 9, 22), '07:41', 'Вход'),   (_date(2025, 9, 22), '17:06', 'Выход'),
+            (_date(2025, 9, 23), '07:40', 'Вход'),   (_date(2025, 9, 23), '17:03', 'Выход'),
+            (_date(2025, 9, 25), '07:39', 'Вход'),   (_date(2025, 9, 25), '17:07', 'Выход'),
+            (_date(2025, 9, 26), '07:41', 'Вход'),   (_date(2025, 9, 26), '17:06', 'Выход'),
+            (_date(2025, 9, 29), '17:06', 'Выход'),
+            (_date(2025, 9, 30), '07:36', 'Вход'),   (_date(2025, 9, 30), '17:08', 'Выход'),
+        ]
+        for d, t, ev in _SEP_2025:
+            db.session.add(AccessRecord(
+                employee_id='1874',
+                access_date=d,
+                access_time=t,
+                event_type=ev,
+                door_location='Турникет 2',
+            ))
+
+    db.session.commit()
+    logging.info('Seeded employee 1874 (Кумарова) with Sep 2025 payslip and access records')
 
 
 def _seed_april_2026_access_001():
