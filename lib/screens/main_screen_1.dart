@@ -55,7 +55,7 @@ class _MainPage1State extends State<MainPage1> {
   Future<void> initializeSharedPreferences() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "KZ");
+      prefs.setString(AppValues.LANG, "RU");
     }
     final login = await SecureStorageHelper.instance.getLogin();
     setState(() {
@@ -620,47 +620,7 @@ class _MainMenu1State extends State<MainMenu1> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'scroll to right'.tr,
-                          style: const TextStyle(fontSize: 12.0, color: Colors.grey),
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _filterText.isEmpty
-                                  ? '${reportsEntries.length} ${'records_count'.tr}'
-                                  : '${filtered.length}/${reportsEntries.length} ${'records_count'.tr}',
-                              style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
-                            ),
-                            const SizedBox(width: 4),
-                            InkWell(
-                              borderRadius: BorderRadius.circular(4),
-                              onTap: () {
-                                final lines = filtered.map((e) =>
-                                    '${_formatDate(e[0])}\t${e[1]}\t${e[2]}\t${e[3]}').join('\n');
-                                Clipboard.setData(ClipboardData(text: lines));
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                  content: Text('copied'.tr),
-                                  duration: const Duration(seconds: 1),
-                                  behavior: SnackBarBehavior.floating,
-                                ));
-                              },
-                              child: const Padding(
-                                padding: EdgeInsets.all(2),
-                                child: Icon(Icons.copy_outlined, size: 14, color: Colors.grey),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 4),
-                    _buildWorkSummary(filtered),
-                    _buildEventSummary(filtered),
                     const SizedBox(height: 4),
                     if (filtered.isEmpty && _filterText.isNotEmpty)
                       Padding(

@@ -116,7 +116,7 @@ class MyApp extends StatelessWidget {
           }
         },
       ),
-      locale: Locale(prefs.getString(AppValues.LANG) ?? "KZ"),
+      locale: Locale(prefs.getString(AppValues.LANG) ?? "RU"),
       translations: LocaleString(),
     );
   }
