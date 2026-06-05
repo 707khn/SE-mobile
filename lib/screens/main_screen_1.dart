@@ -55,7 +55,7 @@ class _MainPage1State extends State<MainPage1> {
   Future<void> initializeSharedPreferences() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "KZ");
+      prefs.setString(AppValues.LANG, "RU");
     }
     final login = await SecureStorageHelper.instance.getLogin();
     setState(() {
