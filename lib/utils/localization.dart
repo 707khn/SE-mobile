@@ -116,6 +116,10 @@ class LocaleString extends Translations {
           'payslip_benefits': 'Жеңілдіктер',
           'payslip_reference': 'Анықтама',
           'payslip_debt': 'Кәсіпорын қарызы',
+          'tab_turnstile': 'Турникет',
+          'tab_payslip': 'Жалақы',
+          'tab_leave': 'Демалыс',
+          'tab_menu': 'Мәзір',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -230,6 +234,10 @@ class LocaleString extends Translations {
           'payslip_benefits': 'Льготы',
           'payslip_reference': 'Справочно',
           'payslip_debt': 'Долг предприятия',
+          'tab_turnstile': 'Турникет',
+          'tab_payslip': 'Зарплата',
+          'tab_leave': 'Отпуск',
+          'tab_menu': 'Меню',
         }
       };
 }
