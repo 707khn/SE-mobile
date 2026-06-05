@@ -69,17 +69,19 @@ class PayslipData {
 }
 
 // Re-authenticates via /login to get a fresh employee_id for the current backend.
-// Returns null if the backend explicitly rejects the IIN (IIN not registered).
+// Returns null if the backend explicitly rejects the credentials.
 // Falls back to the cached value only on network errors (offline / server sleeping).
 Future<String?> _freshEmployeeId() async {
-  final iin = await SecureStorageHelper.instance.getLogin();
-  if (iin != null && iin.isNotEmpty) {
+  final storage = SecureStorageHelper.instance;
+  final login = await storage.getLogin();
+  final password = await storage.getPassword();
+  if (login != null && login.isNotEmpty && password != null && password.isNotEmpty) {
     try {
       final r = await http
           .post(
             Uri.parse('${AppValues.baseUrl}/login'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'iin': iin}),
+            body: jsonEncode({'login': login, 'password': password}),
           )
           .timeout(const Duration(seconds: 15));
       if (r.statusCode == 200) {
@@ -87,12 +89,11 @@ Future<String?> _freshEmployeeId() async {
         if (b['message'] == 'Success') {
           final id = (b['employee_id'] as String?) ?? '';
           if (id.isNotEmpty) {
-            await SecureStorageHelper.instance.saveEmployeeId(id);
+            await storage.saveEmployeeId(id);
             return id;
           }
         } else {
-          // Backend explicitly says this IIN is unknown.
-          // Do NOT fall back to a stale cached id from another backend.
+          // Backend explicitly rejected these credentials.
           return null;
         }
       }
@@ -100,7 +101,7 @@ Future<String?> _freshEmployeeId() async {
       // Network error — fall back to cached id for offline / cold-start scenarios.
     }
   }
-  return SecureStorageHelper.instance.getEmployeeId();
+  return storage.getEmployeeId();
 }
 
 PayslipItem _toItem(dynamic e) {

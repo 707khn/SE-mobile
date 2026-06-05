@@ -30,6 +30,7 @@ Future<void> loginToAccount(String login, String password, BuildContext context)
         String employeeId = responseBody['employee_id'] ?? '';
         await secureStorage.saveCredentials(
           login: login,
+          password: password,
           fullName: fullName,
           job: job,
           employeeId: employeeId,
