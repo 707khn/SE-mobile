@@ -58,6 +58,13 @@ class _AdminPageState extends State<AdminPage> {
       appBar: AppBar(
         title: BigText(content: "main_menu".tr, fontWeight: FontWeight.bold),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'log_out_title'.tr,
+            onPressed: _exit,
+          ),
+        ],
       ),
       drawer: Theme(
         data: Theme.of(context).copyWith(
@@ -259,46 +266,57 @@ class _AdminPageState extends State<AdminPage> {
             children: [
               _buildGreeting(),
               SizedBox(height: Dimensions.height30 / 2),
-              _buildMenuCard(
-                icon: Icons.person,
-                label: "self report".tr,
-                subtitle: "self_report_subtitle".tr,
-                onTap: () => Get.to(() => MainPage1(fullName: widget.fullName, job: widget.job)),
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              _buildMenuCard(
-                icon: Icons.groups,
-                label: "employee report".tr,
-                subtitle: "employee_report_subtitle".tr,
-                onTap: () => Get.to(() => MainPage2(fullName: widget.fullName, job: widget.job)),
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              _buildMenuCard(
-                icon: Icons.receipt_long,
-                label: "payslip".tr,
-                subtitle: "payslip_subtitle".tr,
-                onTap: () => Get.to(() => const PayslipPage()),
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              _buildMenuCard(
-                icon: Icons.beach_access,
-                label: "leave_sick_days".tr,
-                subtitle: "leave_subtitle".tr,
-                onTap: () => Get.to(() => const LeavePage()),
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              _buildMenuCard(
-                icon: Icons.restaurant_menu,
-                label: "canteen_menu".tr,
-                subtitle: "canteen_subtitle".tr,
-                onTap: () => Get.to(() => const MenuScreen()),
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              _buildMenuCard(
-                icon: Icons.badge_outlined,
-                label: "attendance".tr,
-                subtitle: "attendance_subtitle".tr,
-                onTap: () => Get.to(() => const AttendanceScreen()),
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 1.05,
+                children: [
+                  _buildGridCard(
+                    icon: Icons.person,
+                    label: "self report".tr,
+                    subtitle: "self_report_subtitle".tr,
+                    color: const Color(0xFF1565C0),
+                    onTap: () => Get.to(() => MainPage1(fullName: widget.fullName, job: widget.job)),
+                  ),
+                  _buildGridCard(
+                    icon: Icons.groups,
+                    label: "employee report".tr,
+                    subtitle: "employee_report_subtitle".tr,
+                    color: const Color(0xFF6A1B9A),
+                    onTap: () => Get.to(() => MainPage2(fullName: widget.fullName, job: widget.job)),
+                  ),
+                  _buildGridCard(
+                    icon: Icons.receipt_long,
+                    label: "payslip".tr,
+                    subtitle: "payslip_subtitle".tr,
+                    color: AppColors.mainColor,
+                    onTap: () => Get.to(() => const PayslipPage()),
+                  ),
+                  _buildGridCard(
+                    icon: Icons.beach_access,
+                    label: "leave_sick_days".tr,
+                    subtitle: "leave_subtitle".tr,
+                    color: const Color(0xFFE65100),
+                    onTap: () => Get.to(() => const LeavePage()),
+                  ),
+                  _buildGridCard(
+                    icon: Icons.restaurant_menu,
+                    label: "canteen_menu".tr,
+                    subtitle: "canteen_subtitle".tr,
+                    color: const Color(0xFFC62828),
+                    onTap: () => Get.to(() => const MenuScreen()),
+                  ),
+                  _buildGridCard(
+                    icon: Icons.badge_outlined,
+                    label: "attendance".tr,
+                    subtitle: "attendance_subtitle".tr,
+                    color: const Color(0xFF00695C),
+                    onTap: () => Get.to(() => const AttendanceScreen()),
+                  ),
+                ],
               ),
             ],
           ),
@@ -307,53 +325,53 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
-  Widget _buildMenuCard({
+  Widget _buildGridCard({
     required IconData icon,
     required String label,
     required String subtitle,
+    required Color color,
     required VoidCallback onTap,
   }) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: () {
           HapticFeedback.selectionClick();
           onTap();
         },
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: Dimensions.width20,
-            vertical: Dimensions.height30 * 0.7,
-          ),
-          child: Row(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.mainColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: AppColors.mainColor, size: 32),
+                child: Icon(icon, color: color, size: 28),
               ),
-              SizedBox(width: Dimensions.width20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ],
+              const SizedBox(height: 10),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
             ],
           ),
         ),
@@ -375,6 +393,10 @@ class _AdminPageState extends State<AdminPage> {
     final firstName = widget.fullName.split(' ').first.isNotEmpty
         ? widget.fullName.split(' ').first
         : widget.fullName;
+    final days = _lang == 'RU'
+        ? ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+        : ['Дүйсенбі', 'Сейсенбі', 'Сәрсенбі', 'Бейсенбі', 'Жұма', 'Сенбі', 'Жексенбі'];
+    final dayName = days[now.weekday - 1];
     final dateStr =
         '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}';
     return Container(
@@ -386,13 +408,13 @@ class _AdminPageState extends State<AdminPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '$greetKey'.tr,
+            greetKey.tr,
             style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
           const SizedBox(height: 2),
@@ -404,7 +426,7 @@ class _AdminPageState extends State<AdminPage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Row(
             children: [
               Expanded(
@@ -416,7 +438,7 @@ class _AdminPageState extends State<AdminPage> {
                 ),
               ),
               Text(
-                dateStr,
+                '$dayName, $dateStr',
                 style: const TextStyle(color: Colors.white54, fontSize: 12),
               ),
             ],
