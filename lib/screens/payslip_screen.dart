@@ -3,702 +3,719 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
-import 'start_screen.dart';
 
 import '../requests/payslip_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 
-sealed class _State {}
-final class _Loading extends _State {
-  // Non-null during automatic retry — shown as a subtitle under the spinner.
-  final String? hint;
-  _Loading([this.hint]);
-}
-final class _Error extends _State {
-  final PayslipErrorKind kind;
-  _Error(this.kind);
-}
-final class _Ready extends _State {
-  final PayslipData data;
-  _Ready(this.data);
-}
-
 class PayslipPage extends StatefulWidget {
   const PayslipPage({Key? key}) : super(key: key);
+
   @override
   State<PayslipPage> createState() => _PayslipPageState();
 }
 
 class _PayslipPageState extends State<PayslipPage> {
-  static DateTime _defaultDate() {
+  static DateTime _prevMonth() {
     final now = DateTime.now();
     return DateTime(now.year, now.month - 1);
   }
 
-  DateTime _selected = _defaultDate();
-  _State _state = _Loading();
-  final _fmt = NumberFormat('#,##0.00', 'ru_RU');
+  DateTime _selectedDate = _prevMonth();
+  PayslipData? _payslip;
+  bool _loading = false;
+  String? _error;
+
+  final _numberFormat = NumberFormat('#,##0.00', 'ru_RU');
 
   @override
   void initState() {
     super.initState();
-    _fetch();
+    _fetchPayslip();
   }
 
-  Future<void> _fetch() async {
-    setState(() => _state = _Loading());
-
-    // Show a hint after 5 s so the user knows the server is waking up.
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _state is _Loading) {
-        setState(() => _state = _Loading('server_timeout'.tr));
+  Future<void> _fetchPayslip() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _payslip = null;
+    });
+    final data = await getPayslip(
+      context,
+      _selectedDate.month.toString().padLeft(2, '0'),
+      _selectedDate.year.toString(),
+    );
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (data == null) {
+        _error = 'payslip not found'.tr;
+      } else {
+        _payslip = data;
       }
     });
-
-    try {
-      final data = await fetchPayslip(
-        _selected.month.toString().padLeft(2, '0'),
-        _selected.year.toString(),
-      );
-      if (mounted) setState(() => _state = _Ready(data));
-    } on PayslipException catch (e) {
-      if (mounted) setState(() => _state = _Error(e.kind));
-    } catch (_) {
-      if (mounted) setState(() => _state = _Error(PayslipErrorKind.network));
-    }
   }
 
-  bool get _isFutureMonth {
+  bool get _isCurrentOrFutureMonth {
     final now = DateTime.now();
-    return _selected.year > now.year ||
-        (_selected.year == now.year && _selected.month >= now.month);
+    return _selectedDate.year > now.year ||
+        (_selectedDate.year == now.year && _selectedDate.month >= now.month);
   }
 
-  void _goPrev() {
-    setState(() => _selected = DateTime(_selected.year, _selected.month - 1));
-    _fetch();
+  void _goToPrevMonth() {
+    setState(() => _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1));
+    _fetchPayslip();
   }
 
-  void _goNext() {
-    setState(() => _selected = DateTime(_selected.year, _selected.month + 1));
-    _fetch();
+  void _goToNextMonth() {
+    setState(() => _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1));
+    _fetchPayslip();
   }
 
-  void _share() {
-    if (_state is! _Ready) return;
-    final d = (_state as _Ready).data;
-    final buf = StringBuffer()
-      ..writeln(d.employee)
-      ..writeln(d.period)
-      ..writeln()
-      ..writeln('${'accruals'.tr}:');
-    for (final i in d.accruals) {
-      buf.writeln('  ${i.name}: ${_fmt.format(i.amount)} ₸');
-    }
-    buf
-      ..writeln('${'total'.tr}: ${_fmt.format(d.totalAccruals)} ₸')
-      ..writeln()
-      ..writeln('${'deductions'.tr}:');
-    for (final i in d.deductions) {
-      buf.writeln('  ${i.name}: ${_fmt.format(i.amount)} ₸');
-    }
-    buf
-      ..writeln('${'total'.tr}: ${_fmt.format(d.totalDeductions)} ₸')
-      ..writeln()
-      ..writeln('${'net pay'.tr}: ${_fmt.format(d.netPay)} ₸');
+  void _sharePayslip() {
+    if (_payslip == null) return;
+    final buf = StringBuffer();
+    buf.writeln(_payslip!.employee);
+    buf.writeln(_payslip!.period);
+    buf.writeln('');
+    buf.writeln('${'accruals'.tr}: ${_numberFormat.format(_payslip!.totalAccruals)} ₸');
+    buf.writeln('${'deductions'.tr}: ${_numberFormat.format(_payslip!.totalDeductions)} ₸');
+    buf.writeln('${'net pay'.tr}: ${_numberFormat.format(_payslip!.netPay)} ₸');
     HapticFeedback.lightImpact();
     Share.share(buf.toString());
   }
 
-  Future<void> _pickPeriod() async {
-    int year = _selected.year;
-    int month = _selected.month;
+  Future<void> _pickMonth() async {
+    int selYear = _selectedDate.year;
+    int selMonth = _selectedDate.month;
     final now = DateTime.now();
 
-    final confirmed = await showDialog<bool>(
+    await showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, set) => AlertDialog(
-          title: Text('choose period'.tr),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios),
-                      onPressed: year > now.year - 5 ? () => set(() => year--) : null,
-                    ),
-                    Text('$year',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    IconButton(
-                      icon: const Icon(Icons.arrow_forward_ios),
-                      onPressed: year < now.year ? () => set(() => year++) : null,
-                    ),
-                  ],
-                ),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    childAspectRatio: 1.5,
+      builder: (ctx) => AlertDialog(
+        title: Text('choose period'.tr),
+        content: StatefulBuilder(
+          builder: (context, setInner) {
+            final isCurrentYear = selYear == now.year;
+            return SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        onPressed: selYear > now.year - 5
+                            ? () => setInner(() => selYear--)
+                            : null,
+                        icon: const Icon(Icons.arrow_back_ios),
+                      ),
+                      Text('$selYear',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      IconButton(
+                        onPressed: selYear < now.year ? () => setInner(() => selYear++) : null,
+                        icon: const Icon(Icons.arrow_forward_ios),
+                      ),
+                    ],
                   ),
-                  itemCount: 12,
-                  itemBuilder: (_, i) {
-                    final m = i + 1;
-                    final isSelected = m == month && year == _selected.year;
-                    final isFuture = year == now.year && m > now.month;
-                    final isCurrent = m == now.month && year == now.year;
-                    return GestureDetector(
-                      onTap: isFuture ? null : () => set(() => month = m),
-                      child: Container(
-                        margin: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.mainColor
-                              : isFuture
-                                  ? Colors.grey.shade100
-                                  : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                          border: isCurrent && !isSelected
-                              ? Border.all(color: AppColors.mainColor.withOpacity(0.5))
-                              : null,
-                        ),
-                        child: Center(
-                          child: Text(
-                            DateFormat('MMM', 'ru').format(DateTime(year, m)),
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected
-                                  ? Colors.white
-                                  : isFuture
-                                      ? Colors.grey.shade400
-                                      : isCurrent
-                                          ? AppColors.mainColor
-                                          : Colors.black87,
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      childAspectRatio: 1.5,
+                    ),
+                    itemCount: 12,
+                    itemBuilder: (ctx, i) {
+                      final m = i + 1;
+                      final isSelected = m == selMonth && selYear == _selectedDate.year;
+                      final isFuture = isCurrentYear && m > now.month;
+                      final isCurrent = m == now.month && selYear == now.year;
+                      return GestureDetector(
+                        onTap: isFuture ? null : () => setInner(() => selMonth = m),
+                        child: Container(
+                          margin: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.mainColor
+                                : isFuture
+                                    ? Colors.grey.shade100
+                                    : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: isCurrent && !isSelected
+                                ? Border.all(color: AppColors.mainColor.withOpacity(0.5))
+                                : null,
+                          ),
+                          child: Center(
+                            child: Text(
+                              DateFormat('MMM', 'ru').format(DateTime(selYear, m)),
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : isFuture
+                                        ? Colors.grey.shade400
+                                        : isCurrent
+                                            ? AppColors.mainColor
+                                            : Colors.black87,
+                                fontSize: 13,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('cancel'.tr),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('show report'.tr),
-            ),
-          ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('cancel'.tr)),
+          ElevatedButton(
+            onPressed: () {
+              setState(() => _selectedDate = DateTime(selYear, selMonth));
+              Navigator.pop(ctx);
+              _fetchPayslip();
+            },
+            child: Text('show report'.tr),
+          ),
+        ],
       ),
     );
-
-    if (confirmed == true) {
-      setState(() => _selected = DateTime(year, month));
-      _fetch();
-    }
-  }
-
-  void _copy(String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('copied'.tr),
-      duration: const Duration(seconds: 1),
-      behavior: SnackBarBehavior.floating,
-    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final loading = _state is _Loading;
     return Scaffold(
       appBar: AppBar(
         title: BigText(content: 'payslip'.tr, fontWeight: FontWeight.bold),
         centerTitle: true,
         actions: [
-          if (_state is _Ready)
+          if (_payslip != null)
             IconButton(
               icon: const Icon(Icons.share),
               tooltip: 'share'.tr,
-              onPressed: _share,
+              onPressed: _sharePayslip,
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'refresh'.tr,
-            onPressed: loading ? null : _fetch,
+            onPressed: _loading ? null : _fetchPayslip,
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _fetch,
+        onRefresh: _fetchPayslip,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.all(Dimensions.width20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _periodBar(loading),
-              SizedBox(height: Dimensions.height30 / 2),
-              switch (_state) {
-                _Loading(hint: final hint) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CircularProgressIndicator(color: AppColors.mainColor),
-                          if (hint != null) ...[
-                            const SizedBox(height: 16),
-                            Text(
-                              hint,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                            ),
-                          ],
-                        ],
+              // Month picker card
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left, color: AppColors.mainColor),
+                        onPressed: _loading ? null : _goToPrevMonth,
+                        tooltip: 'last_month'.tr,
                       ),
-                    ),
-                  ),
-                _Error(kind: final k) => _errorView(k),
-                _Ready(data: final d) => _dataView(d),
-              },
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _periodBar(bool disabled) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left, color: AppColors.mainColor),
-              onPressed: disabled ? null : _goPrev,
-              tooltip: 'last_month'.tr,
-            ),
-            const Icon(Icons.calendar_month, color: AppColors.mainColor, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                DateFormat('MMMM yyyy', 'ru').format(_selected),
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.chevron_right,
-                color: _isFutureMonth ? Colors.grey.shade300 : AppColors.mainColor,
-              ),
-              onPressed: (disabled || _isFutureMonth) ? null : _goNext,
-              tooltip: 'this_month'.tr,
-            ),
-            TextButton(
-              onPressed: disabled ? null : _pickPeriod,
-              child: Text('choose period'.tr, style: const TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _errorView(PayslipErrorKind kind) {
-    final msg = switch (kind) {
-      PayslipErrorKind.timeout => 'server_timeout'.tr,
-      PayslipErrorKind.network => 'connection_error'.tr,
-      PayslipErrorKind.notFound => 'payslip not found'.tr,
-    };
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(Dimensions.height30),
-        child: Column(
-          children: [
-            const Icon(Icons.receipt_long, size: 56, color: Colors.grey),
-            SizedBox(height: Dimensions.height30 / 2),
-            Text(
-              msg,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 16),
-            ),
-            SizedBox(height: Dimensions.height30 / 2),
-            ElevatedButton.icon(
-              onPressed: _fetch,
-              icon: const Icon(Icons.refresh),
-              label: Text('refresh'.tr),
-            ),
-            if (kind == PayslipErrorKind.notFound) ...[
-              SizedBox(height: Dimensions.height30),
-              const Divider(),
-              SizedBox(height: Dimensions.height30 / 2),
-              OutlinedButton.icon(
-                onPressed: _goToLogin,
-                icon: const Icon(Icons.person_outline, size: 18),
-                label: const Text('Сменить аккаунт'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _goToLogin() => Get.offAll(() => const StartPage());
-
-  Widget _dataView(PayslipData d) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      child: Column(
-        key: ValueKey(d.period),
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          GestureDetector(
-            onLongPress: () => _copy('${d.employee}\n${d.period}'),
-            child: Card(
-              color: AppColors.mainColor,
-              child: Padding(
-                padding: EdgeInsets.all(Dimensions.width20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      d.employee,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: Dimensions.height30 / 4),
-                    Text(d.period, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-                    if (d.position.isNotEmpty) ...[
-                      SizedBox(height: Dimensions.height30 / 8),
-                      Text(d.position,
-                          style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                      const Icon(Icons.calendar_month, color: AppColors.mainColor, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          DateFormat('MMMM yyyy', 'ru').format(_selectedDate),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.chevron_right,
+                          color: _isCurrentOrFutureMonth
+                              ? Colors.grey.shade300
+                              : AppColors.mainColor,
+                        ),
+                        onPressed: (_loading || _isCurrentOrFutureMonth) ? null : _goToNextMonth,
+                      ),
+                      TextButton(
+                        onPressed: _loading ? null : _pickMonth,
+                        child: Text('choose period'.tr, style: const TextStyle(fontSize: 12)),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
+              SizedBox(height: Dimensions.height30 / 2),
+
+              if (_loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(color: AppColors.mainColor),
+                  ),
+                ),
+
+              if (_error != null)
+                Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(Dimensions.height30),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.receipt_long, size: 56, color: Colors.grey),
+                        SizedBox(height: Dimensions.height30 / 2),
+                        Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                        SizedBox(height: Dimensions.height30 / 2),
+                        ElevatedButton.icon(
+                          onPressed: _fetchPayslip,
+                          icon: const Icon(Icons.refresh),
+                          label: Text('refresh'.tr),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _payslip == null
+                    ? const SizedBox.shrink()
+                    : Column(
+                        key: ValueKey(_payslip!.period),
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Header: employee + period
+                          GestureDetector(
+                            onLongPress: () {
+                              Clipboard.setData(ClipboardData(
+                                  text: '${_payslip!.employee}\n${_payslip!.period}'));
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text('copied'.tr),
+                                duration: const Duration(seconds: 1),
+                                behavior: SnackBarBehavior.floating,
+                              ));
+                            },
+                            child: Card(
+                              color: AppColors.mainColor,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                              child: Padding(
+                                padding: EdgeInsets.all(Dimensions.width20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(_payslip!.employee,
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 4),
+                                    Text(_payslip!.period,
+                                        style:
+                                            const TextStyle(color: Colors.white70, fontSize: 14)),
+                                    if (_payslip!.position.isNotEmpty ||
+                                        _payslip!.department.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        [_payslip!.position, _payslip!.department]
+                                            .where((s) => s.isNotEmpty)
+                                            .join(' · '),
+                                        style:
+                                            const TextStyle(color: Colors.white54, fontSize: 12),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: Dimensions.height30 / 2),
+
+                          // Summary: net pay gradient card
+                          _buildNetPayCard(),
+                          SizedBox(height: Dimensions.height30 / 2),
+
+                          // Accruals (expanded)
+                          _buildExpandableSection(
+                            title: 'accruals'.tr,
+                            items: _payslip!.accruals,
+                            total: _payslip!.totalAccruals,
+                            color: Colors.green.shade700,
+                            initiallyExpanded: true,
+                          ),
+                          SizedBox(height: Dimensions.height30 / 2),
+
+                          // Deductions (expanded)
+                          _buildExpandableSection(
+                            title: 'deductions'.tr,
+                            items: _payslip!.deductions,
+                            total: _payslip!.totalDeductions,
+                            color: AppColors.niceRed,
+                            initiallyExpanded: true,
+                          ),
+
+                          if (_payslip!.paid.isNotEmpty) ...[
+                            SizedBox(height: Dimensions.height30 / 2),
+                            _buildPaidSection(),
+                          ],
+                          if (_payslip!.benefits.isNotEmpty) ...[
+                            SizedBox(height: Dimensions.height30 / 2),
+                            _buildSimpleExpandable(
+                              title: 'payslip_benefits'.tr,
+                              items: _payslip!.benefits,
+                              color: Colors.blue.shade700,
+                            ),
+                          ],
+                          if (_payslip!.reference.isNotEmpty) ...[
+                            SizedBox(height: Dimensions.height30 / 2),
+                            _buildSimpleExpandable(
+                              title: 'payslip_reference'.tr,
+                              items: _payslip!.reference,
+                              color: Colors.grey.shade600,
+                            ),
+                          ],
+                          SizedBox(height: Dimensions.height30),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNetPayCard() {
+    final ps = _payslip!;
+    final deductPct = ps.totalAccruals > 0
+        ? (ps.totalDeductions / ps.totalAccruals * 100).clamp(0.0, 100.0)
+        : 0.0;
+    return GestureDetector(
+      onLongPress: () {
+        Clipboard.setData(ClipboardData(text: '${_numberFormat.format(ps.netPay)} ₸'));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('copied'.tr),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ));
+      },
+      child: Container(
+        padding: EdgeInsets.all(Dimensions.width20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.mainColor, AppColors.gradientColor2],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.mainColor.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              'net pay'.tr,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${_numberFormat.format(ps.netPay)} ₸',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            if (ps.debtEnd != 0.0) ...[
+              const SizedBox(height: 4),
+              Text(
+                '${'payslip_debt'.tr}: ${_numberFormat.format(ps.debtEnd)} ₸',
+                style: const TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: 1.0 - deductPct / 100,
+                minHeight: 6,
+                backgroundColor: Colors.white24,
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '▲ ${_numberFormat.format(ps.totalAccruals)} ₸',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                Text(
+                  '▼ ${_numberFormat.format(ps.totalDeductions)} ₸',
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandableSection({
+    required String title,
+    required List<PayslipItem> items,
+    required double total,
+    required Color color,
+    bool initiallyExpanded = false,
+  }) {
+    final sorted = ([...items]..sort((a, b) => b.amount.compareTo(a.amount)));
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        tilePadding: EdgeInsets.symmetric(
+            horizontal: Dimensions.width20, vertical: 4),
+        title: Row(
+          children: [
+            Text(title,
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+            const SizedBox(width: 8),
+            if (items.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('${items.length}',
+                    style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+              ),
+          ],
+        ),
+        trailing: Text(
+          '${_numberFormat.format(total)} ₸',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
+        ),
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+                Dimensions.width20, 0, Dimensions.width20, Dimensions.width20),
+            child: Column(
+              children: [
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                if (items.isEmpty)
+                  Text('no_records'.tr,
+                      style: const TextStyle(color: Colors.grey, fontSize: 14))
+                else
+                  ...sorted.map((item) {
+                    final pct = total > 0 ? (item.amount / total * 100) : 0.0;
+                    return GestureDetector(
+                      onLongPress: () {
+                        Clipboard.setData(ClipboardData(
+                            text: '${item.name}: ${_numberFormat.format(item.amount)} ₸'));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('copied'.tr),
+                          duration: const Duration(seconds: 1),
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                    child:
+                                        Text(item.name, style: const TextStyle(fontSize: 14))),
+                                Text('${_numberFormat.format(item.amount)} ₸',
+                                    style: const TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(2),
+                                    child: LinearProgressIndicator(
+                                      value: pct / 100,
+                                      minHeight: 3,
+                                      backgroundColor: color.withOpacity(0.1),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          color.withOpacity(0.5)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text('${pct.toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                        fontSize: 11, color: Colors.grey.shade500)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+              ],
             ),
           ),
-          SizedBox(height: Dimensions.height30 / 2),
-          _section('accruals'.tr, d.accruals, d.totalAccruals, Colors.green.shade700),
-          SizedBox(height: Dimensions.height30 / 2),
-          _section('deductions'.tr, d.deductions, d.totalDeductions, AppColors.niceRed),
-          if (d.paid.isNotEmpty) ...[
-            SizedBox(height: Dimensions.height30 / 2),
-            _paidSection(d),
-          ],
-          if (d.benefits.isNotEmpty) ...[
-            SizedBox(height: Dimensions.height30 / 2),
-            _simpleSection('payslip_benefits'.tr, d.benefits, Colors.blue.shade700),
-          ],
-          if (d.reference.isNotEmpty) ...[
-            SizedBox(height: Dimensions.height30 / 2),
-            _simpleSection('payslip_reference'.tr, d.reference, Colors.grey.shade600),
-          ],
-          SizedBox(height: Dimensions.height30 / 2),
-          _netPayCard(d),
-          SizedBox(height: Dimensions.height30),
         ],
       ),
     );
   }
 
-  Widget _section(String title, List<PayslipItem> items, double total, Color color) {
-    final sorted = [...items]..sort((a, b) => b.amount.compareTo(a.amount));
+  Widget _buildSimpleExpandable({
+    required String title,
+    required List<PayslipItem> items,
+    required Color color,
+  }) {
+    final total = items.fold(0.0, (s, e) => s + e.amount);
     return Card(
-      child: Padding(
-        padding: EdgeInsets.all(Dimensions.width20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(title,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color)),
-                if (items.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text('${items.length}',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold, color: color)),
-                  ),
-              ],
-            ),
-            const Divider(),
-            if (items.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('no_records'.tr,
-                    style: const TextStyle(color: Colors.grey, fontSize: 14)),
-              )
-            else
-              ...sorted.map((item) {
-                final pct = total > 0 ? (item.amount / total * 100) : 0.0;
-                return GestureDetector(
-                  onLongPress: () =>
-                      _copy('${item.name}: ${_fmt.format(item.amount)} ₸'),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                                child: Text(item.name,
-                                    style: const TextStyle(fontSize: 14))),
-                            Text('${_fmt.format(item.amount)} ₸',
-                                style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(2),
-                                child: LinearProgressIndicator(
-                                  value: pct / 100,
-                                  minHeight: 3,
-                                  backgroundColor: color.withOpacity(0.1),
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      color.withOpacity(0.5)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text('${pct.toStringAsFixed(1)}%',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey.shade500)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('total'.tr,
-                    style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-                Text('${_fmt.format(total)} ₸',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-              ],
-            ),
-          ],
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: false,
+        tilePadding:
+            EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
+        title: Text(title,
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+        trailing: Text(
+          '${_numberFormat.format(total)} ₸',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
         ),
-      ),
-    );
-  }
-
-  Widget _simpleSection(String title, List<PayslipItem> items, Color color) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(Dimensions.width20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color)),
-            const Divider(),
-            ...items.map((item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                          child: Text(item.name,
-                              style: const TextStyle(fontSize: 14))),
-                      Text('${_fmt.format(item.amount)} ₸',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _paidSection(PayslipData d) {
-    const color = AppColors.mainColor;
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(Dimensions.width20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+                Dimensions.width20, 0, Dimensions.width20, Dimensions.width20),
+            child: Column(
               children: [
-                const Text('Выплачено',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16, color: color)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text('${d.paid.length}',
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.bold, color: color)),
-                ),
-              ],
-            ),
-            const Divider(),
-            ...d.paid.map((item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(item.paymentType,
-                                style: const TextStyle(fontSize: 14)),
-                            if (item.document.isNotEmpty)
-                              Text(item.document,
-                                  style: TextStyle(
-                                      fontSize: 12, color: Colors.grey.shade500)),
-                            if (item.date.isNotEmpty)
-                              Text(item.date,
-                                  style: TextStyle(
-                                      fontSize: 12, color: Colors.grey.shade500)),
-                          ],
-                        ),
-                      ),
-                      Text('${_fmt.format(item.amount)} ₸',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                )),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Итого',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, color: color)),
-                Text('${_fmt.format(d.totalPaid)} ₸',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, color: color)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _netPayCard(PayslipData d) {
-    return GestureDetector(
-      onLongPress: () => _copy('${_fmt.format(d.netPay)} ₸'),
-      child: Card(
-        elevation: 3,
-        child: Padding(
-          padding: EdgeInsets.all(Dimensions.width20),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('net pay'.tr,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text(
-                    '${_fmt.format(d.netPay)} ₸',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: AppColors.mainColor,
-                    ),
-                  ),
-                ],
-              ),
-              if (d.debtEnd != 0.0) ...[
+                const Divider(height: 1),
                 const SizedBox(height: 8),
-                const Divider(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('payslip_debt'.tr,
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-                    Text('${_fmt.format(d.debtEnd)} ₸',
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-                  ],
-                ),
-              ],
-              if (d.totalAccruals > 0) ...[
-                const SizedBox(height: 8),
-                Builder(builder: (context) {
-                  final deductPct =
-                      (d.totalDeductions / d.totalAccruals * 100).clamp(0.0, 100.0);
-                  return Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: 1.0 - deductPct / 100,
-                          minHeight: 6,
-                          backgroundColor: AppColors.niceRed.withOpacity(0.2),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.mainColor),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
+                ...items.map((item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '${'net pay'.tr}: ${(100 - deductPct).toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                                fontSize: 11, color: AppColors.mainColor),
-                          ),
-                          Text(
-                            '${'deductions'.tr}: ${deductPct.toStringAsFixed(1)}%',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.niceRed.withOpacity(0.8)),
-                          ),
+                          Expanded(
+                              child:
+                                  Text(item.name, style: const TextStyle(fontSize: 14))),
+                          Text('${_numberFormat.format(item.amount)} ₸',
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w500)),
                         ],
                       ),
-                    ],
-                  );
-                }),
+                    )),
               ],
-            ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaidSection() {
+    final items = _payslip!.paid;
+    const color = AppColors.mainColor;
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: false,
+        tilePadding:
+            EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
+        title: Row(
+          children: [
+            const Text('Выплачено',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text('${items.length}',
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+            ),
+          ],
         ),
+        trailing: Text(
+          '${_numberFormat.format(_payslip!.totalPaid)} ₸',
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 13, color: color),
+        ),
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+                Dimensions.width20, 0, Dimensions.width20, Dimensions.width20),
+            child: Column(
+              children: [
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                ...items.map((item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.paymentType,
+                                    style: const TextStyle(fontSize: 14)),
+                                if (item.document.isNotEmpty)
+                                  Text(item.document,
+                                      style: TextStyle(
+                                          fontSize: 12, color: Colors.grey.shade500)),
+                                if (item.date.isNotEmpty)
+                                  Text(item.date,
+                                      style: TextStyle(
+                                          fontSize: 12, color: Colors.grey.shade500)),
+                              ],
+                            ),
+                          ),
+                          Text('${_numberFormat.format(item.amount)} ₸',
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    )),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
