@@ -41,20 +41,33 @@ class _PayslipPageState extends State<PayslipPage> {
       _error = null;
       _payslip = null;
     });
-    final data = await getPayslip(
-      context,
-      _selectedDate.month.toString().padLeft(2, '0'),
-      _selectedDate.year.toString(),
-    );
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-      if (data == null) {
-        _error = 'payslip not found'.tr;
-      } else {
+    try {
+      final data = await fetchPayslip(
+        _selectedDate.month.toString().padLeft(2, '0'),
+        _selectedDate.year.toString(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
         _payslip = data;
-      }
-    });
+      });
+    } on PayslipException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.kind == PayslipErrorKind.notFound
+            ? 'payslip not found'.tr
+            : e.kind == PayslipErrorKind.timeout
+                ? 'timeout'.tr
+                : 'network_error'.tr;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'network_error'.tr;
+      });
+    }
   }
 
   bool get _isCurrentOrFutureMonth {
