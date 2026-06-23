@@ -8,7 +8,11 @@ import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 
 class MenuScreen extends StatefulWidget {
-  const MenuScreen({Key? key}) : super(key: key);
+  const MenuScreen({Key? key, this.onBack}) : super(key: key);
+
+  /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
+  /// is shown that runs this callback instead of popping the route.
+  final VoidCallback? onBack;
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -76,6 +80,12 @@ class _MenuScreenState extends State<MenuScreen> {
         backgroundColor: AppColors.mainColor,
         foregroundColor: Colors.white,
         elevation: 0,
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onBack,
+              )
+            : null,
         title: BigText(content: 'canteen_menu'.tr, color: Colors.white),
         actions: [
           if (!_isToday)
