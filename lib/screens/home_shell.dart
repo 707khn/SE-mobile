@@ -26,56 +26,62 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          HomeScreen(
-            fullName: widget.fullName,
-            job: widget.job,
-            onNavigate: _navigateTo,
-          ),
-          MainPage1(fullName: widget.fullName, job: widget.job),
-          const PayslipPage(),
-          const LeavePage(),
-          const MenuScreen(),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _navigateTo,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.mainColor,
-        unselectedItemColor: Colors.grey,
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home_outlined),
-            activeIcon: const Icon(Icons.home),
-            label: 'tab_home'.tr,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.sensor_door_outlined),
-            activeIcon: const Icon(Icons.sensor_door),
-            label: 'tab_turnstile'.tr,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.receipt_long_outlined),
-            activeIcon: const Icon(Icons.receipt_long),
-            label: 'tab_payslip'.tr,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.beach_access_outlined),
-            activeIcon: const Icon(Icons.beach_access),
-            label: 'tab_leave'.tr,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.restaurant_menu_outlined),
-            activeIcon: const Icon(Icons.restaurant_menu),
-            label: 'tab_menu'.tr,
-          ),
-        ],
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvoked: (didPop) {
+        if (!didPop) setState(() => _selectedIndex = 0);
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            HomeScreen(
+              fullName: widget.fullName,
+              job: widget.job,
+              onNavigate: _navigateTo,
+            ),
+            MainPage1(fullName: widget.fullName, job: widget.job),
+            const PayslipPage(),
+            const LeavePage(),
+            const MenuScreen(),
+          ],
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _navigateTo,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: AppColors.mainColor,
+          unselectedItemColor: Colors.grey,
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: const Icon(Icons.home),
+              label: 'tab_home'.tr,
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.sensor_door_outlined),
+              activeIcon: const Icon(Icons.sensor_door),
+              label: 'tab_turnstile'.tr,
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.receipt_long_outlined),
+              activeIcon: const Icon(Icons.receipt_long),
+              label: 'tab_payslip'.tr,
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.beach_access_outlined),
+              activeIcon: const Icon(Icons.beach_access),
+              label: 'tab_leave'.tr,
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.restaurant_menu_outlined),
+              activeIcon: const Icon(Icons.restaurant_menu),
+              label: 'tab_menu'.tr,
+            ),
+          ],
+        ),
       ),
     );
   }
