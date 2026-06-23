@@ -199,6 +199,28 @@ def _seed_sarseken():
 _CREDENTIALS = {
     '2114': ('2114', '001'),
     '1874': ('1874', '1874'),
+    '0000000044': ('0000000044', '0000000044'),
+    '0000000644': ('0000000644', '0000000644'),
+    '0000000674': ('0000000674', '0000000674'),
+    '0000000726': ('0000000726', '0000000726'),
+    '0000000820': ('0000000820', '0000000820'),
+    '0000000910': ('0000000910', '0000000910'),
+    '0000001093': ('0000001093', '0000001093'),
+    '0000001236': ('0000001236', '0000001236'),
+    '0000001295': ('0000001295', '0000001295'),
+    '0000001296': ('0000001296', '0000001296'),
+    '0000001445': ('0000001445', '0000001445'),
+    '0000001579': ('0000001579', '0000001579'),
+    '0000001668': ('0000001668', '0000001668'),
+    '0000001681': ('0000001681', '0000001681'),
+    '0000001864': ('0000001864', '0000001864'),
+    '0000001874': ('0000001874', '0000001874'),
+    '0000001965': ('0000001965', '0000001965'),
+    '0000001978': ('0000001978', '0000001978'),
+    '0000002005': ('0000002005', '0000002005'),
+    '0000002063': ('0000002063', '0000002063'),
+    '0000002148': ('0000002148', '0000002148'),
+    '0000002162': ('0000002162', '0000002162'),
 }
 
 
@@ -245,6 +267,7 @@ def create_app():
             _update_april_2026_001,
             _seed_april_2026_access_001,
             _seed_kumarova,
+            _seed_docx_employees_2026,
         ]:
             try:
                 _fn()
@@ -1845,6 +1868,961 @@ def _seed_turnstile_events():
                 direction='out',
                 timestamp=datetime(2026, 5, d, h_out, m_out)))
 
+    db.session.commit()
+
+
+def _seed_docx_employees_2026():
+    """Seed 22 employees from docx payslips + their Jan-Apr 2026 payslips."""
+
+    # ── Employees ─────────────────────────────────────────────────────────
+    if not Employee.query.filter_by(employee_id='0000000044').first():
+        db.session.add(Employee(employee_id='0000000044', full_name='Ибраева Эльмира Кудайбергеновна', job_title='Технолог'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000000644').first():
+        db.session.add(Employee(employee_id='0000000644', full_name='Жиешев Кайрат Казахстанович', job_title='Заведующий складом'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000000674').first():
+        db.session.add(Employee(employee_id='0000000674', full_name='Жолдыбалинова Альмира Аманбековна', job_title='Заведующий складом'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000000726').first():
+        db.session.add(Employee(employee_id='0000000726', full_name='Саманова Жулдыз Аргымбаевна', job_title='Бухгалтер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000000820').first():
+        db.session.add(Employee(employee_id='0000000820', full_name='Фадеев Юрий Борисович', job_title='Контрольный мастер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000000910').first():
+        db.session.add(Employee(employee_id='0000000910', full_name='Кузбаев Канат Мукаметканович', job_title='Начальник отдела'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001093').first():
+        db.session.add(Employee(employee_id='0000001093', full_name='Павленко Александр Александрович', job_title='Контрольный мастер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001236').first():
+        db.session.add(Employee(employee_id='0000001236', full_name='Бахтинова Малика Жумабековна', job_title='Заместитель главного бухгалтера'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001295').first():
+        db.session.add(Employee(employee_id='0000001295', full_name='Ахметова Алия Тураровна', job_title='Главный менеджер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001296').first():
+        db.session.add(Employee(employee_id='0000001296', full_name='Арзуева Ирина Александровна', job_title='Главный менеджер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001445').first():
+        db.session.add(Employee(employee_id='0000001445', full_name='Елеубекова Айжан Сайдыгалиевна', job_title='Менеджер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001579').first():
+        db.session.add(Employee(employee_id='0000001579', full_name='Калиева Алмагуль Копышевна', job_title='Кладовщик'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001668').first():
+        db.session.add(Employee(employee_id='0000001668', full_name='Николаев Даниил Олегович', job_title='Заместитель начальника'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001681').first():
+        db.session.add(Employee(employee_id='0000001681', full_name='Чирков Максим Сергеевич', job_title='Контрольный мастер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001864').first():
+        db.session.add(Employee(employee_id='0000001864', full_name='Кутанова Асель Даниярбековна', job_title='Менеджер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001874').first():
+        db.session.add(Employee(employee_id='0000001874', full_name='Кумарова Мадина Кумаровна', job_title='Специалист по кадрам'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001965').first():
+        db.session.add(Employee(employee_id='0000001965', full_name='Жамбазар Ерсұлтан Мырзабекұлы', job_title='инженер-программист'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000001978').first():
+        db.session.add(Employee(employee_id='0000001978', full_name='Габдулин Роллан Жумагазыевич', job_title='Мастер СУ'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000002005').first():
+        db.session.add(Employee(employee_id='0000002005', full_name='Ияшева Эльмира Тимуровна', job_title='Бухгалтер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000002063').first():
+        db.session.add(Employee(employee_id='0000002063', full_name='Тусупжанова Айым Темирболаткызы', job_title='Офис менеджер'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000002148').first():
+        db.session.add(Employee(employee_id='0000002148', full_name='Диппель Ольга Владимировна', job_title='Повар'))
+        db.session.flush()
+    if not Employee.query.filter_by(employee_id='0000002162').first():
+        db.session.add(Employee(employee_id='0000002162', full_name='Науканов Мерхат Кайсарович', job_title='Менеджер'))
+        db.session.flush()
+
+    # ── Payslips Jan-Apr 2026 ─────────────────────────────────────────────
+    if not Payslip.query.filter_by(employee_id='0000000044', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000000044', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=361988.0, total_deductions=64765.0, net_pay=297223.0,
+            total_paid=1000.0, debt_start=1981.0, debt_end=294242.0,
+            salary_rate=375250.0,
+            position='Технолог',
+            department='Столовая',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000044', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000000044', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=498998.0, total_deductions=94907.0, net_pay=404091.0,
+            total_paid=292322.0, debt_start=294242.0, debt_end=406011.0,
+            salary_rate=375250.0,
+            position='Технолог',
+            department='Столовая',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000044', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000000044', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=621530.0, total_deductions=121567.0, net_pay=499963.0,
+            total_paid=481011.0, debt_start=406011.0, debt_end=424963.0,
+            salary_rate=375250.0,
+            position='Технолог',
+            department='Столовая',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000044', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000000044', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=456788.0, total_deductions=88123.0, net_pay=368665.0,
+            total_paid=424963.0, debt_start=424963.0, debt_end=368665.0,
+            salary_rate=375250.0,
+            position='Технолог',
+            department='Столовая',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000644', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000000644', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=310777.0, total_deductions=169010.0, net_pay=141767.0,
+            total_paid=4000.0, debt_start=873.0, debt_end=136894.0,
+            salary_rate=350393.0,
+            position='Заведующий складом',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000644', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000000644', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=133885.0, total_deductions=125078.0, net_pay=8807.0,
+            total_paid=131974.0, debt_start=136894.0, debt_end=13727.0,
+            salary_rate=350393.0,
+            position='Заведующий складом',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000644', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000000644', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=415679.0, total_deductions=193838.0, net_pay=221841.0,
+            total_paid=13727.0, debt_start=13727.0, debt_end=221841.0,
+            salary_rate=350393.0,
+            position='Заведующий складом',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000644', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000000644', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=391920.0, total_deductions=196252.0, net_pay=195668.0,
+            total_paid=221841.0, debt_start=221841.0, debt_end=195668.0,
+            salary_rate=350393.0,
+            position='Заведующий складом',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000674', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000000674', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=310777.0, total_deductions=54323.0, net_pay=256454.0,
+            total_paid=4000.0, debt_start=0.0, debt_end=252454.0,
+            salary_rate=350393.0,
+            position='Заведующий складом',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000674', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000000674', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=391920.0, total_deductions=71752.0, net_pay=320168.0,
+            total_paid=252534.0, debt_start=252454.0, debt_end=320088.0,
+            salary_rate=350393.0,
+            position='Заведующий складом',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000674', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000000674', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=498333.0, total_deductions=94147.0, net_pay=404186.0,
+            total_paid=395088.0, debt_start=320088.0, debt_end=329186.0,
+            salary_rate=350393.0,
+            position='Заведующий складом',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000674', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000000674', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=391920.0, total_deductions=73412.0, net_pay=318508.0,
+            total_paid=329186.0, debt_start=329186.0, debt_end=318508.0,
+            salary_rate=350393.0,
+            position='Заведующий складом',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000726', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000000726', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=425070.0, total_deductions=85790.0, net_pay=339280.0,
+            total_paid=19255.0, debt_start=15255.0, debt_end=335280.0,
+            salary_rate=349395.0,
+            position='Бухгалтер',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000726', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000000726', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=438866.0, total_deductions=92571.0, net_pay=346295.0,
+            total_paid=343360.0, debt_start=335280.0, debt_end=338215.0,
+            salary_rate=349395.0,
+            position='Бухгалтер',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000726', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000000726', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=519973.0, total_deductions=97323.0, net_pay=422650.0,
+            total_paid=469619.0, debt_start=338215.0, debt_end=291246.0,
+            salary_rate=349395.0,
+            position='Бухгалтер',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000726', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000000726', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=419413.0, total_deductions=85444.0, net_pay=333969.0,
+            total_paid=281887.0, debt_start=291246.0, debt_end=343328.0,
+            salary_rate=349395.0,
+            position='Бухгалтер',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000820', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000000820', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=365648.0, total_deductions=65743.0, net_pay=299905.0,
+            total_paid=2000.0, debt_start=0.0, debt_end=297905.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000820', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000000820', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=461424.0, total_deductions=86431.0, net_pay=374993.0,
+            total_paid=293985.0, debt_start=297905.0, debt_end=378913.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000820', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000000820', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=1838348.0, total_deductions=369758.0, net_pay=1468590.0,
+            total_paid=1542463.0, debt_start=378913.0, debt_end=305040.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000820', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000000820', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=89204.0, total_deductions=10808.0, net_pay=78396.0,
+            total_paid=305040.0, debt_start=305040.0, debt_end=78396.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000910', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000000910', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=518661.0, total_deductions=169595.0, net_pay=349066.0,
+            total_paid=5000.0, debt_start=1304.0, debt_end=342762.0,
+            salary_rate=589775.0,
+            position='Начальник отдела',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000910', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000000910', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=655241.0, total_deductions=217957.0, net_pay=437284.0,
+            total_paid=340842.0, debt_start=342762.0, debt_end=439204.0,
+            salary_rate=589775.0,
+            position='Начальник отдела',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000910', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000000910', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=734532.0, total_deductions=218958.0, net_pay=515574.0,
+            total_paid=439204.0, debt_start=439204.0, debt_end=515574.0,
+            salary_rate=589775.0,
+            position='Начальник отдела',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000000910', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000000910', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=742400.0, total_deductions=154191.0, net_pay=588209.0,
+            total_paid=832182.0, debt_start=515574.0, debt_end=271601.0,
+            salary_rate=589775.0,
+            position='Начальник отдела',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001093', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001093', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=403611.0, total_deductions=120407.0, net_pay=283204.0,
+            total_paid=168222.0, debt_start=0.0, debt_end=114982.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001093', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001093', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=461424.0, total_deductions=208883.0, net_pay=252541.0,
+            total_paid=112320.0, debt_start=114982.0, debt_end=255203.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001093', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001093', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=486698.0, total_deductions=303128.0, net_pay=183570.0,
+            total_paid=257203.0, debt_start=255203.0, debt_end=181570.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001093', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001093', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=1536098.0, total_deductions=625933.0, net_pay=910165.0,
+            total_paid=854224.0, debt_start=181570.0, debt_end=237511.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001236', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001236', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=623431.0, total_deductions=118127.0, net_pay=505304.0,
+            total_paid=5000.0, debt_start=928.0, debt_end=499376.0,
+            salary_rate=456331.0,
+            position='Заместитель главного бухгалтера',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001236', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001236', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=448875.0, total_deductions=83166.0, net_pay=365709.0,
+            total_paid=502456.0, debt_start=499376.0, debt_end=362629.0,
+            salary_rate=456331.0,
+            position='Заместитель главного бухгалтера',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001236', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001236', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=682177.0, total_deductions=135198.0, net_pay=546979.0,
+            total_paid=437629.0, debt_start=362629.0, debt_end=471979.0,
+            salary_rate=456331.0,
+            position='Заместитель главного бухгалтера',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001236', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001236', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=558228.0, total_deductions=114085.0, net_pay=444143.0,
+            total_paid=471979.0, debt_start=471979.0, debt_end=444143.0,
+            salary_rate=456331.0,
+            position='Заместитель главного бухгалтера',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001295', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001295', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=401418.0, total_deductions=84179.0, net_pay=317239.0,
+            total_paid=3000.0, debt_start=460.0, debt_end=313779.0,
+            salary_rate=454768.0,
+            position='Главный менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001295', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001295', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=506733.0, total_deductions=111917.0, net_pay=394816.0,
+            total_paid=311859.0, debt_start=313779.0, debt_end=396736.0,
+            salary_rate=454768.0,
+            position='Главный менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001295', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001295', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=1405706.0, total_deductions=289614.0, net_pay=1116092.0,
+            total_paid=1072660.0, debt_start=396736.0, debt_end=440168.0,
+            salary_rate=454768.0,
+            position='Главный менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001295', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001295', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=1789596.0, total_deductions=367631.0, net_pay=1421965.0,
+            total_paid=1442976.0, debt_start=440168.0, debt_end=419157.0,
+            salary_rate=454768.0,
+            position='Главный менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001296', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001296', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=390042.0, total_deductions=67927.0, net_pay=322115.0,
+            total_paid=2000.0, debt_start=0.0, debt_end=320115.0,
+            salary_rate=407399.0,
+            position='Главный менеджер',
+            department='Отдел правового и административного обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001296', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001296', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=454627.0, total_deductions=88273.0, net_pay=366354.0,
+            total_paid=317195.0, debt_start=320115.0, debt_end=369274.0,
+            salary_rate=407399.0,
+            position='Главный менеджер',
+            department='Отдел правового и административного обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001296', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001296', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=564524.0, total_deductions=104223.0, net_pay=460301.0,
+            total_paid=444274.0, debt_start=369274.0, debt_end=385301.0,
+            salary_rate=407399.0,
+            position='Главный менеджер',
+            department='Административный отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001296', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001296', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=454627.0, total_deductions=81666.0, net_pay=372961.0,
+            total_paid=385301.0, debt_start=385301.0, debt_end=372961.0,
+            salary_rate=407399.0,
+            position='Главный менеджер',
+            department='Административный отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001445', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001445', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=322862.0, total_deductions=53425.0, net_pay=269437.0,
+            total_paid=2000.0, debt_start=0.0, debt_end=267437.0,
+            salary_rate=368995.0,
+            position='Менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001445', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001445', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=412383.0, total_deductions=76654.0, net_pay=335729.0,
+            total_paid=266517.0, debt_start=267437.0, debt_end=336649.0,
+            salary_rate=368995.0,
+            position='Менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001445', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001445', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=497383.0, total_deductions=96110.0, net_pay=401273.0,
+            total_paid=411649.0, debt_start=336649.0, debt_end=326273.0,
+            salary_rate=368995.0,
+            position='Менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001445', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001445', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=439216.0, total_deductions=86225.0, net_pay=352991.0,
+            total_paid=326273.0, debt_start=326273.0, debt_end=352991.0,
+            salary_rate=368995.0,
+            position='Менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001579', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001579', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=222815.0, total_deductions=34878.0, net_pay=187937.0,
+            total_paid=0.0, debt_start=614.0, debt_end=187323.0,
+            salary_rate=260966.0,
+            position='Кладовщик',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001579', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001579', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=280502.0, total_deductions=46140.0, net_pay=234362.0,
+            total_paid=185403.0, debt_start=187323.0, debt_end=236282.0,
+            salary_rate=260966.0,
+            position='Кладовщик',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001579', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001579', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=365502.0, total_deductions=68076.0, net_pay=297426.0,
+            total_paid=311282.0, debt_start=236282.0, debt_end=222426.0,
+            salary_rate=260966.0,
+            position='Кладовщик',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001579', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001579', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=268047.0, total_deductions=46065.0, net_pay=221982.0,
+            total_paid=222426.0, debt_start=222426.0, debt_end=221982.0,
+            salary_rate=260966.0,
+            position='Кладовщик',
+            department='Служба учета ТМЦ',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001668', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001668', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=384762.0, total_deductions=69425.0, net_pay=315337.0,
+            total_paid=7000.0, debt_start=0.0, debt_end=308337.0,
+            salary_rate=456331.0,
+            position='Заместитель начальника',
+            department='Отдел информационных технологий и связи',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001668', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001668', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=485636.0, total_deductions=92158.0, net_pay=393478.0,
+            total_paid=314417.0, debt_start=308337.0, debt_end=387398.0,
+            salary_rate=456331.0,
+            position='Заместитель начальника',
+            department='Отдел информационных технологий и связи',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001668', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001668', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=512255.0, total_deductions=97852.0, net_pay=414403.0,
+            total_paid=387398.0, debt_start=387398.0, debt_end=414403.0,
+            salary_rate=456331.0,
+            position='Заместитель начальника',
+            department='Отдел информационных технологий и связи',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001668', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001668', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=485636.0, total_deductions=92255.0, net_pay=393381.0,
+            total_paid=414403.0, debt_start=414403.0, debt_end=393381.0,
+            salary_rate=456331.0,
+            position='Заместитель начальника',
+            department='Отдел информационных технологий и связи',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001681', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001681', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=396976.0, total_deductions=26380.0, net_pay=370596.0,
+            total_paid=265163.0, debt_start=0.0, debt_end=105433.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001681', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001681', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=440745.0, total_deductions=136768.0, net_pay=303977.0,
+            total_paid=100514.0, debt_start=105433.0, debt_end=308896.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001681', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001681', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=464871.0, total_deductions=87545.0, net_pay=377326.0,
+            total_paid=308896.0, debt_start=308896.0, debt_end=377326.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001681', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001681', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=440745.0, total_deductions=92399.0, net_pay=348346.0,
+            total_paid=377326.0, debt_start=377326.0, debt_end=348346.0,
+            salary_rate=413578.0,
+            position='Контрольный мастер',
+            department='Отдел технического контроля',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001864', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001864', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=278379.0, total_deductions=54606.0, net_pay=223773.0,
+            total_paid=3000.0, debt_start=0.0, debt_end=220773.0,
+            salary_rate=368995.0,
+            position='Менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001864', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001864', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=375483.0, total_deductions=76748.0, net_pay=298735.0,
+            total_paid=218853.0, debt_start=220773.0, debt_end=300655.0,
+            salary_rate=368995.0,
+            position='Менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001864', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001864', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=524233.0, total_deductions=103410.0, net_pay=420823.0,
+            total_paid=375655.0, debt_start=300655.0, debt_end=345823.0,
+            salary_rate=368995.0,
+            position='Менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001864', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001864', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=424902.0, total_deductions=90728.0, net_pay=334174.0,
+            total_paid=345823.0, debt_start=345823.0, debt_end=334174.0,
+            salary_rate=368995.0,
+            position='Менеджер',
+            department='Планово-экономический отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001874', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001874', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=659514.0, total_deductions=128140.0, net_pay=531374.0,
+            total_paid=444116.0, debt_start=639.0, debt_end=86619.0,
+            salary_rate=334464.0,
+            position='Специалист по кадрам',
+            department='Отдел правового и административного обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001874', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001874', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=340952.0, total_deductions=68948.0, net_pay=272004.0,
+            total_paid=346699.0, debt_start=86619.0, debt_end=11924.0,
+            salary_rate=334464.0,
+            position='Специалист по кадрам',
+            department='Отдел правового и административного обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001874', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001874', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=444533.0, total_deductions=89125.0, net_pay=355408.0,
+            total_paid=86924.0, debt_start=11924.0, debt_end=280408.0,
+            salary_rate=334464.0,
+            position='Специалист по кадрам',
+            department='Административный отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001874', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001874', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=355640.0, total_deductions=72822.0, net_pay=282818.0,
+            total_paid=280408.0, debt_start=280408.0, debt_end=282818.0,
+            salary_rate=334464.0,
+            position='Специалист по кадрам',
+            department='Административный отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001965', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001965', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=469574.0, total_deductions=32669.0, net_pay=436905.0,
+            total_paid=222800.0, debt_start=0.0, debt_end=214105.0,
+            salary_rate=425229.0,
+            position='инженер-программист',
+            department='Отдел информационных технологий и связи',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001965', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001965', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=346671.0, total_deductions=52242.0, net_pay=294429.0,
+            total_paid=298278.0, debt_start=214105.0, debt_end=210256.0,
+            salary_rate=425229.0,
+            position='инженер-программист',
+            department='Отдел информационных технологий и связи',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001965', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001965', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=474712.0, total_deductions=76621.0, net_pay=398091.0,
+            total_paid=312735.0, debt_start=210256.0, debt_end=295612.0,
+            salary_rate=425229.0,
+            position='инженер-программист',
+            department='Отдел информационных технологий и связи',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001965', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001965', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=431717.0, total_deductions=71154.0, net_pay=360563.0,
+            total_paid=295612.0, debt_start=295612.0, debt_end=360563.0,
+            salary_rate=425229.0,
+            position='инженер-программист',
+            department='Отдел информационных технологий и связи',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001978', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000001978', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=1421582.0, total_deductions=283377.0, net_pay=1138205.0,
+            total_paid=807239.0, debt_start=0.0, debt_end=330966.0,
+            salary_rate=413578.0,
+            position='Мастер СУ',
+            department='Строительный участок',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001978', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000001978', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=275314.0, total_deductions=48007.0, net_pay=227307.0,
+            total_paid=334335.0, debt_start=330966.0, debt_end=223938.0,
+            salary_rate=413578.0,
+            position='Мастер СУ',
+            department='Строительный участок',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001978', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000001978', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=443043.0, total_deductions=83649.0, net_pay=359394.0,
+            total_paid=223938.0, debt_start=223938.0, debt_end=359394.0,
+            salary_rate=413578.0,
+            position='Мастер СУ',
+            department='Строительный участок',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000001978', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000001978', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=420066.0, total_deductions=86641.0, net_pay=333425.0,
+            total_paid=359394.0, debt_start=359394.0, debt_end=333425.0,
+            salary_rate=413578.0,
+            position='Мастер СУ',
+            department='Строительный участок',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002005', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000002005', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=321401.0, total_deductions=57917.0, net_pay=263484.0,
+            total_paid=4000.0, debt_start=994.0, debt_end=258490.0,
+            salary_rate=349395.0,
+            position='Бухгалтер',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002005', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000002005', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=369986.0, total_deductions=72743.0, net_pay=297243.0,
+            total_paid=257570.0, debt_start=258490.0, debt_end=298163.0,
+            salary_rate=349395.0,
+            position='Бухгалтер',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002005', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000002005', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=467573.0, total_deductions=88976.0, net_pay=378597.0,
+            total_paid=373163.0, debt_start=298163.0, debt_end=303597.0,
+            salary_rate=349395.0,
+            position='Бухгалтер',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002005', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000002005', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=385665.0, total_deductions=76736.0, net_pay=308929.0,
+            total_paid=303597.0, debt_start=303597.0, debt_end=308929.0,
+            salary_rate=349395.0,
+            position='Бухгалтер',
+            department='Отдел бухгалтерского и налогового учета',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002063', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000002063', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=236048.0, total_deductions=42372.0, net_pay=193676.0,
+            total_paid=0.0, debt_start=620.0, debt_end=193056.0,
+            salary_rate=278720.0,
+            position='Офис менеджер',
+            department='Отдел правового и административного обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002063', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000002063', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=299096.0, total_deductions=58062.0, net_pay=241034.0,
+            total_paid=194136.0, debt_start=193056.0, debt_end=239954.0,
+            salary_rate=278720.0,
+            position='Офис менеджер',
+            department='Отдел правового и административного обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002063', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000002063', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=968261.0, total_deductions=188429.0, net_pay=779832.0,
+            total_paid=924223.0, debt_start=239954.0, debt_end=95563.0,
+            salary_rate=278720.0,
+            position='Офис менеджер',
+            department='Административный отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002063', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000002063', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=297848.0, total_deductions=66642.0, net_pay=231206.0,
+            total_paid=95563.0, debt_start=95563.0, debt_end=231206.0,
+            salary_rate=278720.0,
+            position='Офис менеджер',
+            department='Административный отдел',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002148', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000002148', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=164132.0, total_deductions=19932.0, net_pay=144200.0,
+            total_paid=1000.0, debt_start=0.0, debt_end=143200.0,
+            salary_rate=199682.0,
+            position='Повар',
+            department='Столовая',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002148', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000002148', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=224890.0, total_deductions=35462.0, net_pay=189428.0,
+            total_paid=138280.0, debt_start=143200.0, debt_end=194348.0,
+            salary_rate=199682.0,
+            position='Повар',
+            department='Столовая',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002148', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000002148', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=343037.0, total_deductions=59945.0, net_pay=283092.0,
+            total_paid=269348.0, debt_start=194348.0, debt_end=208092.0,
+            salary_rate=199682.0,
+            position='Повар',
+            department='Столовая',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002148', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000002148', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=206170.0, total_deductions=31508.0, net_pay=174662.0,
+            total_paid=208092.0, debt_start=208092.0, debt_end=174662.0,
+            salary_rate=199682.0,
+            position='Повар',
+            department='Столовая',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002162', period_year=2026, period_month=1).first():
+        db.session.add(Payslip(
+            employee_id='0000002162', period_month=1, period_year=2026,
+            period_display='Январь 2026',
+            total_accruals=283930.0, total_deductions=19190.0, net_pay=264740.0,
+            total_paid=4000.0, debt_start=0.0, debt_end=260740.0,
+            salary_rate=351426.0,
+            position='Менеджер',
+            department='Управление материально-технического обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002162', period_year=2026, period_month=2).first():
+        db.session.add(Payslip(
+            employee_id='0000002162', period_month=2, period_year=2026,
+            period_display='Февраль 2026',
+            total_accruals=436980.0, total_deductions=34867.0, net_pay=402113.0,
+            total_paid=252765.0, debt_start=260740.0, debt_end=410088.0,
+            salary_rate=351426.0,
+            position='Менеджер',
+            department='Управление материально-технического обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002162', period_year=2026, period_month=3).first():
+        db.session.add(Payslip(
+            employee_id='0000002162', period_month=3, period_year=2026,
+            period_display='Март 2026',
+            total_accruals=395741.0, total_deductions=30831.0, net_pay=364910.0,
+            total_paid=410088.0, debt_start=410088.0, debt_end=364910.0,
+            salary_rate=351426.0,
+            position='Менеджер',
+            department='Департамент материально-технического обеспечения',
+        ))
+    if not Payslip.query.filter_by(employee_id='0000002162', period_year=2026, period_month=4).first():
+        db.session.add(Payslip(
+            employee_id='0000002162', period_month=4, period_year=2026,
+            period_display='Апрель 2026',
+            total_accruals=357914.0, total_deductions=32119.0, net_pay=325795.0,
+            total_paid=364910.0, debt_start=364910.0, debt_end=325795.0,
+            salary_rate=351426.0,
+            position='Менеджер',
+            department='Департамент материально-технического обеспечения',
+        ))
     db.session.commit()
 
 
