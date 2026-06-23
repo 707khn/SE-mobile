@@ -10,7 +10,11 @@ import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 
 class PayslipPage extends StatefulWidget {
-  const PayslipPage({Key? key}) : super(key: key);
+  const PayslipPage({Key? key, this.onBack}) : super(key: key);
+
+  /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
+  /// is shown that runs this callback instead of popping the route.
+  final VoidCallback? onBack;
 
   @override
   State<PayslipPage> createState() => _PayslipPageState();
@@ -205,6 +209,12 @@ class _PayslipPageState extends State<PayslipPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onBack,
+              )
+            : null,
         title: BigText(content: 'payslip'.tr, fontWeight: FontWeight.bold),
         centerTitle: true,
         actions: [
