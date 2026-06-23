@@ -43,7 +43,7 @@ class _AdminPageState extends State<AdminPage> {
   Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "KZ");
+      prefs.setString(AppValues.LANG, "RU");
     }
     final login = await SecureStorageHelper.instance.getLogin();
     setState(() {
@@ -414,17 +414,14 @@ class _AdminPageState extends State<AdminPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            greetKey.tr,
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            firstName,
+            '${greetKey.tr} $firstName!',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Row(
