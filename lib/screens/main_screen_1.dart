@@ -88,21 +88,23 @@ class _MainPage1State extends State<MainPage1> {
           ValueListenableBuilder<int>(
             valueListenable: _recordCount,
             builder: (_, count, __) => PopupMenuButton<String>(
-            icon: Icon(Icons.share, color: count > 0 ? null : Colors.white38),
-            enabled: count > 0,
-            tooltip: 'send_report_tooltip'.tr,
-            itemBuilder: (_) => [
-              PopupMenuItem(value: 'send report exc', child: Text('send report exc'.tr)),
-              PopupMenuItem(value: 'send report csv', child: Text('send report csv'.tr)),
-            ],
-            onSelected: (value) {
-              if (value == 'send report exc') {
-                generateExcel(reportsEntries, context);
-              } else if (value == 'send report csv') {
-                generateTable(reportsEntries, context);
-              }
-            },
+              icon: Icon(Icons.share, color: count > 0 ? null : Colors.white38),
+              enabled: count > 0,
+              tooltip: 'send_report_tooltip'.tr,
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'send report exc', child: Text('send report exc'.tr)),
+                PopupMenuItem(value: 'send report csv', child: Text('send report csv'.tr)),
+              ],
+              onSelected: (value) {
+                if (value == 'send report exc') generateExcel(reportsEntries, context);
+                else if (value == 'send report csv') generateTable(reportsEntries, context);
+              },
+            ),
           ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'log_out_title'.tr,
+            onPressed: _exit,
           ),
         ],
       ),
@@ -314,7 +316,6 @@ class _MainMenu1State extends State<MainMenu1> {
     super.initState();
     startDate = DateTime.now();
     endDate = DateTime.now();
-    _initData();
   }
 
   Future<void> _initData() async {
