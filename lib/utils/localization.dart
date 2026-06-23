@@ -120,6 +120,8 @@ class LocaleString extends Translations {
           'tab_payslip': 'Жалақы',
           'tab_leave': 'Демалыс',
           'tab_menu': 'Мәзір',
+          'tab_home': 'Басты бет',
+          'quick_access': 'Жылдам қол жеткізу',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -238,6 +240,8 @@ class LocaleString extends Translations {
           'tab_payslip': 'Зарплата',
           'tab_leave': 'Отпуск',
           'tab_menu': 'Меню',
+          'tab_home': 'Главная',
+          'quick_access': 'Быстрый доступ',
         }
       };
 }

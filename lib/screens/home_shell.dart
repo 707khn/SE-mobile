@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../utils/colors.dart';
+import 'home_screen.dart';
 import 'leave_screen.dart';
 import 'main_screen_1.dart';
 import 'menu_screen.dart';
@@ -21,12 +22,19 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
 
+  void _navigateTo(int index) => setState(() => _selectedIndex = index);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
         children: [
+          HomeScreen(
+            fullName: widget.fullName,
+            job: widget.job,
+            onNavigate: _navigateTo,
+          ),
           MainPage1(fullName: widget.fullName, job: widget.job),
           const PayslipPage(),
           const LeavePage(),
@@ -35,11 +43,18 @@ class _HomeShellState extends State<HomeShell> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
+        onTap: _navigateTo,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppColors.mainColor,
         unselectedItemColor: Colors.grey,
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
         items: [
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: const Icon(Icons.home),
+            label: 'tab_home'.tr,
+          ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.sensor_door_outlined),
             activeIcon: const Icon(Icons.sensor_door),
