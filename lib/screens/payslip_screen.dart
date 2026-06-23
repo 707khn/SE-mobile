@@ -10,7 +10,11 @@ import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 
 class PayslipPage extends StatefulWidget {
-  const PayslipPage({Key? key}) : super(key: key);
+  const PayslipPage({Key? key, this.onBack}) : super(key: key);
+
+  /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
+  /// is shown that runs this callback instead of popping the route.
+  final VoidCallback? onBack;
 
   @override
   State<PayslipPage> createState() => _PayslipPageState();
@@ -205,6 +209,12 @@ class _PayslipPageState extends State<PayslipPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onBack,
+              )
+            : null,
         title: BigText(content: 'payslip'.tr, fontWeight: FontWeight.bold),
         centerTitle: true,
         actions: [
@@ -229,6 +239,7 @@ class _PayslipPageState extends State<PayslipPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Month picker card
               Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -304,6 +315,7 @@ class _PayslipPageState extends State<PayslipPage> {
                         key: ValueKey(_payslip!.period),
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Header: employee + period
                           GestureDetector(
                             onLongPress: () {
                               Clipboard.setData(ClipboardData(
@@ -330,8 +342,8 @@ class _PayslipPageState extends State<PayslipPage> {
                                             fontWeight: FontWeight.bold)),
                                     const SizedBox(height: 4),
                                     Text(_payslip!.period,
-                                        style: const TextStyle(
-                                            color: Colors.white70, fontSize: 14)),
+                                        style:
+                                            const TextStyle(color: Colors.white70, fontSize: 14)),
                                     if (_payslip!.position.isNotEmpty ||
                                         _payslip!.department.isNotEmpty) ...[
                                       const SizedBox(height: 2),
@@ -339,8 +351,8 @@ class _PayslipPageState extends State<PayslipPage> {
                                         [_payslip!.position, _payslip!.department]
                                             .where((s) => s.isNotEmpty)
                                             .join(' · '),
-                                        style: const TextStyle(
-                                            color: Colors.white54, fontSize: 12),
+                                        style:
+                                            const TextStyle(color: Colors.white54, fontSize: 12),
                                       ),
                                     ],
                                   ],
@@ -349,8 +361,12 @@ class _PayslipPageState extends State<PayslipPage> {
                             ),
                           ),
                           SizedBox(height: Dimensions.height30 / 2),
+
+                          // Summary: net pay gradient card
                           _buildNetPayCard(),
                           SizedBox(height: Dimensions.height30 / 2),
+
+                          // Accruals (expanded)
                           _buildExpandableSection(
                             title: 'accruals'.tr,
                             items: _payslip!.accruals,
@@ -359,6 +375,8 @@ class _PayslipPageState extends State<PayslipPage> {
                             initiallyExpanded: true,
                           ),
                           SizedBox(height: Dimensions.height30 / 2),
+
+                          // Deductions (expanded)
                           _buildExpandableSection(
                             title: 'deductions'.tr,
                             items: _payslip!.deductions,
@@ -366,6 +384,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             color: AppColors.niceRed,
                             initiallyExpanded: true,
                           ),
+
                           if (_payslip!.paid.isNotEmpty) ...[
                             SizedBox(height: Dimensions.height30 / 2),
                             _buildPaidSection(),
@@ -495,8 +514,8 @@ class _PayslipPageState extends State<PayslipPage> {
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
-        tilePadding:
-            EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
+        tilePadding: EdgeInsets.symmetric(
+            horizontal: Dimensions.width20, vertical: 4),
         title: Row(
           children: [
             Text(title,
@@ -537,8 +556,7 @@ class _PayslipPageState extends State<PayslipPage> {
                     return GestureDetector(
                       onLongPress: () {
                         Clipboard.setData(ClipboardData(
-                            text:
-                                '${item.name}: ${_numberFormat.format(item.amount)} ₸'));
+                            text: '${item.name}: ${_numberFormat.format(item.amount)} ₸'));
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                           content: Text('copied'.tr),
                           duration: const Duration(seconds: 1),
@@ -554,8 +572,8 @@ class _PayslipPageState extends State<PayslipPage> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Expanded(
-                                    child: Text(item.name,
-                                        style: const TextStyle(fontSize: 14))),
+                                    child:
+                                        Text(item.name, style: const TextStyle(fontSize: 14))),
                                 Text('${_numberFormat.format(item.amount)} ₸',
                                     style: const TextStyle(
                                         fontSize: 14, fontWeight: FontWeight.w500)),
@@ -579,8 +597,7 @@ class _PayslipPageState extends State<PayslipPage> {
                                 const SizedBox(width: 8),
                                 Text('${pct.toStringAsFixed(1)}%',
                                     style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade500)),
+                                        fontSize: 11, color: Colors.grey.shade500)),
                               ],
                             ),
                           ],
@@ -615,8 +632,7 @@ class _PayslipPageState extends State<PayslipPage> {
                 fontWeight: FontWeight.bold, fontSize: 15, color: color)),
         trailing: Text(
           '${_numberFormat.format(total)} ₸',
-          style:
-              TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
         ),
         children: [
           Padding(
@@ -632,8 +648,8 @@ class _PayslipPageState extends State<PayslipPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                              child: Text(item.name,
-                                  style: const TextStyle(fontSize: 14))),
+                              child:
+                                  Text(item.name, style: const TextStyle(fontSize: 14))),
                           Text('${_numberFormat.format(item.amount)} ₸',
                               style: const TextStyle(
                                   fontSize: 14, fontWeight: FontWeight.w500)),
@@ -705,13 +721,11 @@ class _PayslipPageState extends State<PayslipPage> {
                                 if (item.document.isNotEmpty)
                                   Text(item.document,
                                       style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade500)),
+                                          fontSize: 12, color: Colors.grey.shade500)),
                                 if (item.date.isNotEmpty)
                                   Text(item.date,
                                       style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade500)),
+                                          fontSize: 12, color: Colors.grey.shade500)),
                               ],
                             ),
                           ),
