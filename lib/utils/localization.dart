@@ -133,6 +133,7 @@ class LocaleString extends Translations {
           'tab_menu': 'Мәзір',
           'tab_home': 'Басты бет',
           'quick_access': 'Жылдам қол жеткізу',
+          'profile': 'Профиль',
         },
         'RU': {
           'send report exc': 'Отправить отчёт Excel',
@@ -264,6 +265,7 @@ class LocaleString extends Translations {
           'tab_menu': 'Меню',
           'tab_home': 'Главная',
           'quick_access': 'Быстрый доступ',
+          'profile': 'Профиль',
         }
       };
 }

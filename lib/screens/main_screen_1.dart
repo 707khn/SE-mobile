@@ -26,7 +26,14 @@ class MainPage1 extends StatefulWidget {
   final String fullName;
   final String job;
 
-  const MainPage1({Key? key, required this.fullName, required this.job}) : super(key: key);
+  /// When provided (e.g. inside the bottom-nav shell), the AppBar shows a back
+  /// arrow running this callback, and the profile drawer moves to a trailing
+  /// icon so it stays reachable.
+  final VoidCallback? onBack;
+
+  const MainPage1(
+      {Key? key, required this.fullName, required this.job, this.onBack})
+      : super(key: key);
 
   @override
   State<MainPage1> createState() => _MainPage1State();
@@ -38,6 +45,7 @@ class _MainPage1State extends State<MainPage1> {
   late SharedPreferences prefs;
   final _recordCount = ValueNotifier<int>(0);
   final _dateRange = ValueNotifier<String>('');
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -67,9 +75,16 @@ class _MainPage1State extends State<MainPage1> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppColors.niceWhite,
       appBar: AppBar(
         centerTitle: true,
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onBack,
+              )
+            : null,
         title: ValueListenableBuilder<String>(
           valueListenable: _dateRange,
           builder: (_, dateStr, __) => Column(
@@ -101,11 +116,21 @@ class _MainPage1State extends State<MainPage1> {
               },
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'log_out_title'.tr,
-            onPressed: _exit,
-          ),
+          // In tab mode the hamburger is replaced by the back arrow, so the
+          // profile drawer opens from this trailing icon instead. Logout
+          // stays on the standalone variant only — the Home tab already has it.
+          if (widget.onBack != null)
+            IconButton(
+              icon: const Icon(Icons.account_circle_outlined),
+              tooltip: 'profile'.tr,
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'log_out_title'.tr,
+              onPressed: _exit,
+            ),
         ],
       ),
       drawer: Theme(

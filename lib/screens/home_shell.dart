@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../utils/colors.dart';
@@ -40,47 +41,76 @@ class _HomeShellState extends State<HomeShell> {
               job: widget.job,
               onNavigate: _navigateTo,
             ),
-            MainPage1(fullName: widget.fullName, job: widget.job),
+            MainPage1(
+              fullName: widget.fullName,
+              job: widget.job,
+              onBack: () => _navigateTo(0),
+            ),
             PayslipPage(onBack: () => _navigateTo(0)),
             LeavePage(onBack: () => _navigateTo(0)),
             MenuScreen(onBack: () => _navigateTo(0), job: widget.job),
           ],
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _navigateTo,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: AppColors.mainColor,
-          unselectedItemColor: Colors.grey,
-          selectedFontSize: 11,
-          unselectedFontSize: 11,
-          items: [
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.home_outlined),
-              activeIcon: const Icon(Icons.home),
-              label: 'tab_home'.tr,
+        bottomNavigationBar: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            height: 64,
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            indicatorColor: AppColors.mainColor.withOpacity(0.14),
+            labelTextStyle: MaterialStateProperty.resolveWith(
+              (states) => TextStyle(
+                fontSize: 11,
+                fontWeight: states.contains(MaterialState.selected)
+                    ? FontWeight.w600
+                    : FontWeight.w400,
+                color: states.contains(MaterialState.selected)
+                    ? AppColors.mainColor
+                    : Colors.grey.shade600,
+              ),
             ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.sensor_door_outlined),
-              activeIcon: const Icon(Icons.sensor_door),
-              label: 'tab_turnstile'.tr,
+            iconTheme: MaterialStateProperty.resolveWith(
+              (states) => IconThemeData(
+                size: 24,
+                color: states.contains(MaterialState.selected)
+                    ? AppColors.mainColor
+                    : Colors.grey.shade600,
+              ),
             ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.receipt_long_outlined),
-              activeIcon: const Icon(Icons.receipt_long),
-              label: 'tab_payslip'.tr,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.beach_access_outlined),
-              activeIcon: const Icon(Icons.beach_access),
-              label: 'tab_leave'.tr,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.restaurant_menu_outlined),
-              activeIcon: const Icon(Icons.restaurant_menu),
-              label: 'tab_menu'.tr,
-            ),
-          ],
+          ),
+          child: NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (index) {
+              if (index != _selectedIndex) HapticFeedback.selectionClick();
+              _navigateTo(index);
+            },
+            destinations: [
+              NavigationDestination(
+                icon: const Icon(Icons.home_outlined),
+                selectedIcon: const Icon(Icons.home),
+                label: 'tab_home'.tr,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.sensor_door_outlined),
+                selectedIcon: const Icon(Icons.sensor_door),
+                label: 'tab_turnstile'.tr,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.receipt_long_outlined),
+                selectedIcon: const Icon(Icons.receipt_long),
+                label: 'tab_payslip'.tr,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.beach_access_outlined),
+                selectedIcon: const Icon(Icons.beach_access),
+                label: 'tab_leave'.tr,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.restaurant_menu_outlined),
+                selectedIcon: const Icon(Icons.restaurant_menu),
+                label: 'tab_menu'.tr,
+              ),
+            ],
+          ),
         ),
       ),
     );

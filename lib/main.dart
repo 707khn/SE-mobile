@@ -51,6 +51,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
+      // Smooth slide-in for pushed screens (reports, menu editor, …) instead
+      // of the abrupt default.
+      defaultTransition: Transition.cupertino,
+      transitionDuration: const Duration(milliseconds: 260),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
