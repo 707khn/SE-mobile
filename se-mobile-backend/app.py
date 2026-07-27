@@ -272,6 +272,7 @@ def create_app():
             _seed_kumarova,
             _seed_docx_employees_2026,
             _seed_org_directory,
+            _seed_otk_july_2026,
         ]:
             try:
                 _fn()
@@ -3823,6 +3824,82 @@ def _seed_org_directory():
         )
 
     db.session.commit()
+
+
+
+_OTK_DEPARTMENT = 'Отдел технического контроля (ОТК)'
+
+
+def _seed_otk_july_2026():
+    """Sample July 2026 turnstile traffic for the ОТК team.
+
+    The department had no access records, so their employee report was empty.
+    Times are derived from a hash of employee id + date: varied per person and
+    day, yet identical on every run, so re-seeding never shifts the data.
+    Employees who already have July 2026 records are left untouched.
+    """
+    import hashlib
+    from datetime import date as _date, timedelta
+
+    staff = Employee.query.filter_by(department=_OTK_DEPARTMENT).all()
+    if not staff:
+        return
+
+    first, last = _date(2026, 7, 1), _date(2026, 7, 31)
+    added = 0
+
+    for emp in staff:
+        already = AccessRecord.query.filter(
+            AccessRecord.employee_id == emp.employee_id,
+            AccessRecord.access_date >= first,
+            AccessRecord.access_date <= last,
+        ).first()
+        if already:
+            continue
+
+        day = first
+        while day <= last:
+            if day.weekday() >= 5:            # Saturday/Sunday
+                day += timedelta(days=1)
+                continue
+
+            seed = int(hashlib.md5(
+                f'{emp.employee_id}:{day.isoformat()}'.encode()).hexdigest(), 16)
+
+            # Roughly one absence per working month (leave, sick, off-site).
+            if seed % 25 == 0:
+                day += timedelta(days=1)
+                continue
+
+            punches = []
+            arrive_m = 7 * 60 + 35 + (seed % 31)          # 07:35–08:05
+            leave_m = 16 * 60 + 55 + ((seed >> 5) % 51)   # 16:55–17:45
+            punches.append((arrive_m, 'Вход'))
+
+            # About a third of days include a lunch run outside.
+            if (seed >> 11) % 3 == 0:
+                out_m = 11 * 60 + 55 + ((seed >> 17) % 11)
+                back_m = 13 * 60 + 10 + ((seed >> 23) % 26)
+                punches.append((out_m, 'Выход'))
+                punches.append((back_m, 'Вход'))
+
+            punches.append((leave_m, 'Выход'))
+
+            for minutes, event in punches:
+                db.session.add(AccessRecord(
+                    employee_id=emp.employee_id,
+                    access_date=day,
+                    access_time=f'{minutes // 60:02d}:{minutes % 60:02d}',
+                    event_type=event,
+                    door_location='Турникет 1',
+                ))
+                added += 1
+
+            day += timedelta(days=1)
+
+    if added:
+        db.session.commit()
+        logging.info(f'Seeded {added} July 2026 access records for {_OTK_DEPARTMENT}')
 
 
 app = create_app()
