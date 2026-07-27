@@ -11,6 +11,7 @@ class Employee(db.Model):
     full_name = db.Column(db.String(255), nullable=False)
     job_title = db.Column(db.String(100), nullable=False)
     iin = db.Column(db.String(12), unique=True, nullable=True)
+    department = db.Column(db.String(200))
 
     access_records = db.relationship('AccessRecord', backref='employee', lazy='dynamic')
     payslips = db.relationship('Payslip', backref='employee', lazy='dynamic')
