@@ -390,9 +390,12 @@ class _AdminPageState extends State<AdminPage> {
     } else {
       greetKey = 'greeting_evening';
     }
-    final firstName = widget.fullName.split(' ').first.isNotEmpty
-        ? widget.fullName.split(' ').first
-        : widget.fullName;
+    // ФИО format is "Фамилия Имя Отчество" — greet by the given name (2nd word),
+    // falling back to the first word for single-word names.
+    final _nameParts = widget.fullName.trim().split(RegExp(r'\s+'));
+    final firstName = (_nameParts.length >= 2 && _nameParts[1].isNotEmpty)
+        ? _nameParts[1]
+        : (_nameParts.isNotEmpty ? _nameParts.first : widget.fullName);
     final days = _lang == 'RU'
         ? ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
         : ['Дүйсенбі', 'Сейсенбі', 'Сәрсенбі', 'Бейсенбі', 'Жұма', 'Сенбі', 'Жексенбі'];
