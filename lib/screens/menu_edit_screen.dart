@@ -135,7 +135,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
         (_items.isNotEmpty ? _items.last.category : _suggestedCategories.first);
     final categoryController = TextEditingController(text: category);
 
-    final saved = await showDialog<bool>(
+    final action = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
@@ -194,8 +194,15 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
             ),
           ),
           actions: [
+            if (existing != null)
+              TextButton.icon(
+                onPressed: () => Navigator.pop(ctx, 'delete'),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: Text('remove_item'.tr),
+                style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+              ),
             TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
               child: Text('cancel'.tr),
             ),
             ElevatedButton(
@@ -204,7 +211,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
                     categoryController.text.trim().isEmpty) {
                   return;
                 }
-                Navigator.pop(ctx, true);
+                Navigator.pop(ctx, 'save');
               },
               child: Text('menu_save'.tr),
             ),
@@ -213,7 +220,11 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
       ),
     );
 
-    if (saved != true) return;
+    if (action == 'delete' && existing != null) {
+      _removeItem(existing);
+      return;
+    }
+    if (action != 'save') return;
     category = categoryController.text.trim();
     final name = nameController.text.trim();
     final price = double.tryParse(priceController.text.trim().replaceAll(',', '.'));
@@ -232,18 +243,24 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
   }
 
   void _removeItem(_MenuEntry item) {
+    final index = _items.indexOf(item);
+    if (index < 0) return;
     setState(() {
-      _items.remove(item);
+      _items.removeAt(index);
       _dirty = true;
     });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('menu_dish_removed'.tr),
-      behavior: SnackBarBehavior.floating,
-      action: SnackBarAction(
-        label: 'undo'.tr,
-        onPressed: () => setState(() => _items.add(item)),
-      ),
-    ));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('${'menu_dish_removed'.tr}: ${item.name}'),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'undo'.tr,
+          // Put it back where it was, so the section order is preserved.
+          onPressed: () => setState(
+              () => _items.insert(index.clamp(0, _items.length), item)),
+        ),
+      ));
   }
 
   Map<String, List<_MenuEntry>> get _grouped {
@@ -436,9 +453,22 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
                       fontWeight: FontWeight.w600,
                       color: AppColors.mainColor))
               : null,
-          trailing: IconButton(
-            icon: Icon(Icons.edit_outlined, size: 20, color: Colors.grey.shade600),
-            onPressed: () => _editItem(existing: item),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.edit_outlined,
+                    size: 20, color: Colors.grey.shade600),
+                tooltip: 'menu_edit_dish'.tr,
+                onPressed: () => _editItem(existing: item),
+              ),
+              IconButton(
+                icon: Icon(Icons.delete_outline,
+                    size: 20, color: Colors.red.shade400),
+                tooltip: 'remove_item'.tr,
+                onPressed: () => _removeItem(item),
+              ),
+            ],
           ),
           onTap: () => _editItem(existing: item),
         ),
