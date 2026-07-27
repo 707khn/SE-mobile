@@ -39,6 +39,24 @@ class SecureStorageHelper {
     await _storage.write(key: 'employeeId', value: id);
   }
 
+  /// Refreshes the cached profile after HR changes a job title or department,
+  /// so a signed-in user does not have to log out to pick the change up.
+  Future<void> saveProfile({
+    required String fullName,
+    required String job,
+    required String employeeId,
+  }) async {
+    if (employeeId.isNotEmpty) {
+      await _storage.write(key: 'employeeId', value: employeeId);
+    }
+    if (fullName.isNotEmpty) {
+      await _storage.write(key: 'fullName', value: fullName);
+    }
+    if (job.isNotEmpty) {
+      await _storage.write(key: 'job', value: job);
+    }
+  }
+
   Future<String?> getFullName() async {
     return await _storage.read(key: 'fullName');
   }

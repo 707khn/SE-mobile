@@ -43,7 +43,7 @@ class _HomeShellState extends State<HomeShell> {
             MainPage1(fullName: widget.fullName, job: widget.job),
             PayslipPage(onBack: () => _navigateTo(0)),
             LeavePage(onBack: () => _navigateTo(0)),
-            MenuScreen(onBack: () => _navigateTo(0)),
+            MenuScreen(onBack: () => _navigateTo(0), job: widget.job),
           ],
         ),
         bottomNavigationBar: BottomNavigationBar(

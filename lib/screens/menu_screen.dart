@@ -5,14 +5,19 @@ import 'package:intl/intl.dart';
 import '../requests/menu_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/role_helper.dart';
 import '../widgets/custom_text.dart';
+import 'menu_edit_screen.dart';
 
 class MenuScreen extends StatefulWidget {
-  const MenuScreen({Key? key, this.onBack}) : super(key: key);
+  const MenuScreen({Key? key, this.onBack, this.job = ''}) : super(key: key);
 
   /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
   /// is shown that runs this callback instead of popping the route.
   final VoidCallback? onBack;
+
+  /// Job title of the signed-in user; the canteen technologist may edit menus.
+  final String job;
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -94,6 +99,15 @@ class _MenuScreenState extends State<MenuScreen> {
               tooltip: 'today'.tr,
               onPressed: () {
                 setState(() => _selectedDate = DateTime.now());
+                _loadMenu();
+              },
+            ),
+          if (isCanteenTech(widget.job))
+            IconButton(
+              icon: const Icon(Icons.edit_calendar),
+              tooltip: 'menu_edit_title'.tr,
+              onPressed: () async {
+                await Get.to(() => MenuEditScreen(initialDate: _selectedDate));
                 _loadMenu();
               },
             ),

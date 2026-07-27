@@ -116,10 +116,10 @@ class MyApp extends StatelessWidget {
     final secure = SecureStorageHelper.instance;
     final isLogged = await secure.isLoggedIn();
     if (isLogged) {
-      final empId = await secure.getEmployeeId();
-      if (empId == null || empId.isEmpty) {
-        await _refreshEmployeeId(secure);
-      }
+      // Always re-read the profile: job title and department drive which
+      // screens a user sees, and HR edits them server-side. Offline, the
+      // cached values below are used unchanged.
+      await _refreshProfile(secure);
       return {
         'loggedIn': 'true',
         'fullName': await secure.getFullName(),
@@ -130,7 +130,7 @@ class MyApp extends StatelessWidget {
     }
   }
 
-  Future<void> _refreshEmployeeId(SecureStorageHelper secure) async {
+  Future<void> _refreshProfile(SecureStorageHelper secure) async {
     final login = await secure.getLogin();
     final password = await secure.getPassword();
     if (login == null || login.isEmpty || password == null || password.isEmpty) return;
@@ -143,10 +143,11 @@ class MyApp extends StatelessWidget {
       if (r.statusCode == 200) {
         final b = jsonDecode(r.body) as Map<String, dynamic>;
         if (b['message'] == 'Success') {
-          final fresh = (b['employee_id'] as String?) ?? '';
-          if (fresh.isNotEmpty) {
-            await secure.saveEmployeeId(fresh);
-          }
+          await secure.saveProfile(
+            fullName: (b['full_name'] as String?) ?? '',
+            job: (b['job'] as String?) ?? '',
+            employeeId: (b['employee_id'] as String?) ?? '',
+          );
         }
       }
     } catch (_) {}
