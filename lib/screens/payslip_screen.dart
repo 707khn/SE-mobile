@@ -233,7 +233,19 @@ class _PayslipPageState extends State<PayslipPage> {
       ),
       body: RefreshIndicator(
         onRefresh: _fetchPayslip,
-        child: SingleChildScrollView(
+        // Swipe left/right anywhere on the page to move between months.
+        child: GestureDetector(
+          onHorizontalDragEnd: _loading
+              ? null
+              : (details) {
+                  final v = details.primaryVelocity ?? 0;
+                  if (v > 250) {
+                    _goToPrevMonth();
+                  } else if (v < -250 && !_isCurrentOrFutureMonth) {
+                    _goToNextMonth();
+                  }
+                },
+          child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.all(Dimensions.width20),
           child: Column(
@@ -410,6 +422,7 @@ class _PayslipPageState extends State<PayslipPage> {
                       ),
               ),
             ],
+          ),
           ),
         ),
       ),

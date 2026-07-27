@@ -91,6 +91,7 @@ class LoginButtonState extends State<LoginButton> with SingleTickerProviderState
               borderRadius: BorderRadius.all(Radius.circular(Dimensions.radius25)),
             ),
             minimumSize: Size(Dimensions.width120 * 1.2, Dimensions.height30),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
           ),
           onPressed: _loading ? null : submit,
           child: _loading

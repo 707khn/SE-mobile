@@ -69,7 +69,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   String get _dateLabel {
     if (_isToday) return 'today'.tr;
-    return DateFormat('d MMMM yyyy', Get.locale?.languageCode == 'KZ' ? 'ru' : 'ru').format(_selectedDate);
+    return DateFormat('d MMMM yyyy', 'ru').format(_selectedDate);
   }
 
   @override

@@ -37,9 +37,16 @@ class CustomFormState extends State<CustomForm> {
   static TextEditingController passwordController = TextEditingController();
 
   final _loginButtonKey = GlobalKey<LoginButtonState>();
+  final _passwordFocus = FocusNode();
 
   static String _lang = "";
   late SharedPreferences prefs;
+
+  @override
+  void dispose() {
+    _passwordFocus.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -50,7 +57,7 @@ class CustomFormState extends State<CustomForm> {
   Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "KZ");
+      prefs.setString(AppValues.LANG, "RU");
     }
     setState(() {
       _lang = prefs.getString(AppValues.LANG)!;
@@ -82,10 +89,9 @@ class CustomFormState extends State<CustomForm> {
             color: AppColors.niceWhite,
             boxShadow: const [
               BoxShadow(
-                color: Colors.black87,
-                offset: Offset(0, 0),
-                blurRadius: 20,
-                spreadRadius: 3,
+                color: Colors.black38,
+                offset: Offset(0, 8),
+                blurRadius: 24,
               )
             ],
             borderRadius: BorderRadius.all(Radius.circular(Dimensions.radius25 * 0.8)),
@@ -122,9 +128,10 @@ class CustomFormState extends State<CustomForm> {
                 controller: loginController,
                 fontSize: Dimensions.fontSize20,
                 backgroundColor: AppColors.loginField,
-                keyboardType: TextInputType.text,
+                keyboardType: TextInputType.number,
                 maxLength: 20,
-                onSubmitted: () => _loginButtonKey.currentState?.submit(),
+                textInputAction: TextInputAction.next,
+                onSubmitted: () => _passwordFocus.requestFocus(),
               ),
               SizedBox(height: Dimensions.height30 / 3),
               CustomLoginField(
@@ -133,40 +140,22 @@ class CustomFormState extends State<CustomForm> {
                 controller: passwordController,
                 fontSize: Dimensions.fontSize20,
                 backgroundColor: AppColors.loginField,
-                keyboardType: TextInputType.text,
+                keyboardType: TextInputType.number,
                 maxLength: 50,
+                focusNode: _passwordFocus,
                 onSubmitted: () => _loginButtonKey.currentState?.submit(),
               ),
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () {
-                    loginController.text = '2114';
-                    passwordController.text = '2114';
-                  },
-                  child: Text(
-                    'Демо: 2114 / 2114',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.mainColor,
-                    ),
-                  ),
-                ),
-              ),
               SizedBox(height: Dimensions.height30),
-              LoginButton(
-                key: _loginButtonKey,
-                inButton: BigText(
-                  fontWeight: FontWeight.bold,
-                  overflow: TextOverflow.visible,
-                  content: "log in".tr,
-                  color: AppColors.niceWhite,
+              SizedBox(
+                width: double.infinity,
+                child: LoginButton(
+                  key: _loginButtonKey,
+                  inButton: BigText(
+                    fontWeight: FontWeight.bold,
+                    overflow: TextOverflow.visible,
+                    content: "log in".tr,
+                    color: AppColors.niceWhite,
+                  ),
                 ),
               ),
             ],

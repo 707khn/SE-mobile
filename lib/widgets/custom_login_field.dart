@@ -15,6 +15,8 @@ class CustomLoginField extends StatefulWidget {
     this.onSubmitted,
     this.keyboardType = TextInputType.number,
     this.maxLength = 12,
+    this.textInputAction = TextInputAction.done,
+    this.focusNode,
   }) : super(key: key);
 
   final String hintText;
@@ -26,6 +28,10 @@ class CustomLoginField extends StatefulWidget {
   final VoidCallback? onSubmitted;
   final TextInputType keyboardType;
   final int maxLength;
+  final TextInputAction textInputAction;
+
+  /// Optional external focus node (e.g. so a previous field can focus this one).
+  final FocusNode? focusNode;
 
   @override
   _CustomLoginFieldState createState() => _CustomLoginFieldState();
@@ -33,22 +39,26 @@ class CustomLoginField extends StatefulWidget {
 
 class _CustomLoginFieldState extends State<CustomLoginField> {
   late FocusNode _focusNode;
+  bool _ownsFocusNode = false;
   bool _isFocused = false;
   bool _hasText = false;
+  late bool _obscured;
 
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
+    _focusNode = widget.focusNode ?? FocusNode();
+    _ownsFocusNode = widget.focusNode == null;
     _focusNode.addListener(_onFocusChange);
     widget.controller?.addListener(_onTextChange);
     _hasText = widget.controller?.text.isNotEmpty ?? false;
+    _obscured = widget.obscureText;
   }
 
   @override
   void dispose() {
     _focusNode.removeListener(_onFocusChange);
-    _focusNode.dispose();
+    if (_ownsFocusNode) _focusNode.dispose();
     widget.controller?.removeListener(_onTextChange);
     super.dispose();
   }
@@ -80,8 +90,8 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
         child: TextField(
           keyboardType: widget.keyboardType,
           maxLength: widget.maxLength,
-          textInputAction: TextInputAction.done,
-          obscureText: widget.obscureText,
+          textInputAction: widget.textInputAction,
+          obscureText: _obscured,
           controller: widget.controller,
           focusNode: _focusNode,
           onSubmitted: (_) => widget.onSubmitted?.call(),
@@ -96,28 +106,44 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
             counterText: '',
             hintText: widget.hintText,
             hintStyle: const TextStyle(color: Colors.grey),
-            suffixIcon: _hasText
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
-                    onPressed: () => widget.controller?.clear(),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.content_paste_rounded, size: 18, color: Colors.grey),
-                    onPressed: () async {
-                      final data = await Clipboard.getData(Clipboard.kTextPlain);
-                      final text = data?.text?.trim() ?? '';
-                      if (text.isNotEmpty && widget.controller != null) {
-                        widget.controller!.value = TextEditingValue(
-                          text: text,
-                          selection: TextSelection.collapsed(offset: text.length),
-                        );
-                      }
-                    },
-                  ),
+            suffixIcon: _buildSuffixIcon(),
             suffixIconConstraints: const BoxConstraints(),
           ),
         ),
       ),
+    );
+  }
+
+  // Password fields get a show/hide toggle; plain fields keep clear/paste.
+  Widget _buildSuffixIcon() {
+    if (widget.obscureText) {
+      return IconButton(
+        icon: Icon(
+          _obscured ? Icons.visibility_off : Icons.visibility,
+          size: 20,
+          color: Colors.grey,
+        ),
+        onPressed: () => setState(() => _obscured = !_obscured),
+      );
+    }
+    if (_hasText) {
+      return IconButton(
+        icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
+        onPressed: () => widget.controller?.clear(),
+      );
+    }
+    return IconButton(
+      icon: const Icon(Icons.content_paste_rounded, size: 18, color: Colors.grey),
+      onPressed: () async {
+        final data = await Clipboard.getData(Clipboard.kTextPlain);
+        final text = data?.text?.trim() ?? '';
+        if (text.isNotEmpty && widget.controller != null) {
+          widget.controller!.value = TextEditingValue(
+            text: text,
+            selection: TextSelection.collapsed(offset: text.length),
+          );
+        }
+      },
     );
   }
 }
