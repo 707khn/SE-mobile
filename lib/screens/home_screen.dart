@@ -6,8 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
+import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
+import 'attendance_screen.dart';
+import 'main_screen_2.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -138,6 +141,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: const Color(0xFFC62828),
                   onTap: () => widget.onNavigate(4),
                 ),
+                // Managers keep their team-wide screens, now inside the shell.
+                if (isAdminRole(widget.job)) ...[
+                  _buildActionCard(
+                    icon: Icons.groups,
+                    label: 'employee report'.tr,
+                    subtitle: 'employee_report_subtitle'.tr,
+                    color: const Color(0xFF6A1B9A),
+                    onTap: () => Get.to(() => MainPage2(
+                          fullName: widget.fullName,
+                          job: widget.job,
+                        )),
+                  ),
+                  _buildActionCard(
+                    icon: Icons.badge_outlined,
+                    label: 'attendance'.tr,
+                    subtitle: 'attendance_subtitle'.tr,
+                    color: const Color(0xFF00695C),
+                    onTap: () => Get.to(() => const AttendanceScreen()),
+                  ),
+                ],
               ],
             ),
             SizedBox(height: Dimensions.height30),
@@ -277,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 label,
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 3),

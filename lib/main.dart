@@ -4,17 +4,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:se_mobile/screens/admin_screen.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/colors.dart';
 import 'package:se_mobile/utils/localization.dart';
-import 'package:se_mobile/utils/role_helper.dart';
 import 'package:se_mobile/utils/variables.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/home_shell.dart';
-import 'screens/main_screen_1.dart';
-import 'screens/main_screen_2.dart';
 import 'utils/secure_storage_helper.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
@@ -105,11 +101,7 @@ class MyApp extends StatelessWidget {
             if (data != null && data['loggedIn'] == 'true'){
               String fullName = data['fullName'] ?? '';
               String job = data['job'] ?? '';
-              if (isAdminRole(job)){
-                return AdminPage(fullName: fullName, job: job);
-              } else {
-                return HomeShell(fullName: fullName, job: job);
-              }
+              return HomeShell(fullName: fullName, job: job);
             } else {
               return const StartPage();
             }

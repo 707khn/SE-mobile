@@ -3,11 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
-import 'package:se_mobile/screens/admin_screen.dart';
 import '../screens/home_shell.dart';
-import '../screens/main_screen_1.dart';
 import '../utils/dimensions.dart';
-import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
@@ -36,11 +33,9 @@ Future<void> loginToAccount(String login, String password, BuildContext context)
           job: job,
           employeeId: employeeId,
         );
-        if (isAdminRole(job)) {
-          Get.to(() => AdminPage(fullName: fullName, job: job));
-        } else {
-          Get.to(() => HomeShell(fullName: fullName, job: job));
-        }
+        // Everyone gets the bottom-nav shell; admin-only screens are surfaced
+        // as extra quick-access cards inside it.
+        Get.to(() => HomeShell(fullName: fullName, job: job));
       } else {
         if (!context.mounted) return;
         showDialog(
