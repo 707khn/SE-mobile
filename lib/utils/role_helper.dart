@@ -7,6 +7,10 @@ bool isAdminRole(String job) {
       lower.contains('заместитель');
 }
 
+/// The system administrator account, which may inspect any employee.
+bool isSystemAdmin(String job) =>
+    job.toLowerCase().contains('администратор системы');
+
 bool isCanteenTech(String job) {
   final lower = job.toLowerCase();
   return lower.contains('технолог') && lower.contains('столов');

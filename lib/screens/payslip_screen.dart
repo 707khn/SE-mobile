@@ -10,11 +10,16 @@ import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 
 class PayslipPage extends StatefulWidget {
-  const PayslipPage({Key? key, this.onBack}) : super(key: key);
+  const PayslipPage({Key? key, this.onBack, this.employeeId, this.employeeName})
+      : super(key: key);
 
   /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
   /// is shown that runs this callback instead of popping the route.
   final VoidCallback? onBack;
+
+  /// Set by the admin panel to show somebody else's payslip.
+  final String? employeeId;
+  final String? employeeName;
 
   @override
   State<PayslipPage> createState() => _PayslipPageState();
@@ -49,6 +54,7 @@ class _PayslipPageState extends State<PayslipPage> {
       final data = await fetchPayslip(
         _selectedDate.month.toString().padLeft(2, '0'),
         _selectedDate.year.toString(),
+        employeeId: widget.employeeId,
       );
       if (!mounted) return;
       setState(() {
@@ -215,7 +221,9 @@ class _PayslipPageState extends State<PayslipPage> {
                 onPressed: widget.onBack,
               )
             : null,
-        title: BigText(content: 'payslip'.tr, fontWeight: FontWeight.bold),
+        title: BigText(
+            content: widget.employeeName ?? 'payslip'.tr,
+            fontWeight: FontWeight.bold),
         centerTitle: true,
         actions: [
           if (_payslip != null)

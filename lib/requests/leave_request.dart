@@ -72,8 +72,11 @@ Future<String?> _resolveEmployeeId() async {
   return null;
 }
 
-Future<LeaveData?> getLeaves(BuildContext context) async {
-  final login = await _resolveEmployeeId();
+/// [employeeId] overrides the signed-in user — used by the admin panel.
+Future<LeaveData?> getLeaves(BuildContext context, {String? employeeId}) async {
+  final login = (employeeId != null && employeeId.isNotEmpty)
+      ? employeeId
+      : await _resolveEmployeeId();
   if (login == null || login.isEmpty) return null;
 
   try {

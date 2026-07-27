@@ -9,6 +9,7 @@ import '../utils/logout_helper.dart';
 import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
+import 'admin_panel_screen.dart';
 import 'attendance_screen.dart';
 import 'main_screen_2.dart';
 
@@ -141,6 +142,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: const Color(0xFFC62828),
                   onTap: () => widget.onNavigate(4),
                 ),
+                if (isSystemAdmin(widget.job))
+                  _buildActionCard(
+                    icon: Icons.admin_panel_settings,
+                    label: 'admin_panel'.tr,
+                    subtitle: 'admin_panel_subtitle'.tr,
+                    color: const Color(0xFF4527A0),
+                    onTap: () => Get.to(() => const AdminPanelScreen()),
+                  ),
                 // Managers keep their team-wide screens, now inside the shell.
                 if (isAdminRole(widget.job)) ...[
                   _buildActionCard(

@@ -9,7 +9,10 @@ import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 
 class LeavePage extends StatefulWidget {
-  const LeavePage({Key? key, this.onBack}) : super(key: key);
+  const LeavePage({Key? key, this.onBack, this.employeeId}) : super(key: key);
+
+  /// Set by the admin panel to show somebody else's leave.
+  final String? employeeId;
 
   /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
   /// is shown that runs this callback instead of popping the route.
@@ -37,7 +40,7 @@ class _LeavePageState extends State<LeavePage> {
       _leaveData = null;
     });
 
-    final data = await getLeaves(context);
+    final data = await getLeaves(context, employeeId: widget.employeeId);
 
     if (!mounted) return;
     setState(() {

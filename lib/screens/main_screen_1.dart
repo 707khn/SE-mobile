@@ -31,8 +31,17 @@ class MainPage1 extends StatefulWidget {
   /// icon so it stays reachable.
   final VoidCallback? onBack;
 
+  /// Set by the admin panel to show somebody else's turnstile report. The
+  /// profile drawer and logout are hidden then — they belong to the viewer,
+  /// not the person being inspected.
+  final String? employeeId;
+
   const MainPage1(
-      {Key? key, required this.fullName, required this.job, this.onBack})
+      {Key? key,
+      required this.fullName,
+      required this.job,
+      this.onBack,
+      this.employeeId})
       : super(key: key);
 
   @override
@@ -116,10 +125,14 @@ class _MainPage1State extends State<MainPage1> {
               },
             ),
           ),
+          // Viewing somebody else from the admin panel: neither the viewer's
+          // profile nor logout belongs here.
+          if (widget.employeeId != null)
+            const SizedBox.shrink()
           // In tab mode the hamburger is replaced by the back arrow, so the
           // profile drawer opens from this trailing icon instead. Logout
           // stays on the standalone variant only — the Home tab already has it.
-          if (widget.onBack != null)
+          else if (widget.onBack != null)
             IconButton(
               icon: const Icon(Icons.account_circle_outlined),
               tooltip: 'profile'.tr,
@@ -133,7 +146,9 @@ class _MainPage1State extends State<MainPage1> {
             ),
         ],
       ),
-      drawer: Theme(
+      drawer: widget.employeeId != null
+          ? null
+          : Theme(
         data: Theme.of(context).copyWith(
           canvasColor: Theme.of(context).scaffoldBackgroundColor,
         ),
@@ -296,7 +311,10 @@ class _MainPage1State extends State<MainPage1> {
           ),
         ),
       ),
-      body: MainMenu1(recordCount: _recordCount, dateRange: _dateRange),
+      body: MainMenu1(
+          recordCount: _recordCount,
+          dateRange: _dateRange,
+          employeeId: widget.employeeId),
     );
   }
 
@@ -318,8 +336,14 @@ class _MainPage1State extends State<MainPage1> {
 }
 
 class MainMenu1 extends StatefulWidget {
-  const MainMenu1({Key? key, required this.recordCount, required this.dateRange}) : super(key: key);
+  const MainMenu1(
+      {Key? key,
+      required this.recordCount,
+      required this.dateRange,
+      this.employeeId})
+      : super(key: key);
 
+  final String? employeeId;
   final ValueNotifier<int> recordCount;
   final ValueNotifier<String> dateRange;
 
@@ -375,6 +399,7 @@ class _MainMenu1State extends State<MainMenu1> {
       context,
       DateFormat('yyyy-MM-dd').format(startDate),
       DateFormat('yyyy-MM-dd').format(endDate),
+      employeeId: widget.employeeId,
     );
     if (!mounted) return;
     setState(() => _loadingReport = false);

@@ -112,12 +112,16 @@ PayslipItem _toItem(dynamic e) {
   );
 }
 
-Future<PayslipData> fetchPayslip(String month, String year) =>
-    _fetchPayslip(month, year, 0);
+/// [employeeId] overrides the signed-in user — used by the admin panel to read
+/// somebody else's payslip.
+Future<PayslipData> fetchPayslip(String month, String year, {String? employeeId}) =>
+    _fetchPayslip(month, year, 0, employeeId);
 
-Future<PayslipData> _fetchPayslip(String month, String year, int attempt) async {
+Future<PayslipData> _fetchPayslip(
+    String month, String year, int attempt, String? overrideId) async {
   // Re-authenticate on every attempt so a fresh employee_id is used after wake-up.
-  final employeeId = await _freshEmployeeId();
+  final employeeId =
+      (overrideId != null && overrideId.isNotEmpty) ? overrideId : await _freshEmployeeId();
   if (employeeId == null || employeeId.isEmpty) {
     throw const PayslipException(PayslipErrorKind.notFound);
   }
@@ -138,7 +142,7 @@ Future<PayslipData> _fetchPayslip(String month, String year, int attempt) async 
     // Retry up to 3 times (20 s apart) so the total wait covers the full wake-up window.
     if (attempt < 3) {
       await Future.delayed(const Duration(seconds: 20));
-      return _fetchPayslip(month, year, attempt + 1);
+      return _fetchPayslip(month, year, attempt + 1, overrideId);
     }
     throw const PayslipException(PayslipErrorKind.network);
   }

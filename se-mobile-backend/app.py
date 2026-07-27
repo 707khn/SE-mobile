@@ -201,6 +201,7 @@ def _seed_sarseken():
 
 # login → (password, employee_id)
 _CREDENTIALS = {
+    'admin': ('admin', 'ADMIN'),
     '2114': ('2114', '001'),
     '1874': ('1874', '0000001874'),
     '44': ('44', '0000000044'),
@@ -271,6 +272,7 @@ def create_app():
             _seed_kumarova,
             _seed_docx_employees_2026,
             _seed_org_directory,
+            _seed_admin_account,
             _seed_otk_july_2026,
             _remove_departed_employees,
         ]:
@@ -415,6 +417,36 @@ def register_routes(app):
             'message': 'Success',
             'director_report': [_access_to_dict(r) for r in records]
         })
+
+    @app.route('/api/admin/employees', methods=['GET'])
+    def admin_employees():
+        """Full staff directory for the admin panel, with what data each has."""
+        from sqlalchemy import func as sa_func
+
+        payslip_counts = dict(
+            db.session.query(Payslip.employee_id, sa_func.count(Payslip.id))
+            .group_by(Payslip.employee_id).all())
+        access_counts = dict(
+            db.session.query(AccessRecord.employee_id, sa_func.count(AccessRecord.id))
+            .group_by(AccessRecord.employee_id).all())
+        leave_counts = dict(
+            db.session.query(LeaveBalance.employee_id, sa_func.count(LeaveBalance.id))
+            .group_by(LeaveBalance.employee_id).all())
+        logins = {emp_id: login for login, (_, emp_id) in _CREDENTIALS.items()}
+
+        employees = [{
+            'employee_id': e.employee_id,
+            'full_name': e.full_name,
+            'job_title': e.job_title,
+            'department': e.department or '',
+            'iin': e.iin or '',
+            'login': logins.get(e.employee_id, ''),
+            'payslip_count': payslip_counts.get(e.employee_id, 0),
+            'access_count': access_counts.get(e.employee_id, 0),
+            'leave_count': leave_counts.get(e.employee_id, 0),
+        } for e in Employee.query.order_by(Employee.full_name).all()]
+
+        return jsonify({'message': 'Success', 'employees': employees})
 
     @app.route('/get_sname', methods=['POST'])
     def get_sname():
@@ -3854,6 +3886,29 @@ def _remove_departed_employees():
             db.session.delete(emp)
         logging.info(f'Removed departed employee {emp_id}')
 
+    db.session.commit()
+
+
+
+_ADMIN_EMPLOYEE_ID = 'ADMIN'
+
+
+def _seed_admin_account():
+    """Create the system administrator account used by the in-app admin panel.
+
+    Deliberately has no department: /get_sname falls back to listing everyone
+    when the requester has none, so the admin sees the whole company.
+    """
+    admin = Employee.query.get(_ADMIN_EMPLOYEE_ID)
+    if admin:
+        admin.job_title = 'Администратор системы'
+        admin.department = None
+    else:
+        db.session.add(Employee(
+            employee_id=_ADMIN_EMPLOYEE_ID,
+            full_name='Администратор системы',
+            job_title='Администратор системы',
+        ))
     db.session.commit()
 
 

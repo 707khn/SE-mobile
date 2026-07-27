@@ -6,8 +6,12 @@ import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
-Future<List<List<String>>> getReportDateEntries(BuildContext context, startdate, enddate) async {
-  final login = await SecureStorageHelper.instance.getEmployeeId();
+/// [employeeId] overrides the signed-in user — used by the admin panel.
+Future<List<List<String>>> getReportDateEntries(BuildContext context, startdate, enddate,
+    {String? employeeId}) async {
+  final login = (employeeId != null && employeeId.isNotEmpty)
+      ? employeeId
+      : await SecureStorageHelper.instance.getEmployeeId();
 
   try {
     var response = await http
