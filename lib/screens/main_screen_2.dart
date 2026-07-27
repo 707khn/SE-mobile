@@ -571,12 +571,15 @@ class _MainPage2State extends State<MainPage2> {
                   await showDialog(
                     context: context,
                     builder: (BuildContext context) {
-                      return AlertDialog(
+                      // The dialog lives on its own route, so it needs local
+                      // state — the page's setState would not rebuild it.
+                      return StatefulBuilder(
+                        builder: (context, setDialogState) => AlertDialog(
                         title: TextField(
                           controller: employeeController,
                           autofocus: true,
                           onChanged: (value) {
-                            setState(() {
+                            setDialogState(() {
                               searchText = value;
                               filteredEmployees = allEmployees
                                   .where((e) => e.toLowerCase().contains(value.toLowerCase()))
@@ -591,7 +594,7 @@ class _MainPage2State extends State<MainPage2> {
                                     icon: const Icon(Icons.clear),
                                     onPressed: () {
                                       employeeController.clear();
-                                      setState(() {
+                                      setDialogState(() {
                                         searchText = '';
                                         filteredEmployees = allEmployees;
                                       });
@@ -600,10 +603,12 @@ class _MainPage2State extends State<MainPage2> {
                                 : null,
                           ),
                         ),
-                        content: SingleChildScrollView(
-                          child: SizedBox(
+                        // A single bounded scrollable: nesting a shrink-wrapped
+                        // ListView inside a SingleChildScrollView left the list
+                        // unable to scroll to its last entries.
+                        content: SizedBox(
                             width: double.maxFinite,
-                            height: Dimensions.height120 * 3,
+                            height: MediaQuery.of(context).size.height * 0.4,
                             child: FutureBuilder(
                               future: _getEmployeesCached(),
                               builder: (BuildContext context, snapshot) {
@@ -624,7 +629,6 @@ class _MainPage2State extends State<MainPage2> {
                                     );
                                   }
                                   return ListView(
-                                    shrinkWrap: true,
                                     children: displayed.map((employee) {
                                       return ListTile(
                                         title: Text(employee),
@@ -669,7 +673,6 @@ class _MainPage2State extends State<MainPage2> {
                                 }
                               },
                             ),
-                          ),
                         ),
                         actions: [
                           TextButton(
@@ -677,6 +680,7 @@ class _MainPage2State extends State<MainPage2> {
                             child: Text('cancel'.tr),
                           ),
                         ],
+                      ),
                       );
                     },
                   );
