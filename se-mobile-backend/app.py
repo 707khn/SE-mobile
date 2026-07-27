@@ -207,7 +207,6 @@ _CREDENTIALS = {
     '644': ('644', '0000000644'),
     '674': ('674', '0000000674'),
     '726': ('726', '0000000726'),
-    '820': ('820', '0000000820'),
     '910': ('910', '0000000910'),
     '1093': ('1093', '0000001093'),
     '1236': ('1236', '0000001236'),
@@ -273,6 +272,7 @@ def create_app():
             _seed_docx_employees_2026,
             _seed_org_directory,
             _seed_otk_july_2026,
+            _remove_departed_employees,
         ]:
             try:
                 _fn()
@@ -1895,7 +1895,6 @@ _DOCX_EMPLOYEES = [
     ('0000000644', 'Жиешев Кайрат Казахстанович', 'Заведующий складом'),
     ('0000000674', 'Жолдыбалинова Альмира Аманбековна', 'Заведующий складом'),
     ('0000000726', 'Саманова Жулдыз Аргымбаевна', 'Бухгалтер'),
-    ('0000000820', 'Фадеев Юрий Борисович', 'Контрольный мастер'),
     ('0000000910', 'Кузбаев Канат Мукаметканович', 'Начальник отдела'),
     ('0000001093', 'Павленко Александр Александрович', 'Контрольный мастер'),
     ('0000001236', 'Бахтинова Малика Жумабековна', 'Заместитель главного бухгалтера'),
@@ -2239,83 +2238,6 @@ _DOCX_PAYSLIPS = [
             ('Профсоюзный сбор', 3673.0, 'Апр 26'),
             ('ИПН исчисленный', 24188.0, 'Апр 26'),
             ('ОПВ исчисленные', 41293.0, 'Апр 26'),
-        ],
-    },
-    {
-        'employee_id': '0000000820', 'month': 1, 'year': 2026,
-        'display': 'Январь 2026',
-        'total_accruals': 365648.0, 'total_deductions': 65743.0, 'net_pay': 299905.0,
-        'total_paid': 0.0, 'debt_start': 0.0, 'debt_end': 0.0,
-        'salary_rate': 413578.0, 'position': 'Контрольный мастер', 'department': 'Отдел технического контроля',
-        'accruals': [
-            ('Оклад по дням', 326509.0, 'Янв 26', 15, 120.0),
-            ('Выплаты вследствии экологического бедствия', 6488.0, 'Янв 26', None, None),
-            ('Доплата за выслугу лет (по дням)', 32651.0, 'Янв 26', 15, 120.0),
-        ],
-        'deductions': [
-            ('Питание', 631.0, 'Янв 26'),
-            ('Профсоюзный сбор', 3265.0, 'Янв 26'),
-            ('ИПН исчисленный', 18618.0, 'Янв 26'),
-            ('ОПВ исчисленные', 35916.0, 'Янв 26'),
-            ('Взносы ОСМС исчисленные', 7313.0, 'Янв 26'),
-        ],
-    },
-    {
-        'employee_id': '0000000820', 'month': 2, 'year': 2026,
-        'display': 'Февраль 2026',
-        'total_accruals': 461424.0, 'total_deductions': 86431.0, 'net_pay': 374993.0,
-        'total_paid': 0.0, 'debt_start': 0.0, 'debt_end': 0.0,
-        'salary_rate': 413578.0, 'position': 'Контрольный мастер', 'department': 'Отдел технического контроля',
-        'accruals': [
-            ('Оклад по дням', 413578.0, 'Фев 26', 20, 160.0),
-            ('Выплаты вследствии экологического бедствия', 6488.0, 'Фев 26', None, None),
-            ('Доплата за выслугу лет (по дням)', 41358.0, 'Фев 26', 20, 160.0),
-        ],
-        'deductions': [
-            ('Питание', 527.0, 'Фев 26'),
-            ('Профсоюзный сбор', 4136.0, 'Фев 26'),
-            ('ИПН исчисленный', 27046.0, 'Фев 26'),
-            ('ОПВ исчисленные', 45494.0, 'Фев 26'),
-            ('Взносы ОСМС исчисленные', 9228.0, 'Фев 26'),
-        ],
-    },
-    {
-        'employee_id': '0000000820', 'month': 3, 'year': 2026,
-        'display': 'Март 2026',
-        'total_accruals': 1838348.0, 'total_deductions': 369758.0, 'net_pay': 1468590.0,
-        'total_paid': 0.0, 'debt_start': 0.0, 'debt_end': 0.0,
-        'salary_rate': 413578.0, 'position': 'Контрольный мастер', 'department': 'Отдел технического контроля',
-        'accruals': [
-            ('Оклад по дням', 344648.0, 'Мар 26', 15, 120.0),
-            ('Выплаты вследствии экологического бедствия', 6488.0, 'Мар 26', None, None),
-            ('Доплата за выслугу лет (по дням)', 34465.0, 'Мар 26', 15, 120.0),
-            ('Материальная помощь', 827156.0, 'Мар 26', None, None),
-            ('Оплата отпуска', 113744.0, '26-31 Мар 26', 4, 32.0),
-            ('Оплата отпуска', 369667.0, '1-19 Апр 26', 13, 104.0),
-            ('Оплата отпуска', 142180.0, '20-24 Апр 26', 5, 40.0),
-        ],
-        'deductions': [
-            ('Профсоюзный сбор', 3446.0, 'Мар 26'),
-            ('ИПН исчисленный', 148793.0, 'Мар 26'),
-            ('ОПВ исчисленные', 183519.0, 'Мар 26'),
-            ('Взносы ОСМС исчисленные', 34000.0, 'Мар 26'),
-        ],
-    },
-    {
-        'employee_id': '0000000820', 'month': 4, 'year': 2026,
-        'display': 'Апрель 2026',
-        'total_accruals': 89204.0, 'total_deductions': 10808.0, 'net_pay': 78396.0,
-        'total_paid': 0.0, 'debt_start': 0.0, 'debt_end': 0.0,
-        'salary_rate': 413578.0, 'position': 'Контрольный мастер', 'department': 'Отдел технического контроля',
-        'accruals': [
-            ('Оклад по дням', 75196.0, 'Апр 26', 4, 32.0),
-            ('Выплаты вследствии экологического бедствия', 6488.0, 'Апр 26', None, None),
-            ('Доплата за выслугу лет (по дням)', 7520.0, 'Апр 26', 4, 32.0),
-        ],
-        'deductions': [
-            ('Профсоюзный сбор', 752.0, 'Апр 26'),
-            ('ОПВ исчисленные', 8272.0, 'Апр 26'),
-            ('Взносы ОСМС исчисленные', 1784.0, 'Апр 26'),
         ],
     },
     {
@@ -3900,6 +3822,39 @@ def _seed_otk_july_2026():
     if added:
         db.session.commit()
         logging.info(f'Seeded {added} July 2026 access records for {_OTK_DEPARTMENT}')
+
+
+
+# Employees who have left the company. Their seed data is gone from the tables
+# above, but the live database still holds rows from earlier deployments.
+_DEPARTED_EMPLOYEES = ['0000000820']  # Фадеев Юрий Борисович
+
+
+def _remove_departed_employees():
+    """Purge employees who no longer work here, along with everything of theirs.
+
+    Deleting the Payslip rows through the ORM lets the configured cascades take
+    out the accrual/deduction/paid children. Idempotent: a second run finds
+    nothing to remove.
+    """
+    for emp_id in _DEPARTED_EMPLOYEES:
+        emp = Employee.query.get(emp_id)
+        payslips = Payslip.query.filter_by(employee_id=emp_id).all()
+        if not emp and not payslips:
+            continue
+
+        for slip in payslips:
+            db.session.delete(slip)
+
+        for model in (AccessRecord, LeaveBalance, LeaveHistory,
+                      FcmToken, TurnstileEvent):
+            model.query.filter_by(employee_id=emp_id).delete()
+
+        if emp:
+            db.session.delete(emp)
+        logging.info(f'Removed departed employee {emp_id}')
+
+    db.session.commit()
 
 
 app = create_app()
