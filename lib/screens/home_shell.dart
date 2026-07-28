@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../utils/colors.dart';
+import '../utils/role_helper.dart';
 import 'home_screen.dart';
 import 'leave_screen.dart';
 import 'main_screen_1.dart';
@@ -22,6 +23,11 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
+
+  /// The admin account has no attendance, payslip or leave of its own, so the
+  /// tabs would lead to empty screens. Only the admin panel is offered, from
+  /// the Home tab — which makes the bar itself redundant.
+  bool get _isAdmin => isSystemAdmin(widget.job);
 
   void _navigateTo(int index) => setState(() => _selectedIndex = index);
 
@@ -51,7 +57,9 @@ class _HomeShellState extends State<HomeShell> {
             MenuScreen(onBack: () => _navigateTo(0), job: widget.job),
           ],
         ),
-        bottomNavigationBar: Container(
+        bottomNavigationBar: _isAdmin
+            ? null
+            : Container(
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [

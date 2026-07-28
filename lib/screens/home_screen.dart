@@ -53,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool get _isAdmin => isSystemAdmin(widget.job);
+
   // For Kazakh ФИО format (Фамилия Имя Отчество), the given name is the
   // second word. Fall back to the first word for single-word names.
   String get _givenName {
@@ -107,42 +109,18 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             GridView.count(
-              crossAxisCount: 2,
+              // A lone admin card reads better as a full-width banner than as
+              // one square in a two-column grid.
+              crossAxisCount: _isAdmin ? 1 : 2,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.1,
+              childAspectRatio: _isAdmin ? 2.4 : 1.1,
               children: [
-                _buildActionCard(
-                  icon: Icons.sensor_door,
-                  label: 'tab_turnstile'.tr,
-                  subtitle: 'self_report_subtitle'.tr,
-                  color: const Color(0xFF1565C0),
-                  onTap: () => widget.onNavigate(1),
-                ),
-                _buildActionCard(
-                  icon: Icons.receipt_long,
-                  label: 'tab_payslip'.tr,
-                  subtitle: 'payslip_subtitle'.tr,
-                  color: AppColors.mainColor,
-                  onTap: () => widget.onNavigate(2),
-                ),
-                _buildActionCard(
-                  icon: Icons.beach_access,
-                  label: 'tab_leave'.tr,
-                  subtitle: 'leave_subtitle'.tr,
-                  color: const Color(0xFFE65100),
-                  onTap: () => widget.onNavigate(3),
-                ),
-                _buildActionCard(
-                  icon: Icons.restaurant_menu,
-                  label: 'tab_menu'.tr,
-                  subtitle: 'canteen_subtitle'.tr,
-                  color: const Color(0xFFC62828),
-                  onTap: () => widget.onNavigate(4),
-                ),
-                if (isSystemAdmin(widget.job))
+                // The admin has no attendance, payslip or leave of their own —
+                // the panel is the whole job, so it is the only card shown.
+                if (_isAdmin)
                   _buildActionCard(
                     icon: Icons.admin_panel_settings,
                     label: 'admin_panel'.tr,
@@ -150,8 +128,38 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: const Color(0xFF4527A0),
                     onTap: () => Get.to(() => const AdminPanelScreen()),
                   ),
+                if (!_isAdmin) ...[
+                  _buildActionCard(
+                    icon: Icons.sensor_door,
+                    label: 'tab_turnstile'.tr,
+                    subtitle: 'self_report_subtitle'.tr,
+                    color: const Color(0xFF1565C0),
+                    onTap: () => widget.onNavigate(1),
+                  ),
+                  _buildActionCard(
+                    icon: Icons.receipt_long,
+                    label: 'tab_payslip'.tr,
+                    subtitle: 'payslip_subtitle'.tr,
+                    color: AppColors.mainColor,
+                    onTap: () => widget.onNavigate(2),
+                  ),
+                  _buildActionCard(
+                    icon: Icons.beach_access,
+                    label: 'tab_leave'.tr,
+                    subtitle: 'leave_subtitle'.tr,
+                    color: const Color(0xFFE65100),
+                    onTap: () => widget.onNavigate(3),
+                  ),
+                  _buildActionCard(
+                    icon: Icons.restaurant_menu,
+                    label: 'tab_menu'.tr,
+                    subtitle: 'canteen_subtitle'.tr,
+                    color: const Color(0xFFC62828),
+                    onTap: () => widget.onNavigate(4),
+                  ),
+                ],
                 // Managers keep their team-wide screens, now inside the shell.
-                if (isAdminRole(widget.job)) ...[
+                if (!_isAdmin && isAdminRole(widget.job)) ...[
                   _buildActionCard(
                     icon: Icons.groups,
                     label: 'employee report'.tr,
