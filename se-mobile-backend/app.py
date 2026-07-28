@@ -3891,22 +3891,28 @@ def _remove_departed_employees():
 
 
 _ADMIN_EMPLOYEE_ID = 'ADMIN'
+_ADMIN_DISPLAY_NAME = 'Админ'
 
 
 def _seed_admin_account():
     """Create the system administrator account used by the in-app admin panel.
+
+    The name is a single word on purpose: greetings address people by the given
+    name, the second word of ФИО, so "Администратор системы" would come out as
+    "Доброе утро, системы". The role still reads from the job title.
 
     Deliberately has no department: /get_sname falls back to listing everyone
     when the requester has none, so the admin sees the whole company.
     """
     admin = Employee.query.get(_ADMIN_EMPLOYEE_ID)
     if admin:
+        admin.full_name = _ADMIN_DISPLAY_NAME
         admin.job_title = 'Администратор системы'
         admin.department = None
     else:
         db.session.add(Employee(
             employee_id=_ADMIN_EMPLOYEE_ID,
-            full_name='Администратор системы',
+            full_name=_ADMIN_DISPLAY_NAME,
             job_title='Администратор системы',
         ))
     db.session.commit()
