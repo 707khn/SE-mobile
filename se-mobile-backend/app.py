@@ -9,6 +9,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem)
 from parser_1c_xml import parse_1c_xml
+from parser_menu_excel import parse_menu_excel
 
 try:
     import firebase_admin
@@ -869,6 +870,88 @@ def register_routes(app):
 
         db.session.commit()
         return jsonify({'message': 'Success'})
+
+    @app.route('/api/menu/import-excel', methods=['POST'])
+    def import_menu_excel():
+        """Loads a canteen menu straight from the spreadsheet 1C exports.
+
+        Takes multipart form-data: the file plus the technologist's login and
+        password. Writing the menu must stay closed, and she already has those
+        credentials — no separate secret to hand out.
+        """
+        login = (request.form.get('login') or '').strip()
+        password = (request.form.get('password') or '').strip()
+        cred = _CREDENTIALS.get(login)
+        if not cred or password != cred[0]:
+            return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
+
+        uploader = Employee.query.get(cred[1])
+        job = (uploader.job_title if uploader else '').lower()
+        allowed = ('технолог' in job and 'столов' in job) or 'администратор системы' in job
+        if not allowed:
+            return jsonify({
+                'message': 'Загружать меню может технолог столовой',
+                'error': True,
+            }), 403
+
+        if 'file' not in request.files:
+            return jsonify({'message': 'Файл не передан', 'error': True}), 400
+        upload = request.files['file']
+        if not upload.filename.lower().endswith(('.xlsx', '.xlsm', '.xls')):
+            return jsonify({'message': 'Ожидается файл Excel', 'error': True}), 400
+
+        # Dishes listed before any date in the sheet fall back to this day.
+        fallback = None
+        if request.form.get('date'):
+            try:
+                fallback = date.fromisoformat(request.form['date'])
+            except ValueError:
+                return jsonify({'message': 'Неверная дата', 'error': True}), 400
+
+        try:
+            days = parse_menu_excel(upload.read(), fallback_date=fallback)
+        except ValueError as e:
+            return jsonify({'message': str(e), 'error': True}), 422
+
+        summary = []
+        for day in days:
+            menu = MenuDate.query.filter_by(date=day['date']).first()
+            if menu:
+                MenuItem.query.filter_by(menu_date_id=menu.id).delete()
+            else:
+                menu = MenuDate(date=day['date'])
+                db.session.add(menu)
+                db.session.flush()
+
+            sections = {}
+            for item in day['items']:
+                db.session.add(MenuItem(
+                    menu_date_id=menu.id,
+                    category=item['category'],
+                    name=item['name'],
+                    price=item['price'],
+                ))
+                sections[item['category']] = sections.get(item['category'], 0) + 1
+
+            summary.append({
+                'date': day['date'].isoformat(),
+                'date_display': day['date'].strftime('%d.%m.%Y'),
+                'count': len(day['items']),
+                'sections': sections,
+            })
+
+        db.session.commit()
+
+        lines = [
+            f"{d['date_display']} — {d['count']} блюд "
+            f"({', '.join(f'{k} {v}' for k, v in d['sections'].items())})"
+            for d in summary
+        ]
+        logging.info('Menu import by %s: %s', login, '; '.join(lines))
+        return jsonify({
+            'message': 'Загружено:\n' + '\n'.join(lines),
+            'days': summary,
+        })
 
     @app.route('/api/menu/<date_str>', methods=['DELETE'])
     def delete_menu(date_str):
