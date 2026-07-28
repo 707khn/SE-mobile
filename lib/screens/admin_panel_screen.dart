@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../requests/admin_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import 'admin_employee_screen.dart';
 
@@ -87,7 +88,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     final list = _filtered;
     return Scaffold(
       backgroundColor: Colors.grey[50],
+      drawer: const AppDrawer(),
       appBar: AppBar(
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         backgroundColor: AppColors.mainColor,
         foregroundColor: Colors.white,
         elevation: 0,

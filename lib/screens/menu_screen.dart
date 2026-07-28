@@ -6,15 +6,16 @@ import '../requests/menu_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import 'menu_edit_screen.dart';
 
 class MenuScreen extends StatefulWidget {
-  const MenuScreen({Key? key, this.onBack, this.job = ''}) : super(key: key);
+  const MenuScreen({Key? key, this.onNavigate, this.job = ''}) : super(key: key);
 
-  /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
-  /// is shown that runs this callback instead of popping the route.
-  final VoidCallback? onBack;
+  /// Supplied inside the bottom-nav shell: enables the shared drawer and
+  /// lets it switch tab. Null on drill-down views, which keep a back arrow.
+  final ValueChanged<int>? onNavigate;
 
   /// Job title of the signed-in user; the canteen technologist may edit menus.
   final String job;
@@ -81,16 +82,22 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+      drawer: widget.onNavigate == null
+          ? null
+          : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 4),
       appBar: AppBar(
         backgroundColor: AppColors.mainColor,
         foregroundColor: Colors.white,
         elevation: 0,
-        leading: widget.onBack != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: widget.onBack,
-              )
-            : null,
+        leading: widget.onNavigate == null
+            ? null
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
         title: BigText(content: 'canteen_menu'.tr, color: Colors.white),
         actions: [
           if (!_isToday)

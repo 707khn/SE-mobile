@@ -7,29 +7,24 @@ import 'package:path_provider/path_provider.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/report_request.dart';
 import 'package:se_mobile/requests/reportdate_request.dart';
-import 'package:se_mobile/screens/start_screen.dart';
-import 'package:se_mobile/utils/logout_helper.dart';
-import 'package:se_mobile/utils/secure_storage_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../functions/generate_csv.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
 import '../variables.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
-import '../widgets/icon_button_drawer.dart';
 
 
 class MainPage1 extends StatefulWidget {
   final String fullName;
   final String job;
 
-  /// When provided (e.g. inside the bottom-nav shell), the AppBar shows a back
-  /// arrow running this callback, and the profile drawer moves to a trailing
-  /// icon so it stays reachable.
-  final VoidCallback? onBack;
+  /// Supplied inside the bottom-nav shell: enables the shared drawer and lets
+  /// it switch tab. Null on the admin's view of somebody else.
+  final ValueChanged<int>? onNavigate;
 
   /// Set by the admin panel to show somebody else's turnstile report. The
   /// profile drawer and logout are hidden then — they belong to the viewer,
@@ -40,7 +35,7 @@ class MainPage1 extends StatefulWidget {
       {Key? key,
       required this.fullName,
       required this.job,
-      this.onBack,
+      this.onNavigate,
       this.employeeId})
       : super(key: key);
 
@@ -49,12 +44,9 @@ class MainPage1 extends StatefulWidget {
 }
 
 class _MainPage1State extends State<MainPage1> {
-  static String _lang = "";
-  String? _login;
   late SharedPreferences prefs;
   final _recordCount = ValueNotifier<int>(0);
   final _dateRange = ValueNotifier<String>('');
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -74,26 +66,23 @@ class _MainPage1State extends State<MainPage1> {
     if (prefs.getString(AppValues.LANG) == null) {
       prefs.setString(AppValues.LANG, "RU");
     }
-    final login = await SecureStorageHelper.instance.getLogin();
-    setState(() {
-      _lang = prefs.getString(AppValues.LANG)!;
-      _login = login;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
       backgroundColor: AppColors.niceWhite,
       appBar: AppBar(
         centerTitle: true,
-        leading: widget.onBack != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: widget.onBack,
-              )
-            : null,
+        leading: widget.onNavigate == null
+            ? null
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
         title: ValueListenableBuilder<String>(
           valueListenable: _dateRange,
           builder: (_, dateStr, __) => Column(
@@ -125,192 +114,13 @@ class _MainPage1State extends State<MainPage1> {
               },
             ),
           ),
-          // Viewing somebody else from the admin panel: neither the viewer's
-          // profile nor logout belongs here.
-          if (widget.employeeId != null)
-            const SizedBox.shrink()
-          // In tab mode the hamburger is replaced by the back arrow, so the
-          // profile drawer opens from this trailing icon instead. Logout
-          // stays on the standalone variant only — the Home tab already has it.
-          else if (widget.onBack != null)
-            IconButton(
-              icon: const Icon(Icons.account_circle_outlined),
-              tooltip: 'profile'.tr,
-              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: 'log_out_title'.tr,
-              onPressed: _exit,
-            ),
+          // Logout lives in the drawer now; the standalone variant (admin
+          // viewing somebody else) gets neither, since it is not their session.
         ],
       ),
-      drawer: widget.employeeId != null
+      drawer: widget.onNavigate == null
           ? null
-          : Theme(
-        data: Theme.of(context).copyWith(
-          canvasColor: Theme.of(context).scaffoldBackgroundColor,
-        ),
-        child: SizedBox(
-          width: Dimensions.width120 * 2.5,
-          child: Drawer(
-            child: Column(
-              children: <Widget>[
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    children: <Widget>[
-                      SizedBox(
-                        height: Dimensions.height120 * 2,
-                        child: DrawerHeader(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                children: [
-                                  GestureDetector(
-                                    onLongPress: () {
-                                      Clipboard.setData(ClipboardData(text: widget.fullName));
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                        content: Text('copied'.tr),
-                                        duration: const Duration(seconds: 1),
-                                        behavior: SnackBarBehavior.floating,
-                                      ));
-                                    },
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        BigText(
-                                          content: widget.fullName,
-                                          color: AppColors.niceWhite,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        MediumText(
-                                          content: widget.job,
-                                          color: AppColors.niceWhite,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (_login != null && _login!.isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          GestureDetector(
-                                            onTap: () {
-                                              Clipboard.setData(ClipboardData(text: _login!));
-                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                                content: Text('copied'.tr),
-                                                duration: const Duration(seconds: 1),
-                                                behavior: SnackBarBehavior.floating,
-                                              ));
-                                            },
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.badge_outlined, size: 12, color: Colors.white54),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  _login!,
-                                                  style: const TextStyle(
-                                                    color: Colors.white54,
-                                                    fontSize: 12,
-                                                    letterSpacing: 1,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Padding(
-                                        padding: EdgeInsets.only(right: Dimensions.width20 / 1.5),
-                                        child: GestureDetector(
-                                          onTap: _changeLanguage,
-                                          child: _lang == "KZ"
-                                              ? SizedBox(
-                                                  width: Dimensions.width20 * 1.25,
-                                                  height: Dimensions.height30 * 1.25,
-                                                  child: Image.asset('assets/ru.png'),
-                                                )
-                                              : SizedBox(
-                                                  width: Dimensions.width20 * 1.25,
-                                                  height: Dimensions.height30 * 1.25,
-                                                  child: Image.asset('assets/kz.png'),
-                                                ),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: _exit,
-                                        child: Image.asset(
-                                          'assets/door.png',
-                                          color: AppColors.niceWhite,
-                                          height: Dimensions.height30 / 1.1,
-                                        ),
-                                      )
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  height: Dimensions.height30 / 15,
-                  width: Dimensions.width120 * 2,
-                  color: Colors.black26,
-                ),
-                Container(
-                  padding: EdgeInsets.only(
-                    bottom: Dimensions.height30,
-                    top: Dimensions.height30 / 2,
-                  ),
-                  height: Dimensions.height60 * 1.5,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      IconButtonDrawer(
-                        icon: Image.asset('assets/youtube.png'),
-                        function: () async {
-                          await launchUrl(Uri.parse('https://www.youtube.com/@semeyengineering4367'), mode: LaunchMode.externalApplication);
-                        },
-                      ),
-                      IconButtonDrawer(
-                        icon: Image.asset('assets/instagram.png'),
-                        function: () async {
-                          await launchUrl(Uri.parse('https://www.instagram.com/jscsemeyengineering/'), mode: LaunchMode.externalApplication);
-                        },
-                      ),
-                      IconButtonDrawer(
-                        icon: Image.asset('assets/facebook.png'),
-                        function: () async {
-                          await launchUrl(Uri.parse('https://www.facebook.com/semeybtrz/'), mode: LaunchMode.externalApplication);
-                        },
-                      ),
-                      IconButtonDrawer(
-                        icon: Image.asset('assets/web.png'),
-                        function: () async {
-                          await launchUrl(Uri.parse('https://se-btrz.com/'), mode: LaunchMode.externalApplication);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+          : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 1),
       body: MainMenu1(
           recordCount: _recordCount,
           dateRange: _dateRange,
@@ -318,21 +128,6 @@ class _MainPage1State extends State<MainPage1> {
     );
   }
 
-  _changeLanguage() async {
-    Navigator.pop(context);
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    if (_lang == "KZ") {
-      prefs.setString(AppValues.LANG, "RU");
-      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
-    } else if (_lang == "RU") {
-      prefs.setString(AppValues.LANG, "KZ");
-      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
-    }
-  }
-
-  _exit() => confirmAndLogout(context);
 }
 
 class MainMenu1 extends StatefulWidget {

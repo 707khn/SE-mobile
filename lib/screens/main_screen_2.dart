@@ -22,6 +22,7 @@ import '../requests/reportdate_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/icon_button_drawer.dart';
 
@@ -99,6 +100,13 @@ class _MainPage2State extends State<MainPage2> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -131,205 +139,7 @@ class _MainPage2State extends State<MainPage2> {
           ),
         ],
       ),
-      drawer: Theme(
-        data: Theme.of(context).copyWith(
-          canvasColor: Theme.of(context).scaffoldBackgroundColor,
-        ),
-        child: SizedBox(
-          width: Dimensions.width120 * 2.5,
-          child: Drawer(
-            child: Column(
-              children: <Widget>[
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    children: <Widget>[
-                      SizedBox(
-                        height: Dimensions.height120 * 2,
-                        child: DrawerHeader(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                children: [
-                                  GestureDetector(
-                                    onLongPress: () {
-                                      Clipboard.setData(ClipboardData(text: widget.fullName));
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                        content: Text('copied'.tr),
-                                        duration: const Duration(seconds: 1),
-                                        behavior: SnackBarBehavior.floating,
-                                      ));
-                                    },
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        BigText(
-                                          content: widget.fullName,
-                                          color: AppColors.niceWhite,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        MediumText(
-                                          content: widget.job,
-                                          color: AppColors.niceWhite,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (_login != null && _login!.isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          GestureDetector(
-                                            onTap: () {
-                                              Clipboard.setData(ClipboardData(text: _login!));
-                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                                content: Text('copied'.tr),
-                                                duration: const Duration(seconds: 1),
-                                                behavior: SnackBarBehavior.floating,
-                                              ));
-                                            },
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.badge_outlined, size: 12, color: Colors.white54),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  _login!,
-                                                  style: const TextStyle(
-                                                    color: Colors.white54,
-                                                    fontSize: 12,
-                                                    letterSpacing: 1,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Padding(
-                                        padding: EdgeInsets.only(right: Dimensions.width20 / 1.5),
-                                        child: GestureDetector(
-                                          onTap: _changeLanguage,
-                                          child: _lang == "KZ"
-                                              ? SizedBox(
-                                                  width: Dimensions.width20 * 1.25,
-                                                  height: Dimensions.height30 * 1.25,
-                                                  child: Image.asset('assets/ru.png'),
-                                                )
-                                              : SizedBox(
-                                                  width: Dimensions.width20 * 1.25,
-                                                  height: Dimensions.height30 * 1.25,
-                                                  child: Image.asset('assets/kz.png'),
-                                                ),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: _exit,
-                                        child: Image.asset(
-                                          'assets/door.png',
-                                          color: AppColors.niceWhite,
-                                          height: Dimensions.height30 / 1.1,
-                                        ),
-                                      )
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.restaurant_menu, color: AppColors.mainColor),
-                        title: BigText(content: 'canteen_menu'.tr),
-                        subtitle: Text('canteen_subtitle'.tr, style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Get.to(() => const MenuScreen());
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.badge_outlined, color: AppColors.mainColor),
-                        title: BigText(content: 'attendance'.tr),
-                        subtitle: Text('attendance_subtitle'.tr, style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Get.to(() => const AttendanceScreen());
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
-                        title: BigText(content: 'payslip'.tr),
-                        subtitle: Text('payslip_subtitle'.tr, style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Get.to(() => const PayslipPage());
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.beach_access, color: AppColors.mainColor),
-                        title: BigText(content: 'leave_sick_days'.tr),
-                        subtitle: Text('leave_subtitle'.tr, style: const TextStyle(fontSize: 11)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Get.to(() => const LeavePage());
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  height: Dimensions.height30 / 15,
-                  width: Dimensions.width120 * 2,
-                  color: Colors.black26,
-                ),
-                Container(
-                  padding: EdgeInsets.only(
-                    bottom: Dimensions.height30,
-                    top: Dimensions.height30 / 2,
-                  ),
-                  height: Dimensions.height60 * 1.5,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      IconButtonDrawer(
-                        icon: Image.asset('assets/youtube.png'),
-                        function: () async {
-                          await launchUrl(Uri.parse('https://www.youtube.com/@semeyengineering4367'), mode: LaunchMode.externalApplication);
-                        },
-                      ),
-                      IconButtonDrawer(
-                        icon: Image.asset('assets/instagram.png'),
-                        function: () async {
-                          await launchUrl(Uri.parse('https://www.instagram.com/jscsemeyengineering/'), mode: LaunchMode.externalApplication);
-                        },
-                      ),
-                      IconButtonDrawer(
-                        icon: Image.asset('assets/facebook.png'),
-                        function: () async {
-                          await launchUrl(Uri.parse('https://www.facebook.com/semeybtrz/'), mode: LaunchMode.externalApplication);
-                        },
-                      ),
-                      IconButtonDrawer(
-                        icon: Image.asset('assets/web.png'),
-                        function: () async {
-                          await launchUrl(Uri.parse('https://se-btrz.com/'), mode: LaunchMode.externalApplication);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      drawer: const AppDrawer(),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(12.0),

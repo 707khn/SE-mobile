@@ -6,17 +6,18 @@ import 'package:share_plus/share_plus.dart';
 import '../requests/leave_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 
 class LeavePage extends StatefulWidget {
-  const LeavePage({Key? key, this.onBack, this.employeeId}) : super(key: key);
+  const LeavePage({Key? key, this.onNavigate, this.employeeId}) : super(key: key);
 
   /// Set by the admin panel to show somebody else's leave.
   final String? employeeId;
 
-  /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
-  /// is shown that runs this callback instead of popping the route.
-  final VoidCallback? onBack;
+  /// Supplied inside the bottom-nav shell: enables the shared drawer and
+  /// lets it switch tab. Null on drill-down views, which keep a back arrow.
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<LeavePage> createState() => _LeavePageState();
@@ -76,13 +77,19 @@ class _LeavePageState extends State<LeavePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: widget.onNavigate == null
+          ? null
+          : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 3),
       appBar: AppBar(
-        leading: widget.onBack != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: widget.onBack,
-              )
-            : null,
+        leading: widget.onNavigate == null
+            ? null
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
         title: BigText(content: 'leave_sick_days'.tr, fontWeight: FontWeight.bold),
         centerTitle: true,
         actions: [

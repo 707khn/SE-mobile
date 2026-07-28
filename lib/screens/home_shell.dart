@@ -14,15 +14,23 @@ class HomeShell extends StatefulWidget {
   final String fullName;
   final String job;
 
-  const HomeShell({Key? key, required this.fullName, required this.job})
-      : super(key: key);
+  /// Tab to open on. Lets the shared drawer land on a section when it has to
+  /// rebuild the shell from a pushed screen.
+  final int initialIndex;
+
+  const HomeShell({
+    Key? key,
+    required this.fullName,
+    required this.job,
+    this.initialIndex = 0,
+  }) : super(key: key);
 
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int _selectedIndex = 0;
+  late int _selectedIndex = widget.initialIndex;
 
   /// The admin account has no attendance, payslip or leave of its own, so the
   /// tabs would lead to empty screens. Only the admin panel is offered, from
@@ -58,11 +66,11 @@ class _HomeShellState extends State<HomeShell> {
             MainPage1(
               fullName: widget.fullName,
               job: widget.job,
-              onBack: () => _navigateTo(0),
+              onNavigate: _navigateTo,
             ),
-            PayslipPage(onBack: () => _navigateTo(0)),
-            LeavePage(onBack: () => _navigateTo(0)),
-            MenuScreen(onBack: () => _navigateTo(0), job: widget.job),
+            PayslipPage(onNavigate: _navigateTo),
+            LeavePage(onNavigate: _navigateTo),
+            MenuScreen(onNavigate: _navigateTo, job: widget.job),
           ],
         ),
         bottomNavigationBar: _isAdmin

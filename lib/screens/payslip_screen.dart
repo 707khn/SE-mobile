@@ -7,15 +7,16 @@ import 'package:share_plus/share_plus.dart';
 import '../requests/payslip_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 
 class PayslipPage extends StatefulWidget {
-  const PayslipPage({Key? key, this.onBack, this.employeeId, this.employeeName})
+  const PayslipPage({Key? key, this.onNavigate, this.employeeId, this.employeeName})
       : super(key: key);
 
-  /// When provided (e.g. inside the bottom-nav shell), an explicit back arrow
-  /// is shown that runs this callback instead of popping the route.
-  final VoidCallback? onBack;
+  /// Supplied inside the bottom-nav shell: enables the shared drawer and
+  /// lets it switch tab. Null on drill-down views, which keep a back arrow.
+  final ValueChanged<int>? onNavigate;
 
   /// Set by the admin panel to show somebody else's payslip.
   final String? employeeId;
@@ -214,13 +215,19 @@ class _PayslipPageState extends State<PayslipPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: widget.onNavigate == null
+          ? null
+          : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 2),
       appBar: AppBar(
-        leading: widget.onBack != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: widget.onBack,
-              )
-            : null,
+        leading: widget.onNavigate == null
+            ? null
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
         title: BigText(
             content: widget.employeeName ?? 'payslip'.tr,
             fontWeight: FontWeight.bold),

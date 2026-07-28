@@ -1,0 +1,320 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../screens/admin_panel_screen.dart';
+import '../screens/attendance_screen.dart';
+import '../screens/home_shell.dart';
+import '../screens/main_screen_2.dart';
+import '../utils/colors.dart';
+import '../utils/dimensions.dart';
+import '../utils/logout_helper.dart';
+import '../utils/role_helper.dart';
+import '../utils/secure_storage_helper.dart';
+import '../utils/variables.dart';
+import 'icon_button_drawer.dart';
+
+/// The navigation drawer shared by every section.
+///
+/// Reads the signed-in user's profile itself, so screens that never receive a
+/// name or job title (payslip, leave, canteen menu…) can use it as-is.
+class AppDrawer extends StatefulWidget {
+  const AppDrawer({Key? key, this.onNavigate, this.currentIndex}) : super(key: key);
+
+  /// Supplied by the tabs inside [HomeShell] to switch tab directly. When null
+  /// the drawer is on a pushed screen and rebuilds the shell instead.
+  final ValueChanged<int>? onNavigate;
+
+  /// Tab index of the screen showing this drawer, highlighted in the list.
+  final int? currentIndex;
+
+  @override
+  State<AppDrawer> createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  String _lang = "RU";
+  String _fullName = '';
+  String _job = '';
+  String? _login;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final storage = SecureStorageHelper.instance;
+    final prefs = await SharedPreferences.getInstance();
+    final fullName = await storage.getFullName();
+    final job = await storage.getJob();
+    final login = await storage.getLogin();
+    if (!mounted) return;
+    setState(() {
+      _lang = prefs.getString(AppValues.LANG) ?? "RU";
+      _fullName = fullName ?? '';
+      _job = job ?? '';
+      _login = login;
+    });
+  }
+
+  bool get _isAdmin => isSystemAdmin(_job);
+
+  /// ФИО is "Фамилия Имя Отчество", so the given name is the second word.
+  String get _givenName {
+    final parts = _fullName.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts[1].isNotEmpty) return parts[1];
+    return parts.isNotEmpty ? parts.first : _fullName;
+  }
+
+  /// Inside the shell this switches tab; from a pushed screen it rebuilds the
+  /// shell on the requested tab, dropping the stack behind it.
+  void _goToTab(int index) {
+    final onNavigate = widget.onNavigate;
+    if (onNavigate != null) {
+      onNavigate(index);
+    } else {
+      Get.offAll(() => HomeShell(
+            fullName: _fullName,
+            job: _job,
+            initialIndex: index,
+          ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      child: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                if (_isAdmin)
+                  _item(
+                    icon: Icons.admin_panel_settings,
+                    label: 'admin_panel'.tr,
+                    onTap: () => Get.to(() => const AdminPanelScreen()),
+                  )
+                else ...[
+                  _item(
+                    icon: Icons.home_outlined,
+                    label: 'tab_home'.tr,
+                    index: 0,
+                    onTap: () => _goToTab(0),
+                  ),
+                  _item(
+                    icon: Icons.sensor_door_outlined,
+                    label: 'tab_turnstile'.tr,
+                    index: 1,
+                    onTap: () => _goToTab(1),
+                  ),
+                  _item(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'tab_payslip'.tr,
+                    index: 2,
+                    onTap: () => _goToTab(2),
+                  ),
+                  _item(
+                    icon: Icons.beach_access_outlined,
+                    label: 'tab_leave'.tr,
+                    index: 3,
+                    onTap: () => _goToTab(3),
+                  ),
+                  _item(
+                    icon: Icons.restaurant_menu_outlined,
+                    label: 'tab_menu'.tr,
+                    index: 4,
+                    onTap: () => _goToTab(4),
+                  ),
+                  if (isAdminRole(_job)) ...[
+                    const Divider(height: 1),
+                    _item(
+                      icon: Icons.groups_outlined,
+                      label: 'employee report'.tr,
+                      onTap: () => Get.to(
+                          () => MainPage2(fullName: _fullName, job: _job)),
+                    ),
+                    _item(
+                      icon: Icons.badge_outlined,
+                      label: 'attendance'.tr,
+                      onTap: () => Get.to(() => const AttendanceScreen()),
+                    ),
+                  ],
+                ],
+                const Divider(height: 1),
+                _item(
+                  icon: Icons.translate,
+                  label: _lang == "KZ" ? 'Русский' : 'Қазақша',
+                  onTap: _changeLanguage,
+                ),
+                _item(
+                  icon: Icons.logout,
+                  label: 'log_out_title'.tr,
+                  color: Colors.red.shade700,
+                  onTap: () => confirmAndLogout(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          _buildSocial(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20, 18),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.mainColor, AppColors.gradientColor2],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: Dimensions.height30 / 2),
+            CircleAvatar(
+              radius: 26,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              child: Text(
+                _givenName.isNotEmpty ? _givenName[0].toUpperCase() : '?',
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onLongPress: () => _copy(_fullName),
+              child: Text(
+                _fullName,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              _job,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (_login != null && _login!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: () => _copy(_login!),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.badge_outlined, size: 12, color: Colors.white54),
+                    const SizedBox(width: 4),
+                    Text(
+                      _login!,
+                      style: const TextStyle(
+                          color: Colors.white54, fontSize: 12, letterSpacing: 1),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocial() {
+    return SizedBox(
+      height: Dimensions.height60 * 1.5,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButtonDrawer(
+            icon: Image.asset('assets/youtube.png'),
+            function: () => _open('https://www.youtube.com/@semeyengineering4367'),
+          ),
+          IconButtonDrawer(
+            icon: Image.asset('assets/instagram.png'),
+            function: () => _open('https://www.instagram.com/jscsemeyengineering/'),
+          ),
+          IconButtonDrawer(
+            icon: Image.asset('assets/facebook.png'),
+            function: () => _open('https://www.facebook.com/semeybtrz/'),
+          ),
+          IconButtonDrawer(
+            icon: Image.asset('assets/web.png'),
+            function: () => _open('https://se-btrz.com/'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Closes the drawer first, so the destination is not left behind it.
+  Widget _item({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    int? index,
+    Color? color,
+  }) {
+    final selected = index != null && index == widget.currentIndex;
+    final tint = color ?? (selected ? AppColors.mainColor : Colors.grey.shade700);
+    return ListTile(
+      dense: true,
+      selected: selected,
+      selectedTileColor: AppColors.mainColor.withOpacity(0.08),
+      leading: Icon(icon, size: 21, color: tint),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          color: color ?? (selected ? AppColors.mainColor : Colors.black87),
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      onTap: () {
+        Navigator.pop(context);
+        HapticFeedback.selectionClick();
+        // Re-tapping the section you are already on should just close.
+        if (selected) return;
+        onTap();
+      },
+    );
+  }
+
+  void _copy(String value) {
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('copied'.tr),
+      duration: const Duration(seconds: 1),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  Future<void> _open(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _changeLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final next = _lang == "KZ" ? "RU" : "KZ";
+    await prefs.setString(AppValues.LANG, next);
+    Get.updateLocale(Locale(next));
+    if (mounted) setState(() => _lang = next);
+  }
+}

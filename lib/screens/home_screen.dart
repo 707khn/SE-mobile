@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
-import '../utils/logout_helper.dart';
 import '../utils/role_helper.dart';
-import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
-import '../widgets/icon_button_drawer.dart';
+import '../widgets/app_drawer.dart';
 import 'admin_panel_screen.dart';
 import 'attendance_screen.dart';
 import 'main_screen_2.dart';
@@ -33,7 +30,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _lang = "RU";
-  String? _login;
 
   @override
   void initState() {
@@ -46,12 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (prefs.getString(AppValues.LANG) == null) {
       prefs.setString(AppValues.LANG, "RU");
     }
-    final login = await SecureStorageHelper.instance.getLogin();
     if (mounted) {
-      setState(() {
-        _lang = prefs.getString(AppValues.LANG)!;
-        _login = login;
-      });
+      setState(() => _lang = prefs.getString(AppValues.LANG)!);
     }
   }
 
@@ -69,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.niceWhite,
-      drawer: _buildDrawer(),
+      drawer: AppDrawer(onNavigate: widget.onNavigate, currentIndex: 0),
       appBar: AppBar(
         // Explicit leading: the shell sits on top of the login screen, so an
         // implied leading would be a back arrow that signs the user out.
@@ -84,21 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text('main_menu'.tr,
             style: const TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: _lang == "KZ" ? "Русский" : "Қазақша",
-            icon: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Image.asset(_lang == "KZ" ? 'assets/ru.png' : 'assets/kz.png'),
-            ),
-            onPressed: _changeLanguage,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'log_out_title'.tr,
-            onPressed: () => confirmAndLogout(context),
-          ),
-        ],
+        // Language and logout live in the drawer now, so they are in the same
+        // place on every section instead of only here.
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
@@ -198,210 +177,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildDrawer() {
-    return Drawer(
-      child: Column(
-        children: [
-          _buildDrawerHeader(),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                if (_isAdmin)
-                  _drawerItem(
-                    icon: Icons.admin_panel_settings,
-                    label: 'admin_panel'.tr,
-                    onTap: () => Get.to(() => const AdminPanelScreen()),
-                  )
-                else ...[
-                  _drawerItem(
-                    icon: Icons.sensor_door_outlined,
-                    label: 'tab_turnstile'.tr,
-                    onTap: () => widget.onNavigate(1),
-                  ),
-                  _drawerItem(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'tab_payslip'.tr,
-                    onTap: () => widget.onNavigate(2),
-                  ),
-                  _drawerItem(
-                    icon: Icons.beach_access_outlined,
-                    label: 'tab_leave'.tr,
-                    onTap: () => widget.onNavigate(3),
-                  ),
-                  _drawerItem(
-                    icon: Icons.restaurant_menu_outlined,
-                    label: 'tab_menu'.tr,
-                    onTap: () => widget.onNavigate(4),
-                  ),
-                  if (isAdminRole(widget.job)) ...[
-                    const Divider(height: 1),
-                    _drawerItem(
-                      icon: Icons.groups_outlined,
-                      label: 'employee report'.tr,
-                      onTap: () => Get.to(() => MainPage2(
-                            fullName: widget.fullName,
-                            job: widget.job,
-                          )),
-                    ),
-                    _drawerItem(
-                      icon: Icons.badge_outlined,
-                      label: 'attendance'.tr,
-                      onTap: () => Get.to(() => const AttendanceScreen()),
-                    ),
-                  ],
-                ],
-                const Divider(height: 1),
-                _drawerItem(
-                  icon: Icons.translate,
-                  label: _lang == "KZ" ? 'Русский' : 'Қазақша',
-                  onTap: _changeLanguage,
-                ),
-                _drawerItem(
-                  icon: Icons.logout,
-                  label: 'log_out_title'.tr,
-                  color: Colors.red.shade700,
-                  onTap: () => confirmAndLogout(context),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          _buildDrawerSocial(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawerHeader() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20, 18),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.mainColor, AppColors.gradientColor2],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: Dimensions.height30 / 2),
-            CircleAvatar(
-              radius: 26,
-              backgroundColor: Colors.white.withOpacity(0.2),
-              child: Text(
-                _givenName.isNotEmpty ? _givenName[0].toUpperCase() : '?',
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 10),
-            GestureDetector(
-              onLongPress: () => _copy(widget.fullName),
-              child: Text(
-                widget.fullName,
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              widget.job,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (_login != null && _login!.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              GestureDetector(
-                onTap: () => _copy(_login!),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.badge_outlined, size: 12, color: Colors.white54),
-                    const SizedBox(width: 4),
-                    Text(
-                      _login!,
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12, letterSpacing: 1),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawerSocial() {
-    return SizedBox(
-      // Bounded strip, matching the same row in the Турникет drawer.
-      height: Dimensions.height60 * 1.5,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          IconButtonDrawer(
-            icon: Image.asset('assets/youtube.png'),
-            function: () => _open('https://www.youtube.com/@semeyengineering4367'),
-          ),
-          IconButtonDrawer(
-            icon: Image.asset('assets/instagram.png'),
-            function: () => _open('https://www.instagram.com/jscsemeyengineering/'),
-          ),
-          IconButtonDrawer(
-            icon: Image.asset('assets/facebook.png'),
-            function: () => _open('https://www.facebook.com/semeybtrz/'),
-          ),
-          IconButtonDrawer(
-            icon: Image.asset('assets/web.png'),
-            function: () => _open('https://se-btrz.com/'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Closes the drawer first, so the tapped destination is not left behind it.
-  Widget _drawerItem({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    return ListTile(
-      dense: true,
-      leading: Icon(icon, size: 21, color: color ?? Colors.grey.shade700),
-      title: Text(label,
-          style: TextStyle(fontSize: 14, color: color ?? Colors.black87)),
-      onTap: () {
-        Navigator.pop(context);
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-    );
-  }
-
-  void _copy(String value) {
-    Clipboard.setData(ClipboardData(text: value));
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('copied'.tr),
-      duration: const Duration(seconds: 1),
-      behavior: SnackBarBehavior.floating,
-    ));
-  }
-
-  Future<void> _open(String url) async {
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
   Widget _buildGreetingCard() {
@@ -552,11 +327,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _changeLanguage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final next = _lang == "KZ" ? "RU" : "KZ";
-    prefs.setString(AppValues.LANG, next);
-    Get.updateLocale(Locale(next));
-    if (mounted) setState(() => _lang = next);
-  }
 }
