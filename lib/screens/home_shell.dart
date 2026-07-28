@@ -34,9 +34,17 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: _selectedIndex == 0,
+      // Never let the shell be popped: below it sits the login screen, so
+      // popping would silently sign the user back out. Back returns to the
+      // Home tab, and on Home it leaves the app like any other root screen.
+      canPop: false,
       onPopInvoked: (didPop) {
-        if (!didPop) setState(() => _selectedIndex = 0);
+        if (didPop) return;
+        if (_selectedIndex != 0) {
+          setState(() => _selectedIndex = 0);
+        } else {
+          SystemNavigator.pop();
+        }
       },
       child: Scaffold(
         body: IndexedStack(

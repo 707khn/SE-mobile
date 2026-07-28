@@ -68,6 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.niceWhite,
       appBar: AppBar(
+        // The shell is pushed on top of the login screen, so Navigator would
+        // otherwise offer a back arrow that signs the user out.
+        automaticallyImplyLeading: false,
         title: Text('main_menu'.tr,
             style: const TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
