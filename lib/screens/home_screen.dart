@@ -344,8 +344,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDrawerSocial() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: Dimensions.height30 / 2),
+    return SizedBox(
+      // Bounded strip, matching the same row in the Турникет drawer.
+      height: Dimensions.height60 * 1.5,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
