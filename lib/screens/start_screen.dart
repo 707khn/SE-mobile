@@ -128,7 +128,9 @@ class CustomFormState extends State<CustomForm> {
                 controller: loginController,
                 fontSize: Dimensions.fontSize20,
                 backgroundColor: AppColors.loginField,
-                keyboardType: TextInputType.number,
+                // Most logins are tabular numbers, but "admin" is letters —
+                // the text keyboard covers both.
+                keyboardType: TextInputType.text,
                 maxLength: 20,
                 textInputAction: TextInputAction.next,
                 onSubmitted: () => _passwordFocus.requestFocus(),
@@ -140,7 +142,7 @@ class CustomFormState extends State<CustomForm> {
                 controller: passwordController,
                 fontSize: Dimensions.fontSize20,
                 backgroundColor: AppColors.loginField,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.visiblePassword,
                 maxLength: 50,
                 focusNode: _passwordFocus,
                 onSubmitted: () => _loginButtonKey.currentState?.submit(),
