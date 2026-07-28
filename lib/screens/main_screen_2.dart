@@ -500,12 +500,6 @@ class _MainPage2State extends State<MainPage2> {
                       setState(() { startDate = now; endDate = now; _dateError = false; });
                     }),
                     const SizedBox(width: 6),
-                    _buildPresetChip('this_week'.tr, () {
-                      final now = DateTime.now();
-                      final monday = now.subtract(Duration(days: now.weekday - 1));
-                      setState(() { startDate = DateTime(monday.year, monday.month, monday.day); endDate = now; _dateError = false; });
-                    }),
-                    const SizedBox(width: 6),
                     _buildPresetChip('last_7_days'.tr, () {
                       final now = DateTime.now();
                       setState(() { startDate = now.subtract(const Duration(days: 6)); endDate = now; _dateError = false; });
