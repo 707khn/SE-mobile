@@ -34,5 +34,9 @@ Future<void> confirmAndLogout(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.clear();
   reportsEntries = [["", "", "", ""]];
+  // The login form's controllers are static, so whatever the previous user
+  // typed would still be sitting in the fields on the way back out.
+  CustomFormState.loginController.clear();
+  CustomFormState.passwordController.clear();
   Get.offAll(() => const StartPage());
 }
