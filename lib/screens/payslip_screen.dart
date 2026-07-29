@@ -9,6 +9,7 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
+import '../widgets/skeleton.dart';
 
 class PayslipPage extends StatefulWidget {
   const PayslipPage({Key? key, this.onNavigate, this.employeeId, this.employeeName})
@@ -304,13 +305,7 @@ class _PayslipPageState extends State<PayslipPage> {
               ),
               SizedBox(height: Dimensions.height30 / 2),
 
-              if (_loading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(color: AppColors.mainColor),
-                  ),
-                ),
+              if (_loading) const SkeletonPayslip(),
 
               if (_error != null)
                 Center(

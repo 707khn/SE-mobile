@@ -9,6 +9,7 @@ import '../utils/role_helper.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
+import '../widgets/skeleton.dart';
 import 'menu_edit_screen.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -123,9 +124,7 @@ class _MenuScreenState extends State<MenuScreen> {
           slivers: [
             SliverToBoxAdapter(child: _buildDateNavigation()),
             if (_loading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator(color: AppColors.mainColor)),
-              )
+              const SliverToBoxAdapter(child: SkeletonList(rows: 5))
             else if (_error)
               SliverFillRemaining(child: _buildError())
             else if (_items.isEmpty)

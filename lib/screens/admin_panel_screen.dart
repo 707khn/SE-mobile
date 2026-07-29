@@ -6,6 +6,7 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
+import '../widgets/skeleton.dart';
 import 'admin_employee_screen.dart';
 
 /// Staff directory for the system administrator: search anyone, open their
@@ -112,8 +113,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           if (!_loading && !_error) _buildFilters(),
           Expanded(
             child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.mainColor))
+                ? const SkeletonList(rows: 8, hasLeading: true)
                 : _error
                     ? _buildError()
                     : list.isEmpty
