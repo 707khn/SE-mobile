@@ -77,9 +77,6 @@ class _MenuScreenState extends State<MenuScreen> {
           ? null
           : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 4),
       appBar: AppBar(
-        backgroundColor: AppColors.mainColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
         leading: widget.onNavigate == null
             ? null
             : Builder(

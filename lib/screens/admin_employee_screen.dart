@@ -23,9 +23,6 @@ class AdminEmployeeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: AppColors.mainColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
         title: BigText(content: 'admin_employee'.tr, color: Colors.white),
       ),
       body: ListView(

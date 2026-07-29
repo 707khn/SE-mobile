@@ -277,9 +277,6 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
       child: Scaffold(
         backgroundColor: Colors.grey[50],
         appBar: AppBar(
-          backgroundColor: AppColors.mainColor,
-          foregroundColor: Colors.white,
-          elevation: 0,
           title: BigText(content: 'menu_edit_title'.tr, color: Colors.white),
           actions: [
             if (_saving)
@@ -303,8 +300,6 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.mainColor,
-          foregroundColor: Colors.white,
           onPressed: () => _editItem(),
           icon: const Icon(Icons.add),
           label: Text('add_item'.tr),

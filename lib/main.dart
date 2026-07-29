@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:se_mobile/screens/start_screen.dart';
+import 'package:se_mobile/utils/app_theme.dart';
 import 'package:se_mobile/utils/colors.dart';
 import 'package:se_mobile/utils/localization.dart';
 import 'package:se_mobile/utils/variables.dart';
@@ -64,21 +65,7 @@ class MyApp extends StatelessWidget {
         Locale('ru'),
       ],
       title: 'SemEng',
-      theme: ThemeData(
-          colorScheme: const ColorScheme(
-            primary: AppColors.mainColor,
-            background: AppColors.niceWhite,
-            onSurface: Colors.black,
-            surface: AppColors.niceWhite,
-            onPrimary: AppColors.niceWhite,
-            secondary: AppColors.mainColor,
-            error: AppColors.niceRed,
-            onBackground: Colors.black,
-            brightness: Brightness.light,
-            onError: AppColors.niceWhite,
-            onSecondary: AppColors.niceWhite,
-          )
-      ),
+      theme: AppTheme.light,
       home: FutureBuilder<Map<String, String?>>(
         future: authCheck(),
         builder: (context, res){

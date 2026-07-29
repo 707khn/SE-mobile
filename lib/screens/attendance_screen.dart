@@ -86,9 +86,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        backgroundColor: AppColors.mainColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
         title: BigText(content: 'attendance'.tr, color: Colors.white),
         actions: [
           if (!_isToday)

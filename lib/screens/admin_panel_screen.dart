@@ -97,9 +97,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        backgroundColor: AppColors.mainColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
         title: BigText(content: 'admin_panel'.tr, color: Colors.white),
         actions: [
           IconButton(
