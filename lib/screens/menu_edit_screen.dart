@@ -7,6 +7,7 @@ import '../requests/menu_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
+import '../widgets/day_navigator.dart';
 
 /// Canteen menu editor, available to the canteen technologist.
 ///
@@ -69,12 +70,6 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
           );
         }));
     });
-  }
-
-  Future<void> _changeDate(int days) async {
-    if (!await _confirmDiscard()) return;
-    setState(() => _date = _date.add(Duration(days: days)));
-    _load();
   }
 
   /// Asks before throwing away edits; returns true when it is safe to continue.
@@ -349,31 +344,13 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
   }
 
   Widget _buildDateBar() {
-    return Container(
-      color: AppColors.mainColor,
-      padding: EdgeInsets.only(
-        left: Dimensions.width20,
-        right: Dimensions.width20,
-        bottom: Dimensions.height30 * 0.5,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 30),
-            onPressed: () => _changeDate(-1),
-          ),
-          Text(
-            DateFormat('d MMMM yyyy', 'ru').format(_date),
-            style: const TextStyle(
-                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, color: Colors.white, size: 30),
-            onPressed: () => _changeDate(1),
-          ),
-        ],
-      ),
+    return DayNavigator(
+      date: _date,
+      onChanged: (d) async {
+        if (!await _confirmDiscard()) return;
+        setState(() => _date = d);
+        _load();
+      },
     );
   }
 

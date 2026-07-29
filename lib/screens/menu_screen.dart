@@ -8,6 +8,7 @@ import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
+import '../widgets/day_navigator.dart';
 import 'menu_edit_screen.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -52,11 +53,6 @@ class _MenuScreenState extends State<MenuScreen> {
     });
   }
 
-  void _changeDate(int days) {
-    setState(() => _selectedDate = _selectedDate.add(Duration(days: days)));
-    _loadMenu();
-  }
-
   Map<String, List<Map<String, dynamic>>> _groupByCategory() {
     final map = <String, List<Map<String, dynamic>>>{};
     for (final item in _items) {
@@ -71,11 +67,6 @@ class _MenuScreenState extends State<MenuScreen> {
     return _selectedDate.year == now.year &&
         _selectedDate.month == now.month &&
         _selectedDate.day == now.day;
-  }
-
-  String get _dateLabel {
-    if (_isToday) return 'today'.tr;
-    return DateFormat('d MMMM yyyy', 'ru').format(_selectedDate);
   }
 
   @override
@@ -123,7 +114,14 @@ class _MenuScreenState extends State<MenuScreen> {
       body: RefreshIndicator(
         color: AppColors.mainColor,
         onRefresh: _loadMenu,
-        child: CustomScrollView(
+        child: DaySwipeDetector(
+          date: _selectedDate,
+          enabled: !_loading,
+          onChanged: (d) {
+            setState(() => _selectedDate = d);
+            _loadMenu();
+          },
+          child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(child: _buildDateNavigation()),
@@ -138,40 +136,19 @@ class _MenuScreenState extends State<MenuScreen> {
             else
               _buildMenuList(),
           ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDateNavigation() {
-    return Container(
-      color: AppColors.mainColor,
-      padding: EdgeInsets.only(
-        left: Dimensions.width20,
-        right: Dimensions.width20,
-        bottom: Dimensions.height30 * 0.6,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 32),
-            onPressed: () => _changeDate(-1),
-          ),
-          Text(
-            _dateLabel,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, color: Colors.white, size: 32),
-            onPressed: () => _changeDate(1),
-          ),
-        ],
-      ),
+    return DayNavigator(
+      date: _selectedDate,
+      onChanged: (d) {
+        setState(() => _selectedDate = d);
+        _loadMenu();
+      },
     );
   }
 

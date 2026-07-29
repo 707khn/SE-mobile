@@ -7,6 +7,7 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
+import '../widgets/day_navigator.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({Key? key}) : super(key: key);
@@ -72,11 +73,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _selectedDate.day == now.day;
   }
 
-  void _changeDate(int delta) {
-    setState(() => _selectedDate = _selectedDate.add(Duration(days: delta)));
-    _load();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -109,7 +105,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       body: RefreshIndicator(
         color: AppColors.mainColor,
         onRefresh: _load,
-        child: CustomScrollView(
+        child: DaySwipeDetector(
+          date: _selectedDate,
+          enabled: !_loading,
+          onChanged: (d) {
+            setState(() => _selectedDate = d);
+            _load();
+          },
+          child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(child: _buildDateNav()),
@@ -125,44 +128,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             else
               _buildList(),
           ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDateNav() {
-    final locale =
-        Get.locale?.languageCode == 'KZ' ? 'ru' : 'ru';
-    final label = _isToday
-        ? 'today'.tr
-        : DateFormat('d MMMM yyyy', locale).format(_selectedDate);
-    return Container(
-      color: AppColors.mainColor,
-      padding: EdgeInsets.only(
-        left: Dimensions.width20,
-        right: Dimensions.width20,
-        bottom: Dimensions.height30 * 0.6,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 32),
-            onPressed: () => _changeDate(-1),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, color: Colors.white, size: 32),
-            onPressed: () => _changeDate(1),
-          ),
-        ],
-      ),
+    return DayNavigator(
+      date: _selectedDate,
+      onChanged: (d) {
+        setState(() => _selectedDate = d);
+        _load();
+      },
     );
   }
 
