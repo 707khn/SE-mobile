@@ -68,11 +68,18 @@ class PayslipData {
   });
 }
 
-// Re-authenticates via /login to get a fresh employee_id for the current backend.
-// Returns null if the backend explicitly rejects the credentials.
-// Falls back to the cached value only on network errors (offline / server sleeping).
-Future<String?> _freshEmployeeId() async {
+// Returns the stored employee_id, signing in only when there is none.
+//
+// This used to re-authenticate before every payslip request, which meant two
+// round-trips per month switch — and against a sleeping server that is a
+// 15-second wait on top of the payslip's own. It is unnecessary: app start-up
+// already refreshes the profile (see _refreshProfile in main.dart), so the
+// stored id is current.
+Future<String?> _resolveEmployeeId() async {
   final storage = SecureStorageHelper.instance;
+  final cached = await storage.getEmployeeId();
+  if (cached != null && cached.isNotEmpty) return cached;
+
   final login = await storage.getLogin();
   final password = await storage.getPassword();
   if (login != null && login.isNotEmpty && password != null && password.isNotEmpty) {
@@ -119,9 +126,9 @@ Future<PayslipData> fetchPayslip(String month, String year, {String? employeeId}
 
 Future<PayslipData> _fetchPayslip(
     String month, String year, int attempt, String? overrideId) async {
-  // Re-authenticate on every attempt so a fresh employee_id is used after wake-up.
-  final employeeId =
-      (overrideId != null && overrideId.isNotEmpty) ? overrideId : await _freshEmployeeId();
+  final employeeId = (overrideId != null && overrideId.isNotEmpty)
+      ? overrideId
+      : await _resolveEmployeeId();
   if (employeeId == null || employeeId.isEmpty) {
     throw const PayslipException(PayslipErrorKind.notFound);
   }

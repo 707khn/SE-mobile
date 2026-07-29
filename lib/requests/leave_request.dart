@@ -50,13 +50,18 @@ class LeaveData {
 Future<String?> _resolveEmployeeId() async {
   var id = await SecureStorageHelper.instance.getEmployeeId();
   if (id != null && id.isNotEmpty) return id;
-  final iin = await SecureStorageHelper.instance.getLogin();
-  if (iin == null || iin.isEmpty) return null;
+  // /login expects login+password; the old {'iin': ...} payload could never
+  // succeed, so this fallback silently returned null whenever it was reached.
+  final login = await SecureStorageHelper.instance.getLogin();
+  final password = await SecureStorageHelper.instance.getPassword();
+  if (login == null || login.isEmpty || password == null || password.isEmpty) {
+    return null;
+  }
   try {
     final r = await http.post(
       Uri.parse('${AppValues.baseUrl}/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'iin': iin}),
+      body: jsonEncode({'login': login, 'password': password}),
     ).timeout(const Duration(seconds: 10));
     if (r.statusCode == 200) {
       final b = jsonDecode(r.body) as Map<String, dynamic>;
