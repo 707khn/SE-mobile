@@ -66,6 +66,19 @@ class MyApp extends StatelessWidget {
       ],
       title: 'SemEng',
       theme: AppTheme.light,
+      // Honour the phone's text-size setting — warehouse and canteen staff
+      // often enlarge it — but cap the growth, since the denser screens
+      // (payslip totals, turnstile rows) start overflowing beyond this.
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: media.textScaler
+                .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.3),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: FutureBuilder<Map<String, String?>>(
         future: authCheck(),
         builder: (context, res){

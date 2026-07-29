@@ -322,7 +322,7 @@ class _PayslipPageState extends State<PayslipPage> {
                         SizedBox(height: Dimensions.height30 / 2),
                         Text(_error!,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                            style: const TextStyle(color: Colors.grey, fontSize: 15)),
                         SizedBox(height: Dimensions.height30 / 2),
                         ElevatedButton.icon(
                           onPressed: _fetchPayslip,
@@ -365,12 +365,12 @@ class _PayslipPageState extends State<PayslipPage> {
                                     Text(_payslip!.employee,
                                         style: const TextStyle(
                                             color: Colors.white,
-                                            fontSize: 16,
+                                            fontSize: 15,
                                             fontWeight: FontWeight.bold)),
                                     const SizedBox(height: 4),
                                     Text(_payslip!.period,
                                         style:
-                                            const TextStyle(color: Colors.white70, fontSize: 14)),
+                                            const TextStyle(color: Colors.white70, fontSize: 13)),
                                     if (_payslip!.position.isNotEmpty ||
                                         _payslip!.department.isNotEmpty) ...[
                                       const SizedBox(height: 2),
@@ -486,7 +486,7 @@ class _PayslipPageState extends State<PayslipPage> {
               '${_numberFormat.format(ps.netPay)} ₸',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 30,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
@@ -577,7 +577,7 @@ class _PayslipPageState extends State<PayslipPage> {
                 const SizedBox(height: 8),
                 if (items.isEmpty)
                   Text('no_records'.tr,
-                      style: const TextStyle(color: Colors.grey, fontSize: 14))
+                      style: const TextStyle(color: Colors.grey, fontSize: 13))
                 else
                   ...sorted.map((item) {
                     final pct = total > 0 ? (item.amount / total * 100) : 0.0;
@@ -601,10 +601,10 @@ class _PayslipPageState extends State<PayslipPage> {
                               children: [
                                 Expanded(
                                     child:
-                                        Text(item.name, style: const TextStyle(fontSize: 14))),
+                                        Text(item.name, style: const TextStyle(fontSize: 13))),
                                 Text('${_numberFormat.format(item.amount)} ₸',
                                     style: const TextStyle(
-                                        fontSize: 14, fontWeight: FontWeight.w500)),
+                                        fontSize: 13, fontWeight: FontWeight.w500)),
                               ],
                             ),
                             const SizedBox(height: 3),
@@ -677,10 +677,10 @@ class _PayslipPageState extends State<PayslipPage> {
                         children: [
                           Expanded(
                               child:
-                                  Text(item.name, style: const TextStyle(fontSize: 14))),
+                                  Text(item.name, style: const TextStyle(fontSize: 13))),
                           Text('${_numberFormat.format(item.amount)} ₸',
                               style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w500)),
+                                  fontSize: 13, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     )),
@@ -745,7 +745,7 @@ class _PayslipPageState extends State<PayslipPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(item.paymentType,
-                                    style: const TextStyle(fontSize: 14)),
+                                    style: const TextStyle(fontSize: 13)),
                                 if (item.document.isNotEmpty)
                                   Text(item.document,
                                       style: TextStyle(
@@ -759,7 +759,7 @@ class _PayslipPageState extends State<PayslipPage> {
                           ),
                           Text('${_numberFormat.format(item.amount)} ₸',
                               style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w500)),
+                                  fontSize: 13, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     )),

@@ -329,7 +329,7 @@ class _MainMenu1State extends State<MainMenu1> {
                         Text(
                           isInvalid ? '!' : '$diff ${'days_short'.tr}',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 11,
                             color: isInvalid ? Colors.red.shade700 : Colors.grey.shade500,
                             fontWeight: isInvalid ? FontWeight.bold : FontWeight.normal,
                           ),

@@ -262,7 +262,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             ),
           ),
         ),
-        title: Text(e.fullName, style: const TextStyle(fontSize: 14)),
+        title: Text(e.fullName, style: const TextStyle(fontSize: 13)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -301,7 +301,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       ),
       child: Text(text,
           style: TextStyle(
-              fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+              fontSize: 11, fontWeight: FontWeight.w600, color: color)),
     );
   }
 

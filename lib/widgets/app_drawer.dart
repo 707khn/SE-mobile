@@ -282,7 +282,7 @@ class _AppDrawerState extends State<AppDrawer> {
       title: Text(
         label,
         style: TextStyle(
-          fontSize: 14,
+          fontSize: 13,
           color: color ?? (selected ? AppColors.mainColor : Colors.black87),
           fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
         ),

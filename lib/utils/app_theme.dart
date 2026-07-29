@@ -27,8 +27,25 @@ class AppTheme {
     onSurface: Colors.black,
   );
 
+  /// The seven sizes the app uses, down from thirteen ad-hoc values that made
+  /// equivalent labels look different from one screen to the next.
+  ///
+  /// caption 11 · secondary 12 · body 13 · emphasis 15 · title 18 ·
+  /// headline 22 · display 28
+  static const textScale = TextTheme(
+    labelSmall: TextStyle(fontSize: 11),
+    bodySmall: TextStyle(fontSize: 12),
+    bodyMedium: TextStyle(fontSize: 13),
+    bodyLarge: TextStyle(fontSize: 15),
+    titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    headlineSmall: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+    displaySmall: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+  );
+
   static ThemeData get light => ThemeData(
         colorScheme: _colorScheme,
+        textTheme: textScale,
 
         // Green bar, white content, flat — stated outright so it no longer
         // depends on which Material version is in force.

@@ -246,7 +246,7 @@ class _MainPage2State extends State<MainPage2> {
                           Text(
                             isInvalid ? '!' : '$diff ${'days_short'.tr}',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 11,
                               color: isInvalid ? Colors.red.shade700 : Colors.grey.shade500,
                               fontWeight: isInvalid ? FontWeight.bold : FontWeight.normal,
                             ),

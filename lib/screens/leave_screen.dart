@@ -132,7 +132,7 @@ class _LeavePageState extends State<LeavePage> {
                         Text(
                           _error!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.grey, fontSize: 16),
+                          style: const TextStyle(color: Colors.grey, fontSize: 15),
                         ),
                         SizedBox(height: Dimensions.height30 / 2),
                         ElevatedButton.icon(
@@ -162,7 +162,7 @@ class _LeavePageState extends State<LeavePage> {
                         _leaveData!.employee,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -262,7 +262,7 @@ class _LeavePageState extends State<LeavePage> {
                       child: Center(
                         child: Text(
                           'no_records'.tr,
-                          style: const TextStyle(color: Colors.grey, fontSize: 14),
+                          style: const TextStyle(color: Colors.grey, fontSize: 13),
                         ),
                       ),
                     ),
@@ -301,7 +301,7 @@ class _LeavePageState extends State<LeavePage> {
                       child: Center(
                         child: Text(
                           'no_records'.tr,
-                          style: const TextStyle(color: Colors.grey, fontSize: 14),
+                          style: const TextStyle(color: Colors.grey, fontSize: 13),
                         ),
                       ),
                     ),
@@ -504,7 +504,7 @@ class _LeavePageState extends State<LeavePage> {
     return Card(
       child: ListTile(
         leading: Icon(icon, color: iconColor, size: 28),
-        title: Text(record.type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        title: Text(record.type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         subtitle: Text(
           '${_fmtDate(record.startDate)} — ${_fmtDate(record.endDate)}  (${record.days} ${'days_short'.tr})',
           style: const TextStyle(fontSize: 13),

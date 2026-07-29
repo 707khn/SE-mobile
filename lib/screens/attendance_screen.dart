@@ -177,7 +177,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           const SizedBox(width: 4),
           Text(
             'records_count'.tr,
-            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            style: TextStyle(fontSize: 13, color: Colors.grey[700]),
           ),
         ],
       ),
@@ -211,7 +211,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 style: const TextStyle(
                     color: AppColors.mainColor,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14),
+                    fontSize: 13),
               ),
             ),
             const SizedBox(width: 12),

@@ -108,7 +108,7 @@ class AdminEmployeeScreen extends StatelessWidget {
                     Text(employee.fullName,
                         style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 17,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold)),
                     const SizedBox(height: 3),
                     Text(employee.jobTitle,
@@ -220,7 +220,7 @@ class AdminEmployeeScreen extends StatelessWidget {
           child: Icon(icon, color: color, size: 22),
         ),
         title: Text(label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         subtitle: Text(
           empty ? 'no_data'.tr : '${'records_count'.tr}: $count',
           style: TextStyle(
