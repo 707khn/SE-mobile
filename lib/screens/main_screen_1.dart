@@ -14,6 +14,7 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
 import '../variables.dart';
+import '../widgets/access_log_list.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 
@@ -483,64 +484,7 @@ class _MainMenu1State extends State<MainMenu1> {
                         ),
                       ),
                     if (filtered.isNotEmpty || _filterText.isEmpty)
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SizedBox(
-                        width: Dimensions.width120 * 4,
-                        child: DataTable(
-                          headingTextStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.mainColor,
-                            fontSize: 13,
-                          ),
-                          columns: [
-                            DataColumn(label: Text('col_date'.tr)),
-                            DataColumn(label: Text('col_time'.tr)),
-                            DataColumn(label: Text('col_event'.tr)),
-                            DataColumn(label: Text('col_door'.tr)),
-                          ],
-                          rows: filtered.asMap().entries.map((e) {
-                      final idx = e.key;
-                      final entry = e.value;
-                      final isToday = _isToday(entry[0]);
-                      return DataRow(
-                        color: WidgetStateProperty.all(
-                          isToday
-                              ? AppColors.mainColor.withOpacity(0.08)
-                              : (idx.isEven ? Colors.transparent : Colors.grey.shade50),
-                        ),
-                        cells: [
-                          DataCell(
-                            Text(
-                              _formatDate(entry[0]),
-                              style: isToday
-                                  ? const TextStyle(
-                                      color: AppColors.mainColor,
-                                      fontWeight: FontWeight.bold,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                          DataCell(Text(entry[1])),
-                          DataCell(Text(entry[2])),
-                          DataCell(
-                            Text(entry[3]),
-                            onLongPress: () {
-                              final row = '${_formatDate(entry[0])}  ${entry[1]}  ${entry[2]}  ${entry[3]}';
-                              Clipboard.setData(ClipboardData(text: row));
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text('copied'.tr),
-                                duration: const Duration(seconds: 1),
-                                behavior: SnackBarBehavior.floating,
-                              ));
-                            },
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
+                      AccessLogList(entries: filtered),
                   ],
                 );
               }),
@@ -588,14 +532,6 @@ class _MainMenu1State extends State<MainMenu1> {
     super.dispose();
   }
 
-  String _formatDate(String raw) {
-    try {
-      final d = DateTime.parse(raw);
-      return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
-    } catch (_) {
-      return raw;
-    }
-  }
 
   Widget _buildEventSummary(List<List<String>> data) {
     final counts = <String, int>{};
@@ -686,13 +622,4 @@ class _MainMenu1State extends State<MainMenu1> {
   String _fmtTime(DateTime dt) =>
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
-  bool _isToday(String raw) {
-    try {
-      final d = DateTime.parse(raw);
-      final now = DateTime.now();
-      return d.year == now.year && d.month == now.month && d.day == now.day;
-    } catch (_) {
-      return false;
-    }
-  }
 }
