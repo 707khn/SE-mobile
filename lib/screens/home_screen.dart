@@ -89,17 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildGreetingCard(),
             SizedBox(height: Dimensions.height30 / 1.2),
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 10),
-              child: Text(
-                'quick_access'.tr,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
-                ),
-              ),
-            ),
             GridView.count(
               // A lone admin card reads better as a full-width banner than as
               // one square in a two-column grid.
