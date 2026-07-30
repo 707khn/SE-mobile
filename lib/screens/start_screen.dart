@@ -103,17 +103,29 @@ class CustomFormState extends State<CustomForm> {
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
                   onTap: _changeLanguage,
-                  child: _lang == "KZ"
-                      ? SizedBox(
-                          width: Dimensions.width20 * 1.25,
-                          height: Dimensions.height30 * 1.25,
-                          child: Image.asset('assets/ru.png'),
-                        )
-                      : SizedBox(
-                          width: Dimensions.width20 * 1.25,
-                          height: Dimensions.height30 * 1.25,
-                          child: Image.asset('assets/kz.png'),
+                  // The flag shows the language you switch *to*, so the caption
+                  // names that same language rather than the current one.
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: Dimensions.width20 * 1.25,
+                        height: Dimensions.height30 * 1.25,
+                        child: Image.asset(
+                            _lang == "KZ" ? 'assets/ru.png' : 'assets/kz.png'),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _lang == "KZ" ? 'RU' : 'KZ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade700,
+                          letterSpacing: 0.5,
                         ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               SizedBox(height: Dimensions.height30 / 2),
