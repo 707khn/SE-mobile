@@ -223,9 +223,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: ChoiceChip(
-        label: Text(label, style: const TextStyle(fontSize: 12)),
+        label: Text(label),
         selected: selected,
-        selectedColor: AppColors.mainColor.withOpacity(0.18),
         onSelected: (_) => onTap(),
       ),
     );

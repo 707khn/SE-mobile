@@ -148,9 +148,8 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
                   children: _suggestedCategories.map((c) {
                     final selected = categoryController.text.trim() == c;
                     return ChoiceChip(
-                      label: Text(c, style: const TextStyle(fontSize: 12)),
+                      label: Text(c),
                       selected: selected,
-                      selectedColor: AppColors.mainColor.withOpacity(0.18),
                       onSelected: (_) =>
                           setDialogState(() => categoryController.text = c),
                     );

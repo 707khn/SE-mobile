@@ -92,11 +92,23 @@ class AppTheme {
           ),
         ),
 
+        // Chips need a visible outline: a pale fill with no border and an
+        // unspecified label colour left them almost invisible on white.
         chipTheme: ChipThemeData(
-          backgroundColor: Colors.grey.shade100,
-          selectedColor: AppColors.mainColor.withOpacity(0.18),
-          labelStyle: const TextStyle(fontSize: 12),
-          side: BorderSide.none,
+          backgroundColor: Colors.white,
+          selectedColor: AppColors.mainColor.withOpacity(0.15),
+          labelStyle: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade900,
+            fontWeight: FontWeight.w500,
+          ),
+          secondaryLabelStyle: const TextStyle(
+            fontSize: 12,
+            color: AppColors.mainColor,
+            fontWeight: FontWeight.w600,
+          ),
+          side: BorderSide(color: Colors.grey.shade400),
+          checkmarkColor: AppColors.mainColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
 

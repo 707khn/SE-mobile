@@ -578,7 +578,8 @@ class _MainMenu1State extends State<MainMenu1> {
 
   Widget _buildPresetChip(String label, VoidCallback onTap) {
     return ActionChip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
+      // No inline style: the chip theme governs size and colour.
+      label: Text(label),
       onPressed: _loadingReport ? null : () {
         HapticFeedback.selectionClick();
         onTap();
