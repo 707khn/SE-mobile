@@ -1,70 +1,88 @@
-# Загрузка меню столовой из Excel в приложение SE-mobile.
+﻿# Загрузка меню столовой из Excel в приложение SE-mobile.
 #
-# Запускается через "Загрузить меню.bat" — либо перетаскиванием файла на ярлык,
+# Запускается через "Загрузить меню.bat" — перетаскиванием файла на ярлык
 # либо двойным щелчком (тогда откроется окно выбора файла).
 #
+# Файл сохранён в UTF-8 С BOM: Windows PowerShell 5.1 читает .ps1 без BOM
+# как ANSI, и кириллица ломается ещё на разборе скрипта.
+#
 # Разбор таблицы делает сервер: если 1С поменяет разметку выгрузки, править
-# нужно только сервер, а этот скрипт на компьютере в столовой трогать не надо.
+# нужно только сервер, а этот скрипт на компьютере в столовой — нет.
 
 param([string]$FilePath)
 
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Windows.Forms | Out-Null
+$logPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'upload_log.txt'
 
-function Show-Message($text, $title, $icon) {
-    [System.Windows.Forms.MessageBox]::Show($text, $title, 'OK', $icon) | Out-Null
+function Write-Log($text) {
+    $stamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    Add-Content -Path $logPath -Value "$stamp  $text" -Encoding UTF8
 }
 
+function Show-Message($text, $title, $icon) {
+    # Окно, если формы доступны; иначе — консоль, чтобы сообщение не пропало.
+    try {
+        [System.Windows.Forms.MessageBox]::Show($text, $title, 'OK', $icon) | Out-Null
+    } catch {
+        Write-Host ""
+        Write-Host "$title : $text"
+    }
+}
+
+# Всё в одном try: раньше Add-Type стоял снаружи, и при сбое показывать ошибку
+# было уже нечем — окно просто не появлялось.
 try {
+    Write-Log "--- запуск, аргумент: '$FilePath' ---"
+
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+    Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
+
+    # .NET Framework по умолчанию может брать TLS 1.0, а сервер принимает 1.2.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
     # --- настройки ---------------------------------------------------------
     $settingsPath = Join-Path $scriptDir 'settings.txt'
     if (-not (Test-Path $settingsPath)) {
-        Show-Message "Не найден файл settings.txt рядом со скриптом.`n`nЗаполните его по образцу из README.txt." 'Меню столовой' 'Error'
-        exit 1
+        throw "Не найден файл settings.txt рядом со скриптом."
     }
 
     $settings = @{}
-    foreach ($line in Get-Content $settingsPath -Encoding UTF8) {
+    foreach ($line in Get-Content $settingsPath) {
         $trimmed = $line.Trim()
         if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
         $parts = $trimmed -split '=', 2
         if ($parts.Count -eq 2) { $settings[$parts[0].Trim()] = $parts[1].Trim() }
     }
-
     foreach ($key in 'server', 'login', 'password') {
         if (-not $settings.ContainsKey($key) -or $settings[$key] -eq '') {
-            Show-Message "В settings.txt не заполнено поле '$key'." 'Меню столовой' 'Error'
-            exit 1
+            throw "В settings.txt не заполнено поле '$key'."
         }
     }
+    Write-Log "сервер: $($settings['server']), логин: $($settings['login'])"
 
     # --- выбор файла -------------------------------------------------------
-    if (-not $FilePath) {
+    if ([string]::IsNullOrWhiteSpace($FilePath)) {
         $dialog = New-Object System.Windows.Forms.OpenFileDialog
         $dialog.Title = 'Выберите файл меню, выгруженный из 1С'
         $dialog.Filter = 'Excel (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls'
-        # Открываем сразу там, куда 1С обычно кладёт выгрузки.
-        $dialog.InitialDirectory = if ($settings.ContainsKey('folder') -and (Test-Path $settings['folder'])) {
-            $settings['folder']
-        } else {
-            [Environment]::GetFolderPath('MyDocuments')
-        }
-        if ($dialog.ShowDialog() -ne 'OK') { exit 0 }
+        $dialog.InitialDirectory =
+            if ($settings.ContainsKey('folder') -and $settings['folder'] -ne '' -and (Test-Path $settings['folder'])) {
+                $settings['folder']
+            } else {
+                [Environment]::GetFolderPath('MyDocuments')
+            }
+        if ($dialog.ShowDialog() -ne 'OK') { Write-Log "выбор файла отменён"; exit 0 }
         $FilePath = $dialog.FileName
     }
-
-    if (-not (Test-Path $FilePath)) {
-        Show-Message "Файл не найден:`n$FilePath" 'Меню столовой' 'Error'
-        exit 1
+    if (-not (Test-Path -LiteralPath $FilePath)) {
+        throw "Файл не найден: $FilePath"
     }
+    Write-Log "файл: $FilePath"
 
     # --- отправка ----------------------------------------------------------
     # Через HttpClient, а не Invoke-RestMethod -Form: параметр -Form есть
     # только в PowerShell 7, а в Windows встроен 5.1.
-    Add-Type -AssemblyName System.Net.Http | Out-Null
-
     $url = $settings['server'].TrimEnd('/') + '/api/menu/import-excel'
     $client = New-Object System.Net.Http.HttpClient
     # Render на бесплатном тарифе засыпает — первый запрос ждёт пробуждения.
@@ -73,7 +91,6 @@ try {
     $content = New-Object System.Net.Http.MultipartFormDataContent
     $content.Add((New-Object System.Net.Http.StringContent($settings['login'])), 'login')
     $content.Add((New-Object System.Net.Http.StringContent($settings['password'])), 'password')
-    # Дата для блюд, перечисленных до первой даты в файле.
     if ($settings.ContainsKey('default_date') -and $settings['default_date'] -ne '') {
         $content.Add((New-Object System.Net.Http.StringContent($settings['default_date'])), 'date')
     }
@@ -84,9 +101,11 @@ try {
         [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/octet-stream')
     $content.Add($fileContent, 'file', [System.IO.Path]::GetFileName($FilePath))
 
+    Write-Log "отправка на $url ..."
     $response = $client.PostAsync($url, $content).GetAwaiter().GetResult()
     $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
     $client.Dispose()
+    Write-Log "ответ $($response.StatusCode): $body"
 
     $parsed = $null
     try { $parsed = $body | ConvertFrom-Json } catch { }
@@ -94,12 +113,14 @@ try {
 
     if ($response.IsSuccessStatusCode) {
         Show-Message $text 'Меню загружено' 'Information'
-    } else {
-        Show-Message "Не удалось загрузить меню.`n`n$text" 'Меню столовой' 'Error'
-        exit 1
+        exit 0
     }
+    throw $text
 }
 catch {
-    Show-Message "Не удалось загрузить меню.`n`n$($_.Exception.Message)" 'Меню столовой' 'Error'
+    $detail = $_.Exception.Message
+    Write-Log "ОШИБКА: $detail"
+    Write-Log $_.ScriptStackTrace
+    Show-Message ("Не удалось загрузить меню." + [Environment]::NewLine + [Environment]::NewLine + $detail + [Environment]::NewLine + [Environment]::NewLine + "Подробности в файле upload_log.txt") 'Меню столовой' 'Error'
     exit 1
 }
