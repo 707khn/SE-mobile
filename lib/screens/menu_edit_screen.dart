@@ -67,6 +67,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
             category: (item['category'] as String?) ?? '',
             name: (item['name'] as String?) ?? '',
             price: (item['price'] as num?)?.toDouble(),
+            portion: item['portion'] as String?,
           );
         }));
     });
@@ -104,6 +105,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
               'category': e.category.trim(),
               'name': e.name.trim(),
               'price': e.price,
+              'portion': e.portion,
             })
         .toList();
     final ok = await saveMenuForDate(_dateKey, payload);
@@ -124,6 +126,8 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
     final nameController = TextEditingController(text: existing?.name ?? '');
     final priceController = TextEditingController(
         text: existing?.price != null ? existing!.price!.toStringAsFixed(0) : '');
+    final portionController =
+        TextEditingController(text: existing?.portion ?? '');
     // Default to the section the technologist last used — most dishes are
     // entered section by section.
     var category = existing?.category ??
@@ -176,13 +180,30 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: priceController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'menu_price'.tr,
-                    isDense: true,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: portionController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'menu_portion'.tr,
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: priceController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'menu_price'.tr,
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -222,16 +243,20 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
     category = categoryController.text.trim();
     final name = nameController.text.trim();
     final price = double.tryParse(priceController.text.trim().replaceAll(',', '.'));
+    final portionText = portionController.text.trim();
+    final portion = portionText.isEmpty ? null : portionText;
 
     setState(() {
       _dirty = true;
       if (existing == null) {
-        _items.add(_MenuEntry(category: category, name: name, price: price));
+        _items.add(_MenuEntry(
+            category: category, name: name, price: price, portion: portion));
       } else {
         existing
           ..category = category
           ..name = name
-          ..price = price;
+          ..price = price
+          ..portion = portion;
       }
     });
   }
@@ -387,6 +412,30 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
     return ListView(children: tiles);
   }
 
+  /// Portion and price, whichever the dish has — 1C exports often carry only
+  /// the portion.
+  Widget? _subtitleFor(_MenuEntry item) {
+    final parts = <String>[];
+    final portion = item.portion?.trim() ?? '';
+    if (portion.isNotEmpty) {
+      parts.add(RegExp(r'^[\d.,]+$').hasMatch(portion)
+          ? '$portion ${'menu_portion_unit'.tr}'
+          : portion);
+    }
+    if (item.price != null) {
+      parts.add('${NumberFormat('#,##0', 'ru').format(item.price)} ₸');
+    }
+    if (parts.isEmpty) return null;
+    return Text(
+      parts.join(' · '),
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: AppColors.mainColor,
+      ),
+    );
+  }
+
   Widget _buildItemTile(_MenuEntry item) {
     return Dismissible(
       key: ObjectKey(item),
@@ -417,13 +466,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
         ),
         child: ListTile(
           title: Text(item.name, style: const TextStyle(fontSize: 15)),
-          subtitle: item.price != null
-              ? Text('${NumberFormat('#,##0', 'ru').format(item.price)} ₸',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.mainColor))
-              : null,
+          subtitle: _subtitleFor(item),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -449,9 +492,17 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
 }
 
 class _MenuEntry {
-  _MenuEntry({required this.category, required this.name, this.price});
+  _MenuEntry({
+    required this.category,
+    required this.name,
+    this.price,
+    this.portion,
+  });
 
   String category;
   String name;
   double? price;
+
+  /// Portion as printed in the 1C export; unit unstated there.
+  String? portion;
 }

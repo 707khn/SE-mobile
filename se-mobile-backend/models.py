@@ -156,3 +156,7 @@ class MenuItem(db.Model):
     category = db.Column(db.String(50), nullable=False)
     name = db.Column(db.String(255), nullable=False)
     price = db.Column(db.Numeric(10, 2))
+    # Portion as printed in the 1C export ("100", "56.25"). Kept as text: the
+    # unit is grams for food and millilitres for drinks, and the sheet does not
+    # say which.
+    portion = db.Column(db.String(50))

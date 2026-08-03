@@ -226,6 +226,14 @@ class _MenuScreenState extends State<MenuScreen> {
     final priceStr = price != null
         ? NumberFormat('#,##0', 'ru').format(price) + ' ₸'
         : '';
+    // Unit is unknown — grams for food, millilitres for drinks — so the number
+    // is shown as the export wrote it, with a neutral suffix.
+    final portionRaw = (item['portion'] as String?)?.trim() ?? '';
+    final portionStr = portionRaw.isEmpty
+        ? ''
+        : (RegExp(r'^[\d.,]+$').hasMatch(portionRaw)
+            ? '$portionRaw ${'menu_portion_unit'.tr}'
+            : portionRaw);
 
     return Container(
       margin: EdgeInsets.symmetric(
@@ -248,7 +256,20 @@ class _MenuScreenState extends State<MenuScreen> {
         child: Row(
           children: [
             Expanded(
-              child: Text(name, style: const TextStyle(fontSize: 15)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: const TextStyle(fontSize: 15)),
+                  // The 1C export carries a portion and often no price at all.
+                  if (portionStr.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      portionStr,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ],
+              ),
             ),
             if (priceStr.isNotEmpty) ...[
               const SizedBox(width: 12),

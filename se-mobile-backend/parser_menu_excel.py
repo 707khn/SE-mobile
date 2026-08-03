@@ -1,18 +1,20 @@
 """
 Parser for canteen menu spreadsheets exported from 1C.
 
-The exact layout 1C produces is not fixed, so the parser reads the sheet
-structurally rather than by hard-coded cell addresses:
+The layout is not fixed, so the sheet is read structurally rather than by
+hard-coded cell addresses:
 
-- a date is taken from any cell that looks like дд.мм.гггг (or a real date
-  cell); everything after it belongs to that day, so one file may hold several
-  days;
-- a row whose name cell is filled and whose price parses is a dish;
-- a row with a name but no price is treated as a section heading and applies to
-  the dishes below it;
-- header rows ("Наименование", "Цена", …) and totals ("Итого") are skipped.
+- the date comes from any cell holding a real date, "03.08.2026" or the written
+  form 1C actually produces — "Меню на 03 августа 2026 г.";
+- the header row ("Наименование", "Выход", "Цена"…) decides which column is
+  what. This matters: the real exports carry a portion column and no price at
+  all, and reading a 100-gram portion as a 100-tenge price would put wrong
+  numbers in front of every employee;
+- a row with a name and no other value is a section heading and applies to the
+  dishes below it;
+- one file may hold several days.
 
-Returns: [{'date': date, 'items': [{'category', 'name', 'price'}, ...]}, ...]
+Returns: [{'date': date, 'items': [{'category', 'name', 'price', 'portion'}]}]
 """
 
 import io
@@ -23,79 +25,164 @@ from openpyxl import load_workbook
 
 DEFAULT_CATEGORY = 'Блюда'
 
-_DATE_TEXT = re.compile(r'(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})')
+_MONTHS = {
+    'январ': 1, 'феврал': 2, 'март': 3, 'апрел': 4, 'ма': 5, 'июн': 6,
+    'июл': 7, 'август': 8, 'сентябр': 9, 'октябр': 10, 'ноябр': 11, 'декабр': 12,
+}
 
-# Cells that label the table rather than name a dish.
-_HEADER_WORDS = (
-    'наименование', 'блюдо', 'цена', 'стоимость', 'сумма', 'выход',
-    '№', 'п/п', 'количество', 'калорийность', 'вес',
-)
-_SKIP_WORDS = ('итого', 'всего', 'подпись', 'утверждаю', 'директор', 'калькулятор')
+_DATE_NUMERIC = re.compile(r'(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})')
+_DATE_WORDS = re.compile(r'(\d{1,2})\s+([А-Яа-яЁё]{3,})\s+(\d{4})')
+
+# Header labels, mapped to the meaning of that column.
+_HEADER_NAME = ('наименование', 'блюдо', 'название')
+_HEADER_PORTION = ('выход', 'порция', 'вес', 'объем', 'объём', 'грамм')
+_HEADER_PRICE = ('цена', 'стоимость', 'сумма')
+
+_SKIP_ROWS = ('итого', 'всего', 'подпись', 'утверждаю', 'директор', 'калькулятор')
 
 # Currency suffixes that may sit next to the number in a price cell.
 _CURRENCY = re.compile(r'\s*(₸|тг\.?|тенге|kzt|руб\.?)\s*$', re.I)
 
 
 def _text(value) -> str:
-    if value is None:
-        return ''
-    if isinstance(value, (datetime, date)):
+    if value is None or isinstance(value, (datetime, date)):
         return ''
     return ' '.join(str(value).split())
 
 
-def _parse_price(value):
-    """Accepts 450, '450', '1 200,50', '450 тг'. Returns float or None.
-
-    Rejects anything carrying other letters, so a portion size like "250 г"
-    is not mistaken for a price.
-    """
+def _parse_number(value):
+    """450, '450', '1 200,50', '450 тг' -> float. Other letters -> None."""
     if value is None or isinstance(value, (datetime, date, bool)):
         return None
     if isinstance(value, (int, float)):
         return float(value)
-    cleaned = str(value).strip().replace('\xa0', ' ')
-    cleaned = _CURRENCY.sub('', cleaned)
+    cleaned = _CURRENCY.sub('', str(value).strip().replace('\xa0', ' '))
     cleaned = cleaned.replace(' ', '').replace(',', '.')
-    # Digits, at most one decimal point, nothing else.
-    if not re.fullmatch(r'\d+(\.\d+)?', cleaned):
-        return None
-    return float(cleaned)
+    return float(cleaned) if re.fullmatch(r'\d+(\.\d+)?', cleaned) else None
 
 
 def _parse_date(value):
-    """Reads a real date cell or дд.мм.гггг inside text. Returns date or None."""
+    """Real date cell, "03.08.2026", or "Меню на 03 августа 2026 г."."""
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, date):
         return value
-    match = _DATE_TEXT.search(str(value or ''))
-    if not match:
-        return None
-    day, month, year = (int(part) for part in match.groups())
-    if year < 100:
-        year += 2000
-    try:
-        return date(year, month, day)
-    except ValueError:
-        return None
+    text = str(value or '')
+
+    match = _DATE_NUMERIC.search(text)
+    if match:
+        day, month, year = (int(p) for p in match.groups())
+        if year < 100:
+            year += 2000
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
+
+    match = _DATE_WORDS.search(text)
+    if match:
+        day, word, year = match.group(1), match.group(2).lower(), match.group(3)
+        # Prefix match: the word is inflected ("августа", "мая", "января").
+        month = next((n for stem, n in _MONTHS.items() if word.startswith(stem)), None)
+        if month:
+            try:
+                return date(int(year), month, int(day))
+            except ValueError:
+                return None
+    return None
 
 
-def _is_header(text: str) -> bool:
-    lowered = text.lower()
-    return any(word in lowered for word in _HEADER_WORDS)
+def _read_header(texts):
+    """Returns {'name': i, 'portion': i, 'price': i} for a header row, else None.
+
+    Requires at least two recognised columns. A single match is not a header:
+    the section heading "Второе блюдо" contains "блюдо" and would otherwise be
+    read as one, wiping the real column map and sending portions into prices.
+    """
+    columns = {}
+    for index, cell in enumerate(texts):
+        lowered = cell.lower()
+        if not lowered:
+            continue
+        if any(w in lowered for w in _HEADER_NAME):
+            columns.setdefault('name', index)
+        elif any(w in lowered for w in _HEADER_PORTION):
+            columns.setdefault('portion', index)
+        elif any(w in lowered for w in _HEADER_PRICE):
+            columns.setdefault('price', index)
+    return columns if 'name' in columns and len(columns) >= 2 else None
 
 
-def _is_skippable(text: str) -> bool:
-    lowered = text.lower()
-    return any(lowered.startswith(word) for word in _SKIP_WORDS)
+def _parse_sheet(sheet, days, state):
+    for row in sheet.iter_rows(values_only=True):
+        if row is None or all(cell is None for cell in row):
+            continue
+        texts = [_text(cell) for cell in row]
+
+        found_date = next(
+            (d for d in (_parse_date(cell) for cell in row) if d is not None), None)
+        if found_date is not None:
+            state['date'] = found_date
+            state['category'] = DEFAULT_CATEGORY
+            continue
+
+        header = _read_header(texts)
+        if header:
+            state['columns'] = header
+            continue
+
+        columns = state['columns']
+        name_at = columns.get('name', 0)
+        name = texts[name_at] if name_at < len(texts) else ''
+        # A leading "№ п/п" column would otherwise be taken for the dish.
+        if not name or _parse_number(name) is not None:
+            name = next(
+                (t for t in texts if t and _parse_number(t) is None), '')
+        if not name:
+            continue
+
+        lowered = name.lower()
+        if any(lowered.startswith(w) for w in _SKIP_ROWS):
+            continue
+
+        def at(key):
+            index = columns.get(key)
+            if index is None or index >= len(texts):
+                return None
+            return texts[index] or None
+
+        portion = at('portion')
+        price = _parse_number(at('price'))
+
+        # No portion and no price: a section heading, not a dish.
+        if portion is None and price is None:
+            others = [t for i, t in enumerate(texts) if t and i != name_at]
+            if not others:
+                state['category'] = name
+                continue
+            # Columns unknown (no header row) — treat a lone number as the price.
+            price = next((_parse_number(t) for t in others
+                          if _parse_number(t) is not None), None)
+            if price is None:
+                state['category'] = name
+                continue
+
+        if state['date'] is None:
+            continue
+
+        days.setdefault(state['date'], []).append({
+            'category': state['category'],
+            'name': name,
+            'price': price,
+            'portion': portion,
+        })
 
 
 def parse_menu_excel(data: bytes, fallback_date: date | None = None):
     """Parses the workbook bytes into per-day menus.
 
-    [fallback_date] is used for dishes that appear before any date is found in
-    the sheet. Raises ValueError when the file yields nothing usable.
+    [fallback_date] covers dishes listed before any date appears in the sheet.
+    Raises ValueError when nothing usable is found.
     """
     try:
         workbook = load_workbook(filename=io.BytesIO(data), data_only=True)
@@ -103,58 +190,12 @@ def parse_menu_excel(data: bytes, fallback_date: date | None = None):
         raise ValueError(f'Не удалось открыть файл Excel: {exc}') from exc
 
     days: dict[date, list[dict]] = {}
-    current_date = fallback_date
-    category = DEFAULT_CATEGORY
-
+    state = {'date': fallback_date, 'category': DEFAULT_CATEGORY, 'columns': {}}
     for sheet in workbook.worksheets:
-        for row in sheet.iter_rows(values_only=True):
-            if row is None or all(cell is None for cell in row):
-                continue
+        _parse_sheet(sheet, days, state)
 
-            # A date anywhere on the row switches the day for what follows.
-            found_date = next(
-                (d for d in (_parse_date(cell) for cell in row) if d is not None), None)
-
-            texts = [_text(cell) for cell in row]
-            prices = [_parse_price(cell) for cell in row]
-            # The name is the first text that is not a bare number — a leading
-            # "№ п/п" column must not be taken for the dish.
-            name_at = next(
-                (i for i, t in enumerate(texts) if t and _parse_price(t) is None), None)
-            name = texts[name_at] if name_at is not None else ''
-            # The price column sits to the right of the name, so scan from the
-            # end and only consider cells after it.
-            price = next(
-                (p for i, p in reversed(list(enumerate(prices)))
-                 if p is not None and name_at is not None and i > name_at), None)
-
-            if found_date is not None:
-                current_date = found_date
-                category = DEFAULT_CATEGORY
-                # A row that only announces the day carries no dish, and its
-                # text must not be taken for a section heading.
-                if not name or _is_header(name) or _parse_date(name) is not None:
-                    continue
-
-            if not name or _is_header(name) or _is_skippable(name):
-                continue
-
-            if price is None:
-                # Name without a price — a section heading.
-                category = name
-                continue
-
-            if current_date is None:
-                # Dishes before any date and without a fallback cannot be filed.
-                continue
-
-            days.setdefault(current_date, []).append({
-                'category': category,
-                'name': name,
-                'price': price,
-            })
-
-    result = [{'date': day, 'items': items} for day, items in sorted(days.items()) if items]
+    result = [{'date': day, 'items': items}
+              for day, items in sorted(days.items()) if items]
     if not result:
         raise ValueError(
             'В файле не найдено ни одного блюда. Проверьте, что это выгрузка меню из 1С.')

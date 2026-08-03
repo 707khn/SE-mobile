@@ -148,6 +148,9 @@ def _migrate_schema():
         'employees': {
             'department': 'VARCHAR(200)',
         },
+        'menu_items': {
+            'portion': 'VARCHAR(50)',
+        },
         'payslips': {
             'position':    'VARCHAR(200)',
             'department':  'VARCHAR(200)',
@@ -833,7 +836,8 @@ def register_routes(app):
             return jsonify({'message': 'Success', 'date': date_str, 'items': []})
 
         items = [{'id': i.id, 'category': i.category, 'name': i.name,
-                  'price': float(i.price) if i.price is not None else None}
+                  'price': float(i.price) if i.price is not None else None,
+                  'portion': i.portion}
                  for i in menu.items]
         return jsonify({'message': 'Success', 'date': date_str, 'items': items})
 
@@ -866,6 +870,8 @@ def register_routes(app):
                 category=category,
                 name=name,
                 price=float(price) if price is not None else None,
+                portion=(str(item.get('portion')).strip()
+                         if item.get('portion') else None),
             ))
 
         db.session.commit()
@@ -930,6 +936,7 @@ def register_routes(app):
                     category=item['category'],
                     name=item['name'],
                     price=item['price'],
+                    portion=item.get('portion'),
                 ))
                 sections[item['category']] = sections.get(item['category'], 0) + 1
 
