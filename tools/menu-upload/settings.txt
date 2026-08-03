@@ -1,7 +1,8 @@
 # Настройки загрузки меню. Заполняется один раз.
 
-# Адрес сервера приложения
-server = https://se-mobile-backend.onrender.com
+# Адрес сервера приложения — тот же, что использует приложение
+# (см. baseUrl в lib/utils/variables.dart)
+server = https://se-mobile.onrender.com
 
 # Логин и пароль технолога столовой (те же, что и в приложении)
 login = 44
