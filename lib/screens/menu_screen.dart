@@ -208,17 +208,39 @@ class _MenuScreenState extends State<MenuScreen> {
         right: Dimensions.width20,
         bottom: 4,
       ),
-      child: Text(
-        category,
-        style: TextStyle(
-          color: AppColors.mainColor,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              category,
+              style: TextStyle(
+                color: AppColors.mainColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          // Names the right-hand column, so a bare "100 г" is not a mystery.
+          if (_hasPortions)
+            SizedBox(
+              width: 62 + 16,
+              child: Text(
+                'menu_portion'.tr,
+                textAlign: TextAlign.right,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              ),
+            ),
+        ],
       ),
     );
   }
+
+  /// True when at least one dish of the day carries a portion — the header
+  /// label is pointless otherwise.
+  bool get _hasPortions => _items.any((item) =>
+      ((item as Map<String, dynamic>)['portion'] as String?)?.trim().isNotEmpty ??
+      false);
 
   Widget _buildItemTile(Map<String, dynamic> item) {
     final name = item['name'] as String? ?? '—';
@@ -256,23 +278,28 @@ class _MenuScreenState extends State<MenuScreen> {
         child: Row(
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: const TextStyle(fontSize: 15)),
-                  // The 1C export carries a portion and often no price at all.
-                  if (portionStr.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      portionStr,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                  ],
-                ],
-              ),
+              child: Text(name, style: const TextStyle(fontSize: 15)),
             ),
+            // Portion in its own right-hand column, as in the source table.
+            // Fixed width so the numbers line up down the list.
+            if (portionStr.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 62,
+                child: Text(
+                  portionStr,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
             if (priceStr.isNotEmpty) ...[
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Text(
                 priceStr,
                 style: TextStyle(
