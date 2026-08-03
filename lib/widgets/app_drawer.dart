@@ -8,6 +8,7 @@ import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/main_screen_2.dart';
+import '../screens/menu_screen.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
@@ -95,13 +96,19 @@ class _AppDrawerState extends State<AppDrawer> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                if (_isAdmin)
+                if (_isAdmin) ...[
                   _item(
                     icon: Icons.admin_panel_settings,
                     label: 'admin_panel'.tr,
                     onTap: () => Get.to(() => const AdminPanelScreen()),
-                  )
-                else ...[
+                  ),
+                  // Pushed as a route: the admin has no tab bar.
+                  _item(
+                    icon: Icons.restaurant_menu_outlined,
+                    label: 'canteen_menu'.tr,
+                    onTap: () => Get.to(() => MenuScreen(job: _job)),
+                  ),
+                ] else ...[
                   _item(
                     icon: Icons.home_outlined,
                     label: 'tab_home'.tr,

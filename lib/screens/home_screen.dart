@@ -10,6 +10,7 @@ import '../utils/variables.dart';
 import '../widgets/app_drawer.dart';
 import 'admin_panel_screen.dart';
 import 'attendance_screen.dart';
+import 'menu_screen.dart';
 import 'main_screen_2.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -90,8 +91,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildGreetingCard(),
             SizedBox(height: Dimensions.height30 / 1.2),
             GridView.count(
-              // A lone admin card reads better as a full-width banner than as
-              // one square in a two-column grid.
+              // The admin's few cards read better as full-width banners than
+              // as squares in a two-column grid.
               crossAxisCount: _isAdmin ? 1 : 2,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -99,9 +100,9 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSpacing: 12,
               childAspectRatio: _isAdmin ? 2.4 : 1.1,
               children: [
-                // The admin has no attendance, payslip or leave of their own —
-                // the panel is the whole job, so it is the only card shown.
-                if (_isAdmin)
+                // The admin has no attendance, payslip or leave of their own,
+                // so only the two things they actually do are shown.
+                if (_isAdmin) ...[
                   _buildActionCard(
                     icon: Icons.admin_panel_settings,
                     label: 'admin_panel'.tr,
@@ -109,6 +110,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: const Color(0xFF4527A0),
                     onTap: () => Get.to(() => const AdminPanelScreen()),
                   ),
+                  // The admin has no tabs, so the canteen menu is pushed as a
+                  // route; they need it to fix the menu when the technologist
+                  // cannot.
+                  _buildActionCard(
+                    icon: Icons.restaurant_menu,
+                    label: 'canteen_menu'.tr,
+                    subtitle: 'canteen_subtitle'.tr,
+                    color: const Color(0xFFC62828),
+                    onTap: () => Get.to(() => MenuScreen(job: widget.job)),
+                  ),
+                ],
                 if (!_isAdmin) ...[
                   _buildActionCard(
                     icon: Icons.sensor_door,

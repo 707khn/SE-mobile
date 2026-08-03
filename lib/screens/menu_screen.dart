@@ -19,7 +19,7 @@ class MenuScreen extends StatefulWidget {
   /// lets it switch tab. Null on drill-down views, which keep a back arrow.
   final ValueChanged<int>? onNavigate;
 
-  /// Job title of the signed-in user; the canteen technologist may edit menus.
+  /// Job title of the signed-in user; decides who sees the edit button.
   final String job;
 
   @override
@@ -98,7 +98,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 _loadMenu();
               },
             ),
-          if (isCanteenTech(widget.job))
+          if (canEditMenu(widget.job))
             IconButton(
               icon: const Icon(Icons.edit_calendar),
               tooltip: 'menu_edit_title'.tr,
