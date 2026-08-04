@@ -7,7 +7,7 @@ from flask_cors import CORS
 from models import (db, Employee, AccessRecord, Payslip,
                     PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
                     PayslipReference, LeaveBalance, LeaveHistory,
-                    FcmToken, TurnstileEvent, MenuDate, MenuItem)
+                    FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 
@@ -231,6 +231,42 @@ _CREDENTIALS = {
 }
 
 
+# Версия сидера. Пока она совпадает с записанной в журнале, сидер не
+# запускается. Изменили данные внутри сидера — повысьте здесь версию, и он
+# отработает один раз на боевой базе. Отсутствующие здесь считаются версией '1'.
+_SEED_VERSIONS = {}
+
+
+def _load_applied_seeds():
+    """Журнал отработавших сидеров: {имя функции: версия}.
+
+    При первом запуске после обновления таблицы ещё нет — тогда журнал пуст и
+    отработают все сидеры, как и раньше.
+    """
+    try:
+        return {row.name: row.version for row in AppliedSeed.query.all()}
+    except Exception as e:
+        db.session.rollback()
+        logging.warning(f'Cannot read applied_seeds ({e}); running all seeders')
+        return {}
+
+
+def _mark_seed_applied(name, version):
+    try:
+        row = db.session.get(AppliedSeed, name)
+        if row is None:
+            db.session.add(AppliedSeed(name=name, version=version))
+        else:
+            row.version = version
+            row.applied_at = datetime.utcnow()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        # Не отметился — значит в следующий раз отработает снова. Медленно,
+        # но безопасно: сидеры идемпотентны.
+        logging.warning(f'Cannot record seed {name} ({e})')
+
+
 def create_app():
     app = Flask(__name__)
     CORS(app)
@@ -256,8 +292,17 @@ def create_app():
         except Exception as e:
             logging.error(f'db.create_all() failed (non-fatal): {e}', exc_info=True)
         logging.info('db.create_all() done')
+        # _migrate_schema идёт отдельно и всегда: он приводит схему в
+        # соответствие с моделями, а не наполняет её данными.
+        try:
+            _migrate_schema()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f'_migrate_schema failed (non-fatal): {e}', exc_info=True)
+
+        _applied = _load_applied_seeds()
+        _ran = _skipped = 0
         for _fn in [
-            _migrate_schema,
             _auto_seed,
             _update_employee_names,
             _update_employee_iins,
@@ -278,13 +323,23 @@ def create_app():
             _seed_org_directory,
             _seed_admin_account,
             _seed_otk_july_2026,
+            _merge_duplicate_employees,
             _remove_departed_employees,
         ]:
+            _name = _fn.__name__
+            _version = _SEED_VERSIONS.get(_name, '1')
+            if _applied.get(_name) == _version:
+                _skipped += 1
+                continue
+            _ran += 1
             try:
                 _fn()
             except Exception as e:
                 db.session.rollback()
-                logging.error(f'{_fn.__name__} failed (non-fatal): {e}', exc_info=True)
+                logging.error(f'{_name} failed (non-fatal): {e}', exc_info=True)
+            else:
+                _mark_seed_applied(_name, _version)
+        logging.info('Seeders: %d executed, %d skipped', _ran, _skipped)
 
     register_routes(app)
     return app
@@ -4006,6 +4061,59 @@ def _seed_admin_account():
             job_title='Администратор системы',
         ))
     db.session.commit()
+
+
+
+# Одни и те же люди, заведённые дважды: (лишний id, id который остаётся).
+# Записи-сироты остались от ранних сидеров, заводивших сотрудника под коротким
+# номером до того, как появились полные табельные.
+_DUPLICATE_EMPLOYEES = [
+    ('1874', '0000001874'),  # Кумарова Мадина Кумаровна
+]
+
+
+def _merge_duplicate_employees():
+    """Переносит данные с записи-дубля на действующую и удаляет дубль.
+
+    Логин Кумаровой ведёт на полный табельный номер, а её проходы турникета
+    лежали на старом коротком — вкладка «Турникет» у неё была пустой.
+    Идемпотентно: повторный запуск не находит, что переносить.
+    """
+    for stale_id, keep_id in _DUPLICATE_EMPLOYEES:
+        stale = Employee.query.get(stale_id)
+        keep = Employee.query.get(keep_id)
+        if stale is None or keep is None:
+            continue
+
+        moved = 0
+        for model in (AccessRecord, LeaveBalance, LeaveHistory,
+                      FcmToken, TurnstileEvent):
+            moved += model.query.filter_by(employee_id=stale_id).update(
+                {'employee_id': keep_id})
+
+        # У расчётных листков есть ограничение на (сотрудник, год, месяц):
+        # переносим только те периоды, которых у действующей записи нет.
+        for slip in Payslip.query.filter_by(employee_id=stale_id).all():
+            clash = Payslip.query.filter_by(
+                employee_id=keep_id,
+                period_year=slip.period_year,
+                period_month=slip.period_month).first()
+            if clash:
+                db.session.delete(slip)
+            else:
+                slip.employee_id = keep_id
+                moved += 1
+
+        # Сначала фиксируем перенос и только потом удаляем дубль: если удалить
+        # его в том же flush, SQLAlchemy обнулит employee_id у «осиротевших»
+        # листков и перезапишет только что сделанное присваивание.
+        db.session.commit()
+
+        db.session.delete(stale)
+        db.session.commit()
+        logging.info(
+            'Merged duplicate employee %s into %s (%d rows moved)',
+            stale_id, keep_id, moved)
 
 
 app = create_app()

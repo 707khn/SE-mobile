@@ -9,6 +9,7 @@ import '../screens/attendance_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
+import '../utils/app_version.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
@@ -171,7 +172,28 @@ class _AppDrawerState extends State<AppDrawer> {
           ),
           const Divider(height: 1),
           _buildSocial(),
+          _buildVersion(),
         ],
+      ),
+    );
+  }
+
+  /// Версия сборки внизу меню: в поддержке первым делом спрашивают её.
+  /// По нажатию копируется, чтобы не переписывать вручную.
+  Widget _buildVersion() {
+    final label = '${'app_version'.tr} ${appVersionLabel()}';
+    return SafeArea(
+      top: false,
+      child: InkWell(
+        onTap: () => _copy(label),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 10, top: 2),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+          ),
+        ),
       ),
     );
   }

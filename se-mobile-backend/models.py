@@ -160,3 +160,18 @@ class MenuItem(db.Model):
     # unit is grams for food and millilitres for drinks, and the sheet does not
     # say which.
     portion = db.Column(db.String(50))
+
+
+class AppliedSeed(db.Model):
+    """Журнал отработавших сидеров.
+
+    Сидеры идемпотентны, но каждый из них — десятки запросов к базе, и они
+    выполняются при каждом старте процесса. На бесплатном Render сервер
+    засыпает и просыпается по нескольку раз в день, поэтому отработавший
+    сидер отмечается здесь и больше не запускается. Чтобы прогнать сидер
+    заново после изменения данных, у него повышается version.
+    """
+    __tablename__ = 'applied_seeds'
+    name = db.Column(db.String(100), primary_key=True)
+    version = db.Column(db.String(20), nullable=False, default='1')
+    applied_at = db.Column(db.DateTime, default=datetime.utcnow)
