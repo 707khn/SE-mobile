@@ -139,7 +139,6 @@ class CustomFormState extends State<CustomForm> {
                 obscureText: false,
                 controller: loginController,
                 fontSize: Dimensions.fontSize20,
-                backgroundColor: AppColors.loginField,
                 // Most logins are tabular numbers, but "admin" is letters —
                 // the text keyboard covers both.
                 keyboardType: TextInputType.text,
@@ -153,7 +152,6 @@ class CustomFormState extends State<CustomForm> {
                 obscureText: true,
                 controller: passwordController,
                 fontSize: Dimensions.fontSize20,
-                backgroundColor: AppColors.loginField,
                 keyboardType: TextInputType.visiblePassword,
                 maxLength: 50,
                 focusNode: _passwordFocus,

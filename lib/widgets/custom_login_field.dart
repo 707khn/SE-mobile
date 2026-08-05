@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 
 class CustomLoginField extends StatefulWidget {
@@ -11,7 +12,6 @@ class CustomLoginField extends StatefulWidget {
     required this.obscureText,
     this.controller,
     required this.fontSize,
-    this.backgroundColor,
     this.onSubmitted,
     this.keyboardType = TextInputType.number,
     this.maxLength = 12,
@@ -23,7 +23,6 @@ class CustomLoginField extends StatefulWidget {
   final TextEditingController? controller;
   final IconButton? suffixIcon;
   final bool obscureText;
-  final Color? backgroundColor;
   final double fontSize;
   final VoidCallback? onSubmitted;
   final TextInputType keyboardType;
@@ -40,7 +39,6 @@ class CustomLoginField extends StatefulWidget {
 class _CustomLoginFieldState extends State<CustomLoginField> {
   late FocusNode _focusNode;
   bool _ownsFocusNode = false;
-  bool _isFocused = false;
   bool _hasText = false;
   late bool _obscured;
 
@@ -49,7 +47,6 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
     _ownsFocusNode = widget.focusNode == null;
-    _focusNode.addListener(_onFocusChange);
     widget.controller?.addListener(_onTextChange);
     _hasText = widget.controller?.text.isNotEmpty ?? false;
     _obscured = widget.obscureText;
@@ -57,16 +54,9 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
 
   @override
   void dispose() {
-    _focusNode.removeListener(_onFocusChange);
     if (_ownsFocusNode) _focusNode.dispose();
     widget.controller?.removeListener(_onTextChange);
     super.dispose();
-  }
-
-  void _onFocusChange() {
-    setState(() {
-      _isFocused = _focusNode.hasFocus;
-    });
   }
 
   void _onTextChange() {
@@ -78,38 +68,51 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = _isFocused ? Colors.white : widget.backgroundColor;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(8),
+    // Рамка принадлежит самому полю, а не обёртке. Раньше поле лежало в
+    // контейнере с серой заливкой и боковыми отступами, а сама заливка поля
+    // была белой — от контейнера оставались видны две серые полоски по краям.
+    return TextField(
+      keyboardType: widget.keyboardType,
+      maxLength: widget.maxLength,
+      textInputAction: widget.textInputAction,
+      obscureText: _obscured,
+      controller: widget.controller,
+      focusNode: _focusNode,
+      onSubmitted: (_) => widget.onSubmitted?.call(),
+      cursorColor: AppColors.mainColor,
+      style: TextStyle(
+        fontSize: widget.fontSize,
+        color: Colors.black,
+        fontFamily: 'Trebuchet MS',
       ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: Dimensions.width20 * 0.5),
-        child: TextField(
-          keyboardType: widget.keyboardType,
-          maxLength: widget.maxLength,
-          textInputAction: widget.textInputAction,
-          obscureText: _obscured,
-          controller: widget.controller,
-          focusNode: _focusNode,
-          onSubmitted: (_) => widget.onSubmitted?.call(),
-          style: TextStyle(
-            fontSize: widget.fontSize,
-            color: Colors.black,
-            fontFamily: 'Trebuchet MS',
-          ),
-          decoration: InputDecoration(
-            focusedBorder: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            counterText: '',
-            hintText: widget.hintText,
-            hintStyle: const TextStyle(color: Colors.grey),
-            suffixIcon: _buildSuffixIcon(),
-            suffixIconConstraints: const BoxConstraints(),
-          ),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.white,
+        isDense: false,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: Dimensions.width20 * 0.7,
+          vertical: Dimensions.height30 * 0.45,
         ),
+        // В покое — тонкая серая рамка: белое поле на почти белой карточке
+        // иначе не видно. При вводе — зелёный контур.
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.mainColor, width: 2),
+        ),
+        counterText: '',
+        hintText: widget.hintText,
+        hintStyle: const TextStyle(color: Colors.grey),
+        suffixIcon: Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: _buildSuffixIcon(),
+        ),
+        // Иконка больше не прижимается к рамке: без отступа она упиралась в
+        // контур, который раньше рисовала внешняя обёртка.
+        suffixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
       ),
     );
   }
@@ -118,6 +121,8 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
   Widget _buildSuffixIcon() {
     if (widget.obscureText) {
       return IconButton(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
         icon: Icon(
           _obscured ? Icons.visibility_off : Icons.visibility,
           size: 20,
@@ -128,11 +133,15 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
     }
     if (_hasText) {
       return IconButton(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
         icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
         onPressed: () => widget.controller?.clear(),
       );
     }
     return IconButton(
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
       icon: const Icon(Icons.content_paste_rounded, size: 18, color: Colors.grey),
       onPressed: () async {
         final data = await Clipboard.getData(Clipboard.kTextPlain);
