@@ -7,6 +7,7 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
 import 'home_shell.dart';
+import '../utils/app_theme.dart';
 
 /// Экран «придумайте пароль».
 ///
@@ -165,7 +166,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 10),
               Text(
                 'password_rules'.tr,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: context.mutedColor),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
@@ -221,7 +222,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.lock_outline, color: AppColors.mainColor, size: 22),
+          Icon(Icons.lock_outline, color: context.accentColor, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -250,14 +251,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         labelText: label,
         suffixIcon: trailing,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: context.cardSurface,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: BorderSide(color: context.hairlineColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.mainColor, width: 2),
+          borderSide: BorderSide(color: context.accentColor, width: 2),
         ),
       ),
     );

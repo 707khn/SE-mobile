@@ -18,6 +18,7 @@ import 'attendance_screen.dart';
 import 'menu_screen.dart';
 import 'payslip_screen.dart';
 import 'start_screen.dart';
+import '../utils/app_theme.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key, required this.fullName, required this.job});
@@ -181,7 +182,7 @@ class _AdminPageState extends State<AdminPage> {
                         ),
                       ),
                       ListTile(
-                        leading: const Icon(Icons.restaurant_menu, color: AppColors.mainColor),
+                        leading: Icon(Icons.restaurant_menu, color: context.accentColor),
                         title: BigText(content: 'canteen_menu'.tr),
                         subtitle: Text('canteen_subtitle'.tr, style: const TextStyle(fontSize: 11)),
                         onTap: () {
@@ -190,7 +191,7 @@ class _AdminPageState extends State<AdminPage> {
                         },
                       ),
                       ListTile(
-                        leading: const Icon(Icons.receipt_long, color: AppColors.mainColor),
+                        leading: Icon(Icons.receipt_long, color: context.accentColor),
                         title: BigText(content: 'payslip'.tr),
                         subtitle: Text('payslip_subtitle'.tr, style: const TextStyle(fontSize: 11)),
                         onTap: () {
@@ -199,7 +200,7 @@ class _AdminPageState extends State<AdminPage> {
                         },
                       ),
                       ListTile(
-                        leading: const Icon(Icons.beach_access, color: AppColors.mainColor),
+                        leading: Icon(Icons.beach_access, color: context.accentColor),
                         title: BigText(content: 'leave_sick_days'.tr),
                         subtitle: Text('leave_subtitle'.tr, style: const TextStyle(fontSize: 11)),
                         onTap: () {
@@ -366,7 +367,7 @@ class _AdminPageState extends State<AdminPage> {
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: context.mutedColor),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

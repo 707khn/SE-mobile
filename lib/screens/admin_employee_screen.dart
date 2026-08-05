@@ -9,6 +9,7 @@ import '../widgets/custom_text.dart';
 import 'leave_screen.dart';
 import 'main_screen_1.dart';
 import 'payslip_screen.dart';
+import '../utils/app_theme.dart';
 
 /// Everything the admin panel knows about one employee, with links into the
 /// existing report screens scoped to them.
@@ -21,7 +22,7 @@ class AdminEmployeeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.pageColor,
       appBar: AppBar(
         title: BigText(content: 'admin_employee'.tr, color: Colors.white),
       ),
@@ -30,7 +31,7 @@ class AdminEmployeeScreen extends StatelessWidget {
         children: [
           _buildHeader(context),
           SizedBox(height: Dimensions.height30 * 0.5),
-          _sectionTitle('admin_data'.tr),
+          _sectionTitle(context, 'admin_data'.tr),
           _buildAction(
             context,
             icon: Icons.sensor_door,
@@ -95,7 +96,7 @@ class AdminEmployeeScreen extends StatelessWidget {
                 radius: 26,
                 backgroundColor: Colors.white.withOpacity(0.2),
                 child: Text(initials,
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold)),
@@ -106,7 +107,7 @@ class AdminEmployeeScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(employee.fullName,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold)),
@@ -173,13 +174,13 @@ class AdminEmployeeScreen extends StatelessWidget {
     );
   }
 
-  Widget _sectionTitle(String text) {
+  Widget _sectionTitle(BuildContext context, String text) {
     return Padding(
       padding: EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20, 6),
       child: Text(
         text,
         style: TextStyle(
-          color: AppColors.mainColor,
+          color: context.accentColor,
           fontSize: 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
@@ -200,15 +201,9 @@ class AdminEmployeeScreen extends StatelessWidget {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.cardSurface,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: context.cardShadow,
       ),
       child: ListTile(
         leading: Container(
@@ -225,7 +220,7 @@ class AdminEmployeeScreen extends StatelessWidget {
           empty ? 'no_data'.tr : '${'records_count'.tr}: $count',
           style: TextStyle(
             fontSize: 12,
-            color: empty ? Colors.grey.shade500 : Colors.grey.shade700,
+            color: empty ? context.mutedColor.withOpacity(0.7) : context.mutedColor,
           ),
         ),
         trailing: const Icon(Icons.chevron_right, size: 20),

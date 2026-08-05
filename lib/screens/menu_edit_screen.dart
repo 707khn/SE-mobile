@@ -8,6 +8,7 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
+import '../utils/app_theme.dart';
 
 /// Canteen menu editor, available to the canteen technologist.
 ///
@@ -145,7 +146,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('menu_category'.tr,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    style: TextStyle(fontSize: 12, color: context.mutedColor)),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 6,
@@ -299,7 +300,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
         if (await _confirmDiscard() && mounted) Navigator.pop(context);
       },
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: context.pageColor,
         appBar: AppBar(
           title: BigText(content: 'menu_edit_title'.tr, color: Colors.white),
           actions: [
@@ -350,8 +351,8 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
               ),
             Expanded(
               child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.mainColor))
+                  ? Center(
+                      child: CircularProgressIndicator(color: context.accentColor))
                   : _items.isEmpty
                       ? _buildEmpty()
                       : _buildList(),
@@ -378,10 +379,10 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.ramen_dining, size: 68, color: Colors.grey[300]),
+          Icon(Icons.ramen_dining, size: 68, color: context.hairlineColor),
           SizedBox(height: Dimensions.height30 / 2),
           Text('menu_empty_editor'.tr,
-              style: const TextStyle(color: Colors.grey, fontSize: 15)),
+              style: TextStyle(color: context.mutedColor, fontSize: 15)),
         ],
       ),
     );
@@ -398,7 +399,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
         child: Text(
           category,
           style: TextStyle(
-            color: AppColors.mainColor,
+            color: context.accentColor,
             fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.5,
@@ -431,7 +432,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
       style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.mainColor,
+        color: context.accentColor,
       ),
     );
   }
@@ -454,15 +455,9 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
       child: Container(
         margin: EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.cardSurface,
           borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          boxShadow: context.cardShadow,
         ),
         child: ListTile(
           title: Text(item.name, style: const TextStyle(fontSize: 15)),
@@ -472,7 +467,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
             children: [
               IconButton(
                 icon: Icon(Icons.edit_outlined,
-                    size: 20, color: Colors.grey.shade600),
+                    size: 20, color: context.mutedColor),
                 tooltip: 'menu_edit_dish'.tr,
                 onPressed: () => _editItem(existing: item),
               ),

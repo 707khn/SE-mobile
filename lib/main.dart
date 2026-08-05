@@ -8,6 +8,7 @@ import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/app_theme.dart';
 import 'package:se_mobile/utils/colors.dart';
 import 'package:se_mobile/utils/localization.dart';
+import 'package:se_mobile/utils/theme_pref.dart';
 import 'package:se_mobile/utils/variables.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -66,6 +67,9 @@ class MyApp extends StatelessWidget {
       ],
       title: 'SemEng',
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      // По умолчанию — как в телефоне; выбор переопределяется в боковом меню.
+      themeMode: ThemePref.read(prefs),
       // Honour the phone's text-size setting — warehouse and canteen staff
       // often enlarge it — but cap the growth, since the denser screens
       // (payslip totals, turnstile rows) start overflowing beyond this.

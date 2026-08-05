@@ -13,11 +13,13 @@ import '../screens/menu_screen.dart';
 import '../utils/app_version.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/theme_pref.dart';
 import '../utils/logout_helper.dart';
 import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import 'icon_button_drawer.dart';
+import '../utils/app_theme.dart';
 
 /// The navigation drawer shared by every section.
 ///
@@ -39,6 +41,7 @@ class AppDrawer extends StatefulWidget {
 
 class _AppDrawerState extends State<AppDrawer> {
   String _lang = "RU";
+  ThemeMode _themeMode = ThemeMode.system;
   String _fullName = '';
   String _job = '';
   String? _login;
@@ -58,6 +61,7 @@ class _AppDrawerState extends State<AppDrawer> {
     if (!mounted) return;
     setState(() {
       _lang = prefs.getString(AppValues.LANG) ?? "RU";
+      _themeMode = ThemePref.read(prefs);
       _fullName = fullName ?? '';
       _job = job ?? '';
       _login = login;
@@ -168,6 +172,11 @@ class _AppDrawerState extends State<AppDrawer> {
                       )),
                 ),
                 _item(
+                  icon: ThemePref.icon(_themeMode),
+                  label: '${'theme'.tr}: ${ThemePref.label(_themeMode)}',
+                  onTap: _pickTheme,
+                ),
+                _item(
                   icon: Icons.translate,
                   label: _lang == "KZ" ? 'Русский' : 'Қазақша',
                   onTap: _changeLanguage,
@@ -202,7 +211,7 @@ class _AppDrawerState extends State<AppDrawer> {
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 11, color: context.mutedColor),
           ),
         ),
       ),
@@ -313,7 +322,7 @@ class _AppDrawerState extends State<AppDrawer> {
     Color? color,
   }) {
     final selected = index != null && index == widget.currentIndex;
-    final tint = color ?? (selected ? AppColors.mainColor : Colors.grey.shade700);
+    final tint = color ?? (selected ? AppColors.mainColor : context.mutedColor);
     return ListTile(
       dense: true,
       selected: selected,
@@ -323,7 +332,7 @@ class _AppDrawerState extends State<AppDrawer> {
         label,
         style: TextStyle(
           fontSize: 13,
-          color: color ?? (selected ? AppColors.mainColor : Colors.black87),
+          color: color ?? (selected ? AppColors.mainColor : context.inkColor),
           fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
@@ -348,6 +357,45 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Future<void> _open(String url) async {
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  /// Три варианта в одном листе: следовать телефону, всегда светлая,
+  /// всегда тёмная. Список короткий, поэтому не диалог, а нижний лист —
+  /// до него дотягивается большой палец.
+  Future<void> _pickTheme() async {
+    final chosen = await showModalBottomSheet<ThemeMode>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('theme'.tr,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            for (final mode in ThemeMode.values)
+              RadioListTile<ThemeMode>(
+                value: mode,
+                groupValue: _themeMode,
+                dense: true,
+                secondary: Icon(ThemePref.icon(mode), size: 21),
+                title: Text(ThemePref.label(mode),
+                    style: const TextStyle(fontSize: 14)),
+                onChanged: (value) => Navigator.pop(ctx, value),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    await ThemePref.write(chosen);
+    if (mounted) setState(() => _themeMode = chosen);
   }
 
   Future<void> _changeLanguage() async {

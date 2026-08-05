@@ -8,6 +8,7 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
+import '../utils/app_theme.dart';
 
 class LeavePage extends StatefulWidget {
   const LeavePage({Key? key, this.onNavigate, this.employeeId}) : super(key: key);
@@ -115,10 +116,10 @@ class _LeavePageState extends State<LeavePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_loading)
-                const Center(
+                Center(
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(color: AppColors.mainColor),
+                    child: CircularProgressIndicator(color: context.accentColor),
                   ),
                 ),
               if (_error != null)
@@ -127,12 +128,12 @@ class _LeavePageState extends State<LeavePage> {
                     padding: EdgeInsets.all(Dimensions.height30),
                     child: Column(
                       children: [
-                        const Icon(Icons.wifi_off, size: 56, color: Colors.grey),
+                        Icon(Icons.wifi_off, size: 56, color: context.mutedColor),
                         SizedBox(height: Dimensions.height30 / 2),
                         Text(
                           _error!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.grey, fontSize: 15),
+                          style: TextStyle(color: context.mutedColor, fontSize: 15),
                         ),
                         SizedBox(height: Dimensions.height30 / 2),
                         ElevatedButton.icon(
@@ -262,7 +263,7 @@ class _LeavePageState extends State<LeavePage> {
                       child: Center(
                         child: Text(
                           'no_records'.tr,
-                          style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          style: TextStyle(color: context.mutedColor, fontSize: 13),
                         ),
                       ),
                     ),
@@ -283,10 +284,10 @@ class _LeavePageState extends State<LeavePage> {
                         ),
                         child: Text(
                           '${_leaveData!.history.length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.mainColor,
+                            color: context.accentColor,
                           ),
                         ),
                       ),
@@ -301,7 +302,7 @@ class _LeavePageState extends State<LeavePage> {
                       child: Center(
                         child: Text(
                           'no_records'.tr,
-                          style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          style: TextStyle(color: context.mutedColor, fontSize: 13),
                         ),
                       ),
                     ),
@@ -330,7 +331,7 @@ class _LeavePageState extends State<LeavePage> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Colors.grey.shade500,
+                              color: context.mutedColor,
                               letterSpacing: 1.2,
                             ),
                           ),
@@ -438,7 +439,7 @@ class _LeavePageState extends State<LeavePage> {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 8,
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: context.hairlineColor,
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),

@@ -10,6 +10,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/skeleton.dart';
 import 'admin_employee_screen.dart';
+import '../utils/app_theme.dart';
 
 /// Staff directory for the system administrator: search anyone, open their
 /// turnstile report, payslips and leave.
@@ -90,7 +91,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   Widget build(BuildContext context) {
     final list = _filtered;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.pageColor,
       drawer: const AppDrawer(),
       appBar: AppBar(
         leading: Builder(
@@ -121,7 +122,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     : list.isEmpty
                         ? _buildEmpty()
                         : RefreshIndicator(
-                            color: AppColors.mainColor,
+                            color: context.accentColor,
                             onRefresh: _load,
                             child: ListView.builder(
                               itemCount: list.length,
@@ -155,7 +156,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   },
                 ),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: context.cardSurface,
           isDense: true,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -168,7 +169,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   Widget _buildFilters() {
     return Container(
-      color: Colors.white,
+      color: context.cardSurface,
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,11 +199,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               children: [
                 Text(
                   '${'admin_found'.tr}: ${_filtered.length}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 12, color: context.mutedColor),
                 ),
                 const Spacer(),
                 Text('admin_only_with_login'.tr,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                    style: TextStyle(fontSize: 12, color: context.mutedColor)),
                 Switch(
                   value: _onlyWithLogin,
                   activeColor: AppColors.mainColor,
@@ -239,27 +240,21 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.cardSurface,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: context.cardShadow,
       ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: e.hasLogin
               ? AppColors.mainColor.withOpacity(0.15)
-              : Colors.grey.shade200,
+              : context.hairlineColor,
           child: Text(
             initials.toUpperCase(),
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: e.hasLogin ? AppColors.mainColor : Colors.grey.shade600,
+              color: e.hasLogin ? context.accentColor : context.mutedColor,
             ),
           ),
         ),
@@ -268,7 +263,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(e.jobTitle,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                style: TextStyle(fontSize: 12, color: context.mutedColor)),
             const SizedBox(height: 2),
             Wrap(
               spacing: 6,
@@ -385,10 +380,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, size: 60, color: Colors.grey.shade300),
+          Icon(Icons.search_off, size: 60, color: context.hairlineColor),
           SizedBox(height: Dimensions.height30 / 2),
           Text('no_records'.tr,
-              style: const TextStyle(color: Colors.grey, fontSize: 15)),
+              style: TextStyle(color: context.mutedColor, fontSize: 15)),
         ],
       ),
     );
@@ -399,10 +394,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.wifi_off, size: 60, color: Colors.grey.shade400),
+          Icon(Icons.wifi_off, size: 60, color: context.mutedColor.withOpacity(0.55)),
           SizedBox(height: Dimensions.height30 / 2),
           Text('load_error'.tr,
-              style: const TextStyle(color: Colors.grey, fontSize: 15)),
+              style: TextStyle(color: context.mutedColor, fontSize: 15)),
           SizedBox(height: Dimensions.height30 / 2),
           TextButton.icon(
             onPressed: _load,

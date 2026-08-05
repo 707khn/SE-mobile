@@ -9,6 +9,7 @@ import 'leave_screen.dart';
 import 'main_screen_1.dart';
 import 'menu_screen.dart';
 import 'payslip_screen.dart';
+import '../utils/app_theme.dart';
 
 class HomeShell extends StatefulWidget {
   final String fullName;
@@ -77,14 +78,8 @@ class _HomeShellState extends State<HomeShell> {
             ? null
             : Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-              ),
-            ],
+            color: context.cardSurface,
+            boxShadow: context.cardShadow,
           ),
           child: SafeArea(
             top: false,
@@ -95,10 +90,10 @@ class _HomeShellState extends State<HomeShell> {
                 _navigateTo(index);
               },
               type: BottomNavigationBarType.fixed,
-              backgroundColor: Colors.white,
+              backgroundColor: context.cardSurface,
               elevation: 0,
               selectedItemColor: AppColors.mainColor,
-              unselectedItemColor: Colors.grey.shade600,
+              unselectedItemColor: context.mutedColor,
               selectedFontSize: 11,
               unselectedFontSize: 11,
               selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),

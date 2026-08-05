@@ -10,6 +10,7 @@ import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/skeleton.dart';
+import '../utils/app_theme.dart';
 
 class PayslipPage extends StatefulWidget {
   const PayslipPage({Key? key, this.onNavigate, this.employeeId, this.employeeName})
@@ -166,7 +167,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             color: isSelected
                                 ? AppColors.mainColor
                                 : isFuture
-                                    ? Colors.grey.shade100
+                                    ? context.hairlineColor
                                     : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                             border: isCurrent && !isSelected
@@ -180,10 +181,10 @@ class _PayslipPageState extends State<PayslipPage> {
                                 color: isSelected
                                     ? Colors.white
                                     : isFuture
-                                        ? Colors.grey.shade400
+                                        ? context.mutedColor.withOpacity(0.55)
                                         : isCurrent
-                                            ? AppColors.mainColor
-                                            : Colors.black87,
+                                            ? context.accentColor
+                                            : context.inkColor,
                                 fontSize: 13,
                                 fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                               ),
@@ -274,11 +275,11 @@ class _PayslipPageState extends State<PayslipPage> {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.chevron_left, color: AppColors.mainColor),
+                        icon: Icon(Icons.chevron_left, color: context.accentColor),
                         onPressed: _loading ? null : _goToPrevMonth,
                         tooltip: 'last_month'.tr,
                       ),
-                      const Icon(Icons.calendar_month, color: AppColors.mainColor, size: 20),
+                      Icon(Icons.calendar_month, color: context.accentColor, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -290,8 +291,8 @@ class _PayslipPageState extends State<PayslipPage> {
                         icon: Icon(
                           Icons.chevron_right,
                           color: _isCurrentOrFutureMonth
-                              ? Colors.grey.shade300
-                              : AppColors.mainColor,
+                              ? context.hairlineColor
+                              : context.accentColor,
                         ),
                         onPressed: (_loading || _isCurrentOrFutureMonth) ? null : _goToNextMonth,
                       ),
@@ -313,11 +314,11 @@ class _PayslipPageState extends State<PayslipPage> {
                     padding: EdgeInsets.all(Dimensions.height30),
                     child: Column(
                       children: [
-                        const Icon(Icons.receipt_long, size: 56, color: Colors.grey),
+                        Icon(Icons.receipt_long, size: 56, color: context.mutedColor),
                         SizedBox(height: Dimensions.height30 / 2),
                         Text(_error!,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.grey, fontSize: 15)),
+                            style: TextStyle(color: context.mutedColor, fontSize: 15)),
                         SizedBox(height: Dimensions.height30 / 2),
                         ElevatedButton.icon(
                           onPressed: _fetchPayslip,
@@ -424,7 +425,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             _buildSimpleExpandable(
                               title: 'payslip_reference'.tr,
                               items: _payslip!.reference,
-                              color: Colors.grey.shade600,
+                              color: context.mutedColor,
                             ),
                           ],
                           SizedBox(height: Dimensions.height30),
@@ -572,7 +573,7 @@ class _PayslipPageState extends State<PayslipPage> {
                 const SizedBox(height: 8),
                 if (items.isEmpty)
                   Text('no_records'.tr,
-                      style: const TextStyle(color: Colors.grey, fontSize: 13))
+                      style: TextStyle(color: context.mutedColor, fontSize: 13))
                 else
                   ...sorted.map((item) {
                     final pct = total > 0 ? (item.amount / total * 100) : 0.0;
@@ -620,7 +621,7 @@ class _PayslipPageState extends State<PayslipPage> {
                                 const SizedBox(width: 8),
                                 Text('${pct.toStringAsFixed(1)}%',
                                     style: TextStyle(
-                                        fontSize: 11, color: Colors.grey.shade500)),
+                                        fontSize: 11, color: context.mutedColor)),
                               ],
                             ),
                           ],
@@ -744,11 +745,11 @@ class _PayslipPageState extends State<PayslipPage> {
                                 if (item.document.isNotEmpty)
                                   Text(item.document,
                                       style: TextStyle(
-                                          fontSize: 12, color: Colors.grey.shade500)),
+                                          fontSize: 12, color: context.mutedColor)),
                                 if (item.date.isNotEmpty)
                                   Text(item.date,
                                       style: TextStyle(
-                                          fontSize: 12, color: Colors.grey.shade500)),
+                                          fontSize: 12, color: context.mutedColor)),
                               ],
                             ),
                           ),

@@ -9,6 +9,7 @@ import '../utils/variables.dart';
 import '../widgets/custom_login_field.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/login_button.dart';
+import '../utils/app_theme.dart';
 
 
 class StartPage extends StatelessWidget {
@@ -90,7 +91,7 @@ class CustomFormState extends State<CustomForm> {
             vertical: Dimensions.height30,
           ),
           decoration: BoxDecoration(
-            color: AppColors.niceWhite,
+            color: context.cardSurface,
             boxShadow: const [
               BoxShadow(
                 color: Colors.black38,
@@ -124,7 +125,7 @@ class CustomFormState extends State<CustomForm> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade700,
+                          color: context.mutedColor,
                           letterSpacing: 0.5,
                         ),
                       ),

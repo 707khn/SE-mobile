@@ -8,6 +8,7 @@ import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
+import '../utils/app_theme.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({Key? key}) : super(key: key);
@@ -76,7 +77,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.pageColor,
       drawer: const AppDrawer(),
       appBar: AppBar(
         leading: Builder(
@@ -100,7 +101,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ],
       ),
       body: RefreshIndicator(
-        color: AppColors.mainColor,
+        color: context.accentColor,
         onRefresh: _load,
         child: DaySwipeDetector(
           date: _selectedDate,
@@ -114,9 +115,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           slivers: [
             SliverToBoxAdapter(child: _buildDateNav()),
             if (_loading)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 child: Center(
-                    child: CircularProgressIndicator(color: AppColors.mainColor)),
+                    child: CircularProgressIndicator(color: context.accentColor)),
               )
             else if (_error)
               SliverFillRemaining(child: _buildError())
@@ -165,19 +166,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.people, color: AppColors.mainColor, size: 20),
+          Icon(Icons.people, color: context.accentColor, size: 20),
           const SizedBox(width: 8),
           Text(
             '${_rows.length}',
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.mainColor),
+                color: context.accentColor),
           ),
           const SizedBox(width: 4),
           Text(
             'records_count'.tr,
-            style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            style: TextStyle(fontSize: 13, color: context.mutedColor),
           ),
         ],
       ),
@@ -189,14 +190,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       margin: EdgeInsets.symmetric(
           horizontal: Dimensions.width20, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.cardSurface,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 2))
-        ],
+        boxShadow: context.cardShadow,
       ),
       child: Padding(
         padding:
@@ -208,8 +204,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               backgroundColor: AppColors.mainColor.withOpacity(0.15),
               child: Text(
                 _initials(row.name),
-                style: const TextStyle(
-                    color: AppColors.mainColor,
+                style: TextStyle(
+                    color: context.accentColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 13),
               ),
@@ -251,7 +247,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               '${row.eventCount}',
               style: TextStyle(
                   fontSize: 13,
-                  color: Colors.grey[500]),
+                  color: context.mutedColor),
             ),
           ],
         ),
@@ -264,9 +260,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.people_outline, size: 72, color: Colors.grey[300]),
+          Icon(Icons.people_outline, size: 72, color: context.hairlineColor),
           SizedBox(height: Dimensions.height30 / 2),
-          BigText(content: 'no_attendance_data'.tr, color: Colors.grey),
+          BigText(content: 'no_attendance_data'.tr, color: context.mutedColor),
         ],
       ),
     );
@@ -277,9 +273,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.wifi_off, size: 64, color: Colors.grey[400]),
+          Icon(Icons.wifi_off, size: 64, color: context.mutedColor.withOpacity(0.55)),
           SizedBox(height: Dimensions.height30 / 2),
-          BigText(content: 'connection_error'.tr, color: Colors.grey),
+          BigText(content: 'connection_error'.tr, color: context.mutedColor),
           SizedBox(height: Dimensions.height30 / 2),
           TextButton.icon(
             onPressed: _load,

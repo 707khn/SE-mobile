@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/app_theme.dart';
 
 class CustomLoginField extends StatefulWidget {
   const CustomLoginField({
@@ -82,12 +83,12 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
       cursorColor: AppColors.mainColor,
       style: TextStyle(
         fontSize: widget.fontSize,
-        color: Colors.black,
+        color: context.inkColor,
         fontFamily: 'Trebuchet MS',
       ),
       decoration: InputDecoration(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: context.cardSurface,
         isDense: false,
         contentPadding: EdgeInsets.symmetric(
           horizontal: Dimensions.width20 * 0.7,
@@ -97,15 +98,15 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
         // иначе не видно. При вводе — зелёный контур.
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: BorderSide(color: context.hairlineColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.mainColor, width: 2),
+          borderSide: BorderSide(color: context.accentColor, width: 2),
         ),
         counterText: '',
         hintText: widget.hintText,
-        hintStyle: const TextStyle(color: Colors.grey),
+        hintStyle: TextStyle(color: context.mutedColor),
         suffixIcon: Padding(
           padding: const EdgeInsets.only(right: 6),
           child: _buildSuffixIcon(),
@@ -126,7 +127,7 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
         icon: Icon(
           _obscured ? Icons.visibility_off : Icons.visibility,
           size: 20,
-          color: Colors.grey,
+          color: context.mutedColor,
         ),
         onPressed: () => setState(() => _obscured = !_obscured),
       );
@@ -135,14 +136,14 @@ class _CustomLoginFieldState extends State<CustomLoginField> {
       return IconButton(
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
-        icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
+        icon: Icon(Icons.clear, size: 18, color: context.mutedColor),
         onPressed: () => widget.controller?.clear(),
       );
     }
     return IconButton(
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
-      icon: const Icon(Icons.content_paste_rounded, size: 18, color: Colors.grey),
+      icon: Icon(Icons.content_paste_rounded, size: 18, color: context.mutedColor),
       onPressed: () async {
         final data = await Clipboard.getData(Clipboard.kTextPlain);
         final text = data?.text?.trim() ?? '';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/dimensions.dart';
+import '../utils/app_theme.dart';
 
 /// Grey placeholders shown while a screen loads.
 ///
@@ -47,7 +48,7 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
         height: widget.height,
         width: widget.width,
         decoration: BoxDecoration(
-          color: Colors.grey.shade300,
+          color: context.hairlineColor,
           borderRadius: BorderRadius.circular(widget.radius),
         ),
       ),

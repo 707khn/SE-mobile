@@ -11,6 +11,7 @@ import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
 import '../widgets/skeleton.dart';
 import 'menu_edit_screen.dart';
+import '../utils/app_theme.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({Key? key, this.onNavigate, this.job = ''}) : super(key: key);
@@ -73,7 +74,7 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: context.pageColor,
       drawer: widget.onNavigate == null
           ? null
           : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 4),
@@ -110,7 +111,7 @@ class _MenuScreenState extends State<MenuScreen> {
         ],
       ),
       body: RefreshIndicator(
-        color: AppColors.mainColor,
+        color: context.accentColor,
         onRefresh: _loadMenu,
         child: DaySwipeDetector(
           date: _selectedDate,
@@ -153,9 +154,9 @@ class _MenuScreenState extends State<MenuScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.restaurant, size: 72, color: Colors.grey[300]),
+          Icon(Icons.restaurant, size: 72, color: context.hairlineColor),
           SizedBox(height: Dimensions.height30 / 2),
-          BigText(content: 'no_menu_today'.tr, color: Colors.grey),
+          BigText(content: 'no_menu_today'.tr, color: context.mutedColor),
         ],
       ),
     );
@@ -166,9 +167,9 @@ class _MenuScreenState extends State<MenuScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.wifi_off, size: 64, color: Colors.grey[400]),
+          Icon(Icons.wifi_off, size: 64, color: context.mutedColor.withOpacity(0.55)),
           SizedBox(height: Dimensions.height30 / 2),
-          BigText(content: 'connection_error'.tr, color: Colors.grey),
+          BigText(content: 'connection_error'.tr, color: context.mutedColor),
           SizedBox(height: Dimensions.height30 / 2),
           TextButton.icon(
             onPressed: _loadMenu,
@@ -214,7 +215,7 @@ class _MenuScreenState extends State<MenuScreen> {
             child: Text(
               category,
               style: TextStyle(
-                color: AppColors.mainColor,
+                color: context.accentColor,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.5,
@@ -228,7 +229,7 @@ class _MenuScreenState extends State<MenuScreen> {
               child: Text(
                 'menu_portion'.tr,
                 textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 11, color: context.mutedColor),
               ),
             ),
         ],
@@ -263,15 +264,9 @@ class _MenuScreenState extends State<MenuScreen> {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.cardSurface,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: context.cardShadow,
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -292,7 +287,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
+                    color: context.mutedColor,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -305,7 +300,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.mainColor,
+                  color: context.accentColor,
                 ),
               ),
             ],

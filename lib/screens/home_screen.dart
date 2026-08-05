@@ -12,6 +12,7 @@ import 'admin_panel_screen.dart';
 import 'attendance_screen.dart';
 import 'menu_screen.dart';
 import 'main_screen_2.dart';
+import '../utils/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -61,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.niceWhite,
+      backgroundColor: context.pageColor,
       drawer: AppDrawer(onNavigate: widget.onNavigate, currentIndex: 0),
       appBar: AppBar(
         // Explicit leading: the shell sits on top of the login screen, so an
@@ -316,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 3),
               Text(
                 subtitle,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: context.mutedColor),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

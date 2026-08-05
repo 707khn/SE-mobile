@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../utils/colors.dart';
+import '../utils/app_theme.dart';
 
 /// Turnstile events as day-grouped rows.
 ///
@@ -70,7 +71,7 @@ class AccessLogList extends StatelessWidget {
 
     final children = <Widget>[];
     days.forEach((date, dayRows) {
-      children.add(_dayHeader(date, dayRows.length));
+      children.add(_dayHeader(context, date, dayRows.length));
       children.addAll(dayRows.map((r) => _row(context, r)));
       children.add(const SizedBox(height: 10));
     });
@@ -78,7 +79,7 @@ class AccessLogList extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
   }
 
-  Widget _dayHeader(String date, int count) {
+  Widget _dayHeader(BuildContext context, String date, int count) {
     final today = _isToday(date);
     final weekday = _weekday(date);
     return Padding(
@@ -90,21 +91,21 @@ class AccessLogList extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: today ? AppColors.mainColor : Colors.grey.shade800,
+              color: today ? context.accentColor : context.mutedColor,
             ),
           ),
           if (weekday.isNotEmpty) ...[
             const SizedBox(width: 6),
             Text(
               weekday,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 12, color: context.mutedColor),
             ),
           ],
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: (today ? AppColors.mainColor : Colors.grey).withOpacity(0.12),
+              color: (today ? context.accentColor : context.mutedColor).withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -112,7 +113,7 @@ class AccessLogList extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: today ? AppColors.mainColor : Colors.grey.shade600,
+                color: today ? context.accentColor : context.mutedColor,
               ),
             ),
           ),
@@ -171,7 +172,7 @@ class AccessLogList extends StatelessWidget {
                     textAlign: TextAlign.right,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 12, color: context.mutedColor),
                   ),
                 ),
               ],

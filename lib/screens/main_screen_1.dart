@@ -17,6 +17,7 @@ import '../variables.dart';
 import '../widgets/access_log_list.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
+import '../utils/app_theme.dart';
 
 
 class MainPage1 extends StatefulWidget {
@@ -72,7 +73,7 @@ class _MainPage1State extends State<MainPage1> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.niceWhite,
+      backgroundColor: context.pageColor,
       appBar: AppBar(
         centerTitle: true,
         leading: widget.onNavigate == null
@@ -296,7 +297,7 @@ class _MainMenu1State extends State<MainMenu1> {
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _dateError ? Colors.red.shade700 : Colors.grey,
+                          color: _dateError ? Colors.red.shade700 : context.mutedColor,
                           width: _dateError ? 1.5 : 1.0,
                         ),
                         borderRadius: BorderRadius.circular(4),
@@ -304,7 +305,7 @@ class _MainMenu1State extends State<MainMenu1> {
                       child: Row(
                         children: [
                           Icon(Icons.calendar_today, size: 16,
-                              color: _dateError ? Colors.red.shade700 : Colors.grey),
+                              color: _dateError ? Colors.red.shade700 : context.mutedColor),
                           const SizedBox(width: 6),
                           Text(
                             '${startDate.day.toString().padLeft(2, '0')}.${startDate.month.toString().padLeft(2, '0')}.${startDate.year}',
@@ -326,12 +327,12 @@ class _MainMenu1State extends State<MainMenu1> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('—', style: TextStyle(color: isInvalid ? Colors.red.shade700 : Colors.grey.shade600)),
+                        Text('—', style: TextStyle(color: isInvalid ? Colors.red.shade700 : context.mutedColor)),
                         Text(
                           isInvalid ? '!' : '$diff ${'days_short'.tr}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: isInvalid ? Colors.red.shade700 : Colors.grey.shade500,
+                            color: isInvalid ? Colors.red.shade700 : context.mutedColor,
                             fontWeight: isInvalid ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
@@ -360,7 +361,7 @@ class _MainMenu1State extends State<MainMenu1> {
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _dateError ? Colors.red.shade700 : Colors.grey,
+                          color: _dateError ? Colors.red.shade700 : context.mutedColor,
                           width: _dateError ? 1.5 : 1.0,
                         ),
                         borderRadius: BorderRadius.circular(4),
@@ -368,7 +369,7 @@ class _MainMenu1State extends State<MainMenu1> {
                       child: Row(
                         children: [
                           Icon(Icons.calendar_today, size: 16,
-                              color: _dateError ? Colors.red.shade700 : Colors.grey),
+                              color: _dateError ? Colors.red.shade700 : context.mutedColor),
                           const SizedBox(width: 6),
                           Text(
                             '${endDate.day.toString().padLeft(2, '0')}.${endDate.month.toString().padLeft(2, '0')}.${endDate.year}',
@@ -474,11 +475,11 @@ class _MainMenu1State extends State<MainMenu1> {
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Column(
                           children: [
-                            Icon(Icons.search_off, size: 40, color: Colors.grey.shade400),
+                            Icon(Icons.search_off, size: 40, color: context.mutedColor.withOpacity(0.55)),
                             const SizedBox(height: 8),
                             Text(
                               '"$_filterText"',
-                              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                              style: TextStyle(color: context.mutedColor, fontSize: 13),
                             ),
                           ],
                         ),
@@ -490,12 +491,12 @@ class _MainMenu1State extends State<MainMenu1> {
               }),
             ] else if (!_loadingReport && _initError) ...[
               const SizedBox(height: 32),
-              Icon(Icons.wifi_off, size: 56, color: Colors.grey.shade400),
+              Icon(Icons.wifi_off, size: 56, color: context.mutedColor.withOpacity(0.55)),
               const SizedBox(height: 8),
               Text(
                 'load_error'.tr,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+                style: TextStyle(color: context.mutedColor, fontSize: 15),
               ),
               const SizedBox(height: 12),
               ElevatedButton.icon(
@@ -505,17 +506,17 @@ class _MainMenu1State extends State<MainMenu1> {
               ),
             ] else if (!_loadingReport && !_hasData) ...[
               const SizedBox(height: 32),
-              Icon(Icons.date_range_outlined, size: 56, color: Colors.grey.shade400),
+              Icon(Icons.date_range_outlined, size: 56, color: context.mutedColor.withOpacity(0.55)),
               const SizedBox(height: 8),
               Text(
                 'no_data'.tr,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+                style: TextStyle(color: context.mutedColor, fontSize: 15),
               ),
               const SizedBox(height: 4),
               Text(
                 'select_period_hint'.tr,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                style: TextStyle(color: context.mutedColor.withOpacity(0.55), fontSize: 13),
               ),
             ],
             SizedBox(height: Dimensions.height30),
@@ -609,11 +610,11 @@ class _MainMenu1State extends State<MainMenu1> {
       padding: const EdgeInsets.only(top: 2, bottom: 2),
       child: Row(
         children: [
-          const Icon(Icons.access_time_filled, size: 13, color: AppColors.mainColor),
+          Icon(Icons.access_time_filled, size: 13, color: context.accentColor),
           const SizedBox(width: 4),
           Text(
             '${_fmtTime(first)} — ${_fmtTime(last)}  ($timeStr)',
-            style: const TextStyle(fontSize: 12, color: AppColors.mainColor),
+            style: TextStyle(fontSize: 12, color: context.accentColor),
           ),
         ],
       ),

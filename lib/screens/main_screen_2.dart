@@ -26,6 +26,7 @@ import '../widgets/access_log_list.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/icon_button_drawer.dart';
+import '../utils/app_theme.dart';
 
 class MainPage2 extends StatefulWidget {
   final String fullName;
@@ -213,7 +214,7 @@ class _MainPage2State extends State<MainPage2> {
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: _dateError ? Colors.red.shade700 : Colors.grey,
+                            color: _dateError ? Colors.red.shade700 : context.mutedColor,
                             width: _dateError ? 1.5 : 1.0,
                           ),
                           borderRadius: BorderRadius.circular(4),
@@ -221,7 +222,7 @@ class _MainPage2State extends State<MainPage2> {
                         child: Row(
                           children: [
                             Icon(Icons.calendar_today, size: 16,
-                                color: _dateError ? Colors.red.shade700 : Colors.grey),
+                                color: _dateError ? Colors.red.shade700 : context.mutedColor),
                             const SizedBox(width: 6),
                             Text(
                               '${startDate.day.toString().padLeft(2, '0')}.${startDate.month.toString().padLeft(2, '0')}.${startDate.year}',
@@ -243,12 +244,12 @@ class _MainPage2State extends State<MainPage2> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('—', style: TextStyle(color: isInvalid ? Colors.red.shade700 : Colors.grey.shade600)),
+                          Text('—', style: TextStyle(color: isInvalid ? Colors.red.shade700 : context.mutedColor)),
                           Text(
                             isInvalid ? '!' : '$diff ${'days_short'.tr}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: isInvalid ? Colors.red.shade700 : Colors.grey.shade500,
+                              color: isInvalid ? Colors.red.shade700 : context.mutedColor,
                               fontWeight: isInvalid ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
@@ -277,7 +278,7 @@ class _MainPage2State extends State<MainPage2> {
                         padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: _dateError ? Colors.red.shade700 : Colors.grey,
+                            color: _dateError ? Colors.red.shade700 : context.mutedColor,
                             width: _dateError ? 1.5 : 1.0,
                           ),
                           borderRadius: BorderRadius.circular(4),
@@ -285,7 +286,7 @@ class _MainPage2State extends State<MainPage2> {
                         child: Row(
                           children: [
                             Icon(Icons.calendar_today, size: 16,
-                                color: _dateError ? Colors.red.shade700 : Colors.grey),
+                                color: _dateError ? Colors.red.shade700 : context.mutedColor),
                             const SizedBox(width: 6),
                             Text(
                               '${endDate.day.toString().padLeft(2, '0')}.${endDate.month.toString().padLeft(2, '0')}.${endDate.year}',
@@ -344,10 +345,10 @@ class _MainPage2State extends State<MainPage2> {
                       ),
                       child: Text(
                         '${employees.length}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.mainColor,
+                          color: context.accentColor,
                         ),
                       ),
                     ),
@@ -429,7 +430,7 @@ class _MainPage2State extends State<MainPage2> {
                                     return Center(
                                       child: Text(
                                         'no_records'.tr,
-                                        style: const TextStyle(color: Colors.grey),
+                                        style: TextStyle(color: context.mutedColor),
                                       ),
                                     );
                                   }
@@ -472,9 +473,9 @@ class _MainPage2State extends State<MainPage2> {
                                 } else if (snapshot.connectionState == ConnectionState.waiting) {
                                   return const Center(child: CircularProgressIndicator());
                                 } else if (snapshot.hasError) {
-                                  return Center(child: Text('load_error'.tr, style: const TextStyle(color: Colors.grey)));
+                                  return Center(child: Text('load_error'.tr, style: TextStyle(color: context.mutedColor)));
                                 } else {
-                                  return Center(child: Text('load_error'.tr, style: const TextStyle(color: Colors.grey)));
+                                  return Center(child: Text('load_error'.tr, style: TextStyle(color: context.mutedColor)));
                                 }
                               },
                             ),
@@ -561,7 +562,7 @@ class _MainPage2State extends State<MainPage2> {
                         child: ListTile(
                           leading: _buildInitialsAvatar(employees[index], index),
                           title: Text(employees[index]),
-                          trailing: const Icon(Icons.swipe_left, size: 16, color: Colors.grey),
+                          trailing: Icon(Icons.swipe_left, size: 16, color: context.mutedColor),
                         ),
                       ),
                     );
@@ -578,7 +579,7 @@ class _MainPage2State extends State<MainPage2> {
                     builder: (ctx) => AlertDialog(
                       title: Row(
                         children: [
-                          const Icon(Icons.info_outline, color: AppColors.mainColor),
+                          Icon(Icons.info_outline, color: context.accentColor),
                           const SizedBox(width: 8),
                           Text('info_title'.tr),
                         ],
@@ -597,11 +598,11 @@ class _MainPage2State extends State<MainPage2> {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                      Icon(Icons.info_outline, size: 16, color: context.mutedColor),
                       const SizedBox(width: 6),
                       Text(
                         'info_hint'.tr,
-                        style: const TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: context.mutedColor),
                       ),
                     ],
                   ),
@@ -625,13 +626,13 @@ class _MainPage2State extends State<MainPage2> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.person_outline, size: 16, color: AppColors.mainColor),
+                        Icon(Icons.person_outline, size: 16, color: context.accentColor),
                         const SizedBox(width: 6),
                         Text(
                           '${'viewing_employee'.tr} ${employees.last}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: AppColors.mainColor,
+                            color: context.accentColor,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -679,7 +680,7 @@ class _MainPage2State extends State<MainPage2> {
                           _filterText.isEmpty
                               ? '${reportsEntries.length} ${'records_count'.tr}'
                               : '${filtered.length}/${reportsEntries.length} ${'records_count'.tr}',
-                          style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
+                          style: TextStyle(fontSize: 12.0, color: context.mutedColor),
                         ),
                         const SizedBox(width: 4),
                         InkWell(
@@ -694,9 +695,9 @@ class _MainPage2State extends State<MainPage2> {
                               behavior: SnackBarBehavior.floating,
                             ));
                           },
-                          child: const Padding(
+                          child: Padding(
                             padding: EdgeInsets.all(2),
-                            child: Icon(Icons.copy_outlined, size: 14, color: Colors.grey),
+                            child: Icon(Icons.copy_outlined, size: 14, color: context.mutedColor),
                           ),
                         ),
                       ],
@@ -712,11 +713,11 @@ class _MainPage2State extends State<MainPage2> {
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Column(
                       children: [
-                        Icon(Icons.search_off, size: 40, color: Colors.grey.shade400),
+                        Icon(Icons.search_off, size: 40, color: context.mutedColor.withOpacity(0.55)),
                         const SizedBox(height: 8),
                         Text(
                           '"$_filterText"',
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                          style: TextStyle(color: context.mutedColor, fontSize: 13),
                         ),
                       ],
                     ),
@@ -728,12 +729,12 @@ class _MainPage2State extends State<MainPage2> {
                 }),
               ] else ...[
                 const SizedBox(height: 24),
-                Icon(Icons.person_search, size: 56, color: Colors.grey.shade400),
+                Icon(Icons.person_search, size: 56, color: context.mutedColor.withOpacity(0.55)),
                 const SizedBox(height: 8),
                 Center(
                   child: Text(
                     'no_data'.tr,
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+                    style: TextStyle(color: context.mutedColor, fontSize: 15),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -741,7 +742,7 @@ class _MainPage2State extends State<MainPage2> {
                   child: Text(
                     'select_employee_hint'.tr,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                    style: TextStyle(color: context.mutedColor.withOpacity(0.55), fontSize: 13),
                   ),
                 ),
               ],
@@ -889,11 +890,11 @@ class _MainPage2State extends State<MainPage2> {
       padding: const EdgeInsets.only(top: 2, bottom: 2),
       child: Row(
         children: [
-          const Icon(Icons.access_time_filled, size: 13, color: AppColors.mainColor),
+          Icon(Icons.access_time_filled, size: 13, color: context.accentColor),
           const SizedBox(width: 4),
           Text(
             '${_fmtTime(first)} — ${_fmtTime(last)}  ($timeStr)',
-            style: const TextStyle(fontSize: 12, color: AppColors.mainColor),
+            style: TextStyle(fontSize: 12, color: context.accentColor),
           ),
         ],
       ),
