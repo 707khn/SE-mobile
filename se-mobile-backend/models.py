@@ -175,3 +175,31 @@ class AppliedSeed(db.Model):
     name = db.Column(db.String(100), primary_key=True)
     version = db.Column(db.String(20), nullable=False, default='1')
     applied_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class UserAccount(db.Model):
+    """Учётная запись для входа в приложение.
+
+    До этого логины и пароли лежали прямо в исходном коде: нового сотрудника
+    нельзя было завести без правки кода и передеплоя, а пароль хранился
+    открытым текстом. Здесь пароль лежит хешем (scrypt) — из хеша исходный
+    пароль не восстанавливается, поэтому забытый пароль только сбрасывают.
+    """
+    __tablename__ = 'user_accounts'
+    login = db.Column(db.String(50), primary_key=True)
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'),
+                            nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+
+    # Просить сменить пароль при следующем входе. У перенесённых из кода
+    # записей пока False: пароли им не меняли, экрана смены ещё нет.
+    must_change_password = db.Column(db.Boolean, nullable=False, default=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+
+    # Считаем неудачные попытки, но пока не блокируем: блокировку включаем
+    # вместе с кнопкой сброса в админ-панели, иначе человека будет некому
+    # разблокировать.
+    failed_attempts = db.Column(db.Integer, nullable=False, default=0)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login_at = db.Column(db.DateTime)

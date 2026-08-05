@@ -4,10 +4,13 @@ import re
 from datetime import date, datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+# Werkzeug идёт вместе с Flask, ставить ничего не нужно. По умолчанию scrypt.
+from werkzeug.security import generate_password_hash, check_password_hash
 from models import (db, Employee, AccessRecord, Payslip,
                     PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
                     PayslipReference, LeaveBalance, LeaveHistory,
-                    FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed)
+                    FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
+                    UserAccount)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 
@@ -204,6 +207,12 @@ def _seed_sarseken():
 
 
 # login → (password, employee_id)
+#
+# ВРЕМЕННО. Учётные записи переехали в таблицу user_accounts, а этот словарь
+# остался запасным путём на время перехода: он срабатывает только для логина,
+# которого в базе ещё нет, и каждое такое срабатывание пишется в лог
+# предупреждением. Когда предупреждения перестанут появляться — удалить
+# словарь вместе с запасной веткой в _authenticate.
 _CREDENTIALS = {
     'admin': ('admin', 'ADMIN'),
     '2114': ('2114', '001'),
@@ -229,6 +238,58 @@ _CREDENTIALS = {
     '2148': ('2148', '0000002148'),
     '2162': ('2162', '0000002162'),
 }
+
+
+def _authenticate(login, password):
+    """Проверяет пару логин/пароль. Возвращает employee_id или None.
+
+    Источник истины — таблица user_accounts. Словарь _CREDENTIALS остаётся
+    запасным путём на время переноса и используется только для логинов,
+    которых в таблице ещё нет.
+    """
+    login = (login or '').strip()
+    password = (password or '').strip()
+    if not login or not password:
+        return None
+
+    account = UserAccount.query.filter_by(login=login, is_active=True).first()
+    if account is not None:
+        try:
+            ok = check_password_hash(account.password_hash, password)
+        except Exception as e:
+            # Испорченный или незнакомый формат хеша — это не «верный пароль».
+            logging.error('Cannot verify password hash for %r: %s', login, e)
+            ok = False
+        try:
+            if ok:
+                account.last_login_at = datetime.utcnow()
+                account.failed_attempts = 0
+            else:
+                account.failed_attempts = (account.failed_attempts or 0) + 1
+            db.session.commit()
+        except Exception:
+            # Счётчик и отметка о входе не должны ломать сам вход.
+            db.session.rollback()
+        return account.employee_id if ok else None
+
+    cred = _CREDENTIALS.get(login)
+    if cred and password == cred[0]:
+        logging.warning(
+            'Login %r served from the in-code fallback: no row in '
+            'user_accounts. Seed it before removing _CREDENTIALS.', login)
+        return cred[1]
+    return None
+
+
+def _login_by_employee():
+    """employee_id → логин, для админ-панели.
+
+    Словарь в коде даёт основу, база поверх него — она главнее.
+    """
+    mapping = {emp_id: login for login, (_, emp_id) in _CREDENTIALS.items()}
+    for account in UserAccount.query.filter_by(is_active=True).all():
+        mapping[account.employee_id] = account.login
+    return mapping
 
 
 # Версия сидера. Пока она совпадает с записанной в журнале, сидер не
@@ -336,6 +397,9 @@ def create_app():
             _seed_otk_july_2026,
             _merge_duplicate_employees,
             _remove_departed_employees,
+            # Последним: ссылается на сотрудников, которых сидеры выше ещё
+            # создают, склеивают и удаляют.
+            _seed_user_accounts,
         ]:
             _name = _fn.__name__
             _version = _SEED_VERSIONS.get(_name, '1')
@@ -413,9 +477,9 @@ def register_routes(app):
         password  = (data.get('password') or '').strip()
 
         try:
-            cred = _CREDENTIALS.get(login_id)
-            if cred and password == cred[0]:
-                emp = Employee.query.get(cred[1])
+            employee_id = _authenticate(login_id, password)
+            if employee_id:
+                emp = Employee.query.get(employee_id)
                 if emp:
                     return jsonify({
                         'message': 'Success',
@@ -505,7 +569,7 @@ def register_routes(app):
         leave_counts = dict(
             db.session.query(LeaveBalance.employee_id, sa_func.count(LeaveBalance.id))
             .group_by(LeaveBalance.employee_id).all())
-        logins = {emp_id: login for login, (_, emp_id) in _CREDENTIALS.items()}
+        logins = _login_by_employee()
 
         employees = [{
             'employee_id': e.employee_id,
@@ -956,11 +1020,11 @@ def register_routes(app):
         """
         login = (request.form.get('login') or '').strip()
         password = (request.form.get('password') or '').strip()
-        cred = _CREDENTIALS.get(login)
-        if not cred or password != cred[0]:
+        employee_id = _authenticate(login, password)
+        if not employee_id:
             return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
 
-        uploader = Employee.query.get(cred[1])
+        uploader = Employee.query.get(employee_id)
         job = (uploader.job_title if uploader else '').lower()
         allowed = ('технолог' in job and 'столов' in job) or 'администратор системы' in job
         if not allowed:
@@ -4038,7 +4102,7 @@ def _remove_departed_employees():
             db.session.delete(slip)
 
         for model in (AccessRecord, LeaveBalance, LeaveHistory,
-                      FcmToken, TurnstileEvent):
+                      FcmToken, TurnstileEvent, UserAccount):
             model.query.filter_by(employee_id=emp_id).delete()
 
         if emp:
@@ -4101,7 +4165,7 @@ def _merge_duplicate_employees():
 
         moved = 0
         for model in (AccessRecord, LeaveBalance, LeaveHistory,
-                      FcmToken, TurnstileEvent):
+                      FcmToken, TurnstileEvent, UserAccount):
             moved += model.query.filter_by(employee_id=stale_id).update(
                 {'employee_id': keep_id})
 
@@ -4128,6 +4192,39 @@ def _merge_duplicate_employees():
         logging.info(
             'Merged duplicate employee %s into %s (%d rows moved)',
             stale_id, keep_id, moved)
+
+
+def _seed_user_accounts():
+    """Переносит учётные записи из кода в таблицу user_accounts.
+
+    Пароли кладутся хешем: из хеша исходный пароль не восстанавливается,
+    поэтому забытый пароль можно только сбросить, а не посмотреть. Сами
+    пароли при этом не меняются — люди входят ровно как раньше, пересобирать
+    приложение не нужно. Обязательную смену пароля включаем отдельным шагом,
+    когда в приложении появится экран для неё.
+
+    Запускается последним: сидеры выше ещё создают, склеивают и удаляют
+    сотрудников, а учётная запись ссылается на существующего.
+    """
+    created = 0
+    for login, (password, employee_id) in _CREDENTIALS.items():
+        if db.session.get(UserAccount, login) is not None:
+            continue
+        if db.session.get(Employee, employee_id) is None:
+            logging.warning('Account %r skipped: employee %s does not exist',
+                            login, employee_id)
+            continue
+        db.session.add(UserAccount(
+            login=login,
+            employee_id=employee_id,
+            password_hash=generate_password_hash(password),
+            must_change_password=False,
+        ))
+        created += 1
+    if created:
+        db.session.commit()
+    logging.info('user_accounts: %d created, %d total',
+                 created, UserAccount.query.count())
 
 
 app = create_app()
