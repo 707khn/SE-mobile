@@ -21,6 +21,13 @@ class Employee(db.Model):
 
 class AccessRecord(db.Model):
     __tablename__ = 'access_records'
+    # Самая большая таблица: примерно полмиллиона строк в год при 500
+    # сотрудниках. Внешний ключ в PostgreSQL сам индекса не создаёт, а каждый
+    # запрос «покажи мои проходы за период» фильтрует ровно по этой паре —
+    # без индекса это полный перебор всей таблицы.
+    __table_args__ = (
+        db.Index('ix_access_records_emp_date', 'employee_id', 'access_date'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'), nullable=False)
     access_date = db.Column(db.Date, nullable=False)
@@ -136,6 +143,12 @@ class FcmToken(db.Model):
 
 class TurnstileEvent(db.Model):
     __tablename__ = 'turnstile_events'
+    # Табель выбирает события за сутки или за месяц — то есть диапазоном по
+    # времени; проходы одного сотрудника ищутся по employee_id.
+    __table_args__ = (
+        db.Index('ix_turnstile_events_ts', 'timestamp'),
+        db.Index('ix_turnstile_events_emp', 'employee_id'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'), nullable=False)
     direction = db.Column(db.String(10), nullable=False)  # 'in' | 'out'

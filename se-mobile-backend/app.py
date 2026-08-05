@@ -1,7 +1,9 @@
 import os
 import logging
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+
+_ONE_DAY = timedelta(days=1)
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 # Werkzeug идёт вместе с Flask, ставить ничего не нужно. По умолчанию scrypt.
@@ -178,6 +180,20 @@ def _migrate_schema():
         },
     }
 
+    # Индексы. db.create_all() создаёт их только вместе с новой таблицей —
+    # к уже существующей ни один индекс он не добавит, поэтому здесь.
+    # Порядок колонок в составном индексе важен: сначала то, по чему равенство,
+    # потом то, по чему диапазон.
+    indexes = {
+        'access_records': [
+            ('ix_access_records_emp_date', '"employee_id", "access_date"'),
+        ],
+        'turnstile_events': [
+            ('ix_turnstile_events_ts', '"timestamp"'),
+            ('ix_turnstile_events_emp', '"employee_id"'),
+        ],
+    }
+
     with db.engine.connect() as conn:
         for table, columns in schema.items():
             if table not in tables:
@@ -187,6 +203,18 @@ def _migrate_schema():
                 if col not in existing:
                     conn.execute(text(f'ALTER TABLE {table} ADD COLUMN "{col}" {typedef}'))
                     logging.info(f'Migration: added {table}.{col}')
+
+        for table, defs in indexes.items():
+            if table not in tables:
+                continue
+            existing = {i['name'] for i in inspector.get_indexes(table)}
+            for name, cols in defs:
+                if name in existing:
+                    continue
+                conn.execute(text(
+                    f'CREATE INDEX IF NOT EXISTS {name} ON {table} ({cols})'))
+                logging.info(f'Migration: created index {name} on {table}')
+
         conn.commit()
 
 
@@ -279,6 +307,17 @@ def _authenticate(login, password):
             'user_accounts. Seed it before removing _CREDENTIALS.', login)
         return cred[1]
     return None
+
+
+def _employee_names():
+    """employee_id → ФИО, одним запросом.
+
+    Имя раньше доставалось внутри цикла по событиям турникета — по запросу
+    к базе на каждое событие. На месячном табеле это одиннадцать тысяч
+    запросов вместо двух. Сотрудников несколько сотен, весь список
+    помещается в память без всяких раздумий.
+    """
+    return dict(db.session.query(Employee.employee_id, Employee.full_name).all())
 
 
 def _login_by_employee():
@@ -458,10 +497,10 @@ def register_routes(app):
         ).group_by(Payslip.employee_id, Payslip.period_year).order_by(
             Payslip.employee_id, Payslip.period_year
         ).all()
+        names = _employee_names()
         result = {}
         for emp_id, year, cnt in rows:
-            emp = Employee.query.get(emp_id)
-            key = f'{emp_id} ({emp.full_name if emp else "?"})'
+            key = f'{emp_id} ({names.get(emp_id, "?")})'
             result.setdefault(key, {})[str(year)] = cnt
         months_002_2026 = [
             ps.period_month for ps in Payslip.query.filter_by(
@@ -901,20 +940,23 @@ def register_routes(app):
         except ValueError:
             return jsonify({'message': 'Failure', 'error': 'Invalid date'}), 400
 
+        # Сравнение диапазоном, а не db.func.date(timestamp) == день:
+        # колонка, обёрнутая в функцию, индексом не пользуется.
+        day_start = datetime.combine(query_date, datetime.min.time())
+        day_end = datetime.combine(query_date + _ONE_DAY, datetime.min.time())
         events = TurnstileEvent.query.filter(
-            db.func.date(TurnstileEvent.timestamp) == query_date
+            TurnstileEvent.timestamp >= day_start,
+            TurnstileEvent.timestamp < day_end,
         ).order_by(TurnstileEvent.timestamp).all()
 
-        result = []
-        for e in events:
-            emp = Employee.query.get(e.employee_id)
-            result.append({
-                'id': e.id,
-                'employee_id': e.employee_id,
-                'full_name': emp.full_name if emp else e.employee_id,
-                'direction': e.direction,
-                'timestamp': e.timestamp.isoformat(),
-            })
+        names = _employee_names()
+        result = [{
+            'id': e.id,
+            'employee_id': e.employee_id,
+            'full_name': names.get(e.employee_id, e.employee_id),
+            'direction': e.direction,
+            'timestamp': e.timestamp.isoformat(),
+        } for e in events]
         return jsonify({'message': 'Success', 'date': date_str, 'events': result})
 
     @app.route('/api/attendance/summary', methods=['GET'])
@@ -922,19 +964,26 @@ def register_routes(app):
         month_str = request.args.get('month', date.today().strftime('%Y-%m'))
         try:
             year, month = (int(x) for x in month_str.split('-'))
+            # Границы месяца считаем сразу: они же и проверяют, что месяц
+            # существует — «2026-13» падает здесь, а не при запросе к базе.
+            month_start = datetime(year, month, 1)
+            month_end = (datetime(year + 1, 1, 1) if month == 12
+                         else datetime(year, month + 1, 1))
         except (ValueError, AttributeError):
             return jsonify({'message': 'Failure', 'error': 'Invalid month, use YYYY-MM'}), 400
 
+        # Диапазон вместо db.extract(...): извлечение года и месяца из колонки
+        # не даёт воспользоваться индексом по времени.
         events = TurnstileEvent.query.filter(
-            db.extract('year', TurnstileEvent.timestamp) == year,
-            db.extract('month', TurnstileEvent.timestamp) == month,
+            TurnstileEvent.timestamp >= month_start,
+            TurnstileEvent.timestamp < month_end,
         ).order_by(TurnstileEvent.timestamp).all()
 
+        names = _employee_names()
         by_day: dict = {}
         for e in events:
             day_key = e.timestamp.date().isoformat()
-            emp = Employee.query.get(e.employee_id)
-            name = emp.full_name if emp else e.employee_id
+            name = names.get(e.employee_id, e.employee_id)
             entry = by_day.setdefault(day_key, {'date': day_key, 'arrivals': 0, 'departures': 0, 'employees': {}})
             if e.direction == 'in':
                 entry['arrivals'] += 1
