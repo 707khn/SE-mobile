@@ -14,6 +14,7 @@ class SecureStorageHelper {
     required String fullName,
     required String job,
     required String employeeId,
+    String? token,
   }) async {
     await _storage.write(key: 'login', value: login);
     await _storage.write(key: 'password', value: password);
@@ -21,6 +22,17 @@ class SecureStorageHelper {
     await _storage.write(key: 'fullName', value: fullName);
     await _storage.write(key: 'job', value: job);
     await _storage.write(key: 'loggedIn', value: 'true');
+    if (token != null && token.isNotEmpty) {
+      await _storage.write(key: 'token', value: token);
+    }
+  }
+
+  /// Пропуск, который сервер выдал при входе. Его ждут все запросы, кроме
+  /// самого входа.
+  Future<String?> getToken() async => _storage.read(key: 'token');
+
+  Future<void> saveToken(String token) async {
+    if (token.isNotEmpty) await _storage.write(key: 'token', value: token);
   }
 
   Future<String?> getLogin() async {

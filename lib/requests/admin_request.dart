@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../utils/variables.dart';
+import '../utils/api.dart';
 
 /// One row of the staff directory shown in the admin panel.
 class AdminEmployee {
@@ -53,10 +54,11 @@ Future<List<AdminEmployee>> fetchAllEmployees() async {
   final response = await http
       .get(
         Uri.parse('${AppValues.baseUrl}/api/admin/employees'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await authHeaders(),
       )
       .timeout(const Duration(seconds: 30));
 
+  if (await handledUnauthorized(response)) return const <AdminEmployee>[];
   if (response.statusCode != 200) {
     throw HttpException('HTTP ${response.statusCode}');
   }

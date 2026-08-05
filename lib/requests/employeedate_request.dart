@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../utils/variables.dart';
+import '../utils/api.dart';
 
 Future<List<List<String>>> getEmployeeDate(BuildContext context, startdate, enddate) async {
   final prefs = await SharedPreferences.getInstance();
@@ -14,10 +15,11 @@ Future<List<List<String>>> getEmployeeDate(BuildContext context, startdate, endd
     var response = await http
         .post(
           Uri.parse('${AppValues.baseUrl}/director_report'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await authHeaders(),
           body: jsonEncode({'emp_sname': emp_sname, 'start_date': startdate, 'end_date': enddate}),
         )
         .timeout(const Duration(seconds: 15));
+    if (await handledUnauthorized(response)) return <List<String>>[];
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);
       List<List<String>> report = [];

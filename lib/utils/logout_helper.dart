@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/start_screen.dart';
 import '../variables.dart';
 import 'secure_storage_helper.dart';
+import 'api.dart';
 
 Future<void> confirmAndLogout(BuildContext context) async {
   final confirmed = await showDialog<bool>(
@@ -30,6 +31,9 @@ Future<void> confirmAndLogout(BuildContext context) async {
   if (confirmed != true) return;
 
   HapticFeedback.mediumImpact();
+  // Гасим пропуск на сервере, чтобы он не остался годным ещё месяц.
+  // Не получилось — не беда: локально его всё равно стираем.
+  await revokeToken();
   await SecureStorageHelper.instance.clearCredentials();
   final prefs = await SharedPreferences.getInstance();
   await prefs.clear();

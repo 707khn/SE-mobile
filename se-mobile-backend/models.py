@@ -216,3 +216,22 @@ class UserAccount(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login_at = db.Column(db.DateTime)
+
+
+class AuthToken(db.Model):
+    """Пропуск, который приложение получает при входе и предъявляет дальше.
+
+    Токен непрозрачный и лежит в базе, а не подписан ключом: так его можно
+    отозвать — при выходе, при смене пароля, при отключении учётной записи.
+    Одна строка на устройство, поэтому вход с телефона не выбрасывает
+    человека с планшета.
+    """
+    __tablename__ = 'auth_tokens'
+    token = db.Column(db.String(64), primary_key=True)
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'),
+                            nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    last_used_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Срок сдвигается при каждом обращении: пока человек пользуется
+    # приложением, его не выбрасывает.
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)

@@ -1,10 +1,10 @@
 import os
 import logging
 import re
+import secrets
+from functools import wraps
 from datetime import date, datetime, timedelta
-
-_ONE_DAY = timedelta(days=1)
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 # Werkzeug идёт вместе с Flask, ставить ничего не нужно. По умолчанию scrypt.
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,9 +12,26 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
-                    UserAccount)
+                    UserAccount, AuthToken)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
+
+_ONE_DAY = timedelta(days=1)
+
+# Сколько живёт пропуск без обращений. Срок сдвигается при каждом запросе,
+# так что человек, который открывает приложение хотя бы раз в месяц, входа
+# не увидит.
+_TOKEN_LIFETIME = timedelta(days=30)
+
+# Требовать пропуск или только просить.
+#
+# Пока выключено, запрос без пропуска проходит, но пишется в лог
+# предупреждением — иначе включение обрушило бы все установленные сборки
+# разом: они пропуск присылать не умеют. Порядок такой: выложить сервер,
+# раздать новую сборку всем 500, убедиться по логам, что запросов без
+# пропуска не осталось, и только тогда поставить REQUIRE_AUTH=1.
+_AUTH_REQUIRED = os.environ.get('REQUIRE_AUTH', '').strip().lower() in (
+    '1', 'true', 'yes', 'on')
 
 try:
     import firebase_admin
@@ -309,6 +326,124 @@ def _authenticate(login, password):
     return None
 
 
+def _is_system_admin(job_title):
+    return 'администратор системы' in (job_title or '').lower()
+
+
+def _issue_token(employee_id):
+    """Выдаёт новый пропуск. Старые не трогает: у человека может быть
+    и телефон, и планшет."""
+    now = datetime.utcnow()
+    token = AuthToken(
+        token=secrets.token_urlsafe(32),
+        employee_id=employee_id,
+        created_at=now,
+        last_used_at=now,
+        expires_at=now + _TOKEN_LIFETIME,
+    )
+    db.session.add(token)
+    # Заодно подчищаем протухшие, чтобы таблица не росла бесконечно.
+    AuthToken.query.filter(AuthToken.expires_at < now).delete()
+    db.session.commit()
+    return token.token
+
+
+def _bearer_token():
+    """Достаёт пропуск из заголовка Authorization: Bearer <...>."""
+    header = request.headers.get('Authorization', '')
+    if header.lower().startswith('bearer '):
+        return header[7:].strip()
+    return ''
+
+
+def _resolve_token(raw):
+    """Пропуск → сотрудник, или None. Заодно сдвигает срок годности."""
+    if not raw:
+        return None
+    row = db.session.get(AuthToken, raw)
+    if row is None:
+        return None
+    now = datetime.utcnow()
+    if row.expires_at <= now:
+        db.session.delete(row)
+        db.session.commit()
+        return None
+    employee = db.session.get(Employee, row.employee_id)
+    if employee is None:
+        return None
+    try:
+        row.last_used_at = now
+        row.expires_at = now + _TOKEN_LIFETIME
+        db.session.commit()
+    except Exception:
+        # Продление — не повод отказать в самом запросе.
+        db.session.rollback()
+    return employee
+
+
+def require_auth(view):
+    """Пускает только с действующим пропуском.
+
+    Пока REQUIRE_AUTH выключен, запрос без пропуска проходит, но пишется
+    в лог: так видно, кто ещё не обновил приложение.
+    """
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        g.employee = _resolve_token(_bearer_token())
+        if g.employee is None:
+            if _AUTH_REQUIRED:
+                return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+            logging.warning('Unauthenticated request to %s — old app build?',
+                            request.path)
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def _deny():
+    return jsonify({'message': 'Failure', 'error': 'forbidden'}), 403
+
+
+def _may_view(target_employee_id):
+    """Свои данные — себе, чужие — начальнику того же отдела или админу."""
+    viewer = getattr(g, 'employee', None)
+    if viewer is None:
+        # Пропуска нет, а проверки ещё не включены: старая сборка.
+        return not _AUTH_REQUIRED
+    if viewer.employee_id == target_employee_id:
+        return True
+    if _is_system_admin(viewer.job_title):
+        return True
+    if _is_admin_role(viewer.job_title):
+        target = db.session.get(Employee, target_employee_id)
+        return bool(target and viewer.department
+                    and target.department == viewer.department)
+    return False
+
+
+def _is_manager():
+    """Табель по всему предприятию — начальникам и админу."""
+    viewer = getattr(g, 'employee', None)
+    if viewer is None:
+        return not _AUTH_REQUIRED
+    return _is_system_admin(viewer.job_title) or _is_admin_role(viewer.job_title)
+
+
+def _is_admin_account():
+    viewer = getattr(g, 'employee', None)
+    if viewer is None:
+        return not _AUTH_REQUIRED
+    return _is_system_admin(viewer.job_title)
+
+
+def _may_edit_menu():
+    """Меню столовой пишет технолог; админ — чтобы починить, когда она не может."""
+    viewer = getattr(g, 'employee', None)
+    if viewer is None:
+        return not _AUTH_REQUIRED
+    job = (viewer.job_title or '').lower()
+    return ('технолог' in job and 'столов' in job) or _is_system_admin(job)
+
+
 def _employee_names():
     """employee_id → ФИО, одним запросом.
 
@@ -486,29 +621,6 @@ def register_routes(app):
             ]
         })
 
-    @app.route('/api/debug/payslips', methods=['GET'])
-    def debug_payslips():
-        """Diagnostic: show payslip counts per employee per year."""
-        from sqlalchemy import func
-        rows = db.session.query(
-            Payslip.employee_id,
-            Payslip.period_year,
-            func.count(Payslip.id).label('cnt')
-        ).group_by(Payslip.employee_id, Payslip.period_year).order_by(
-            Payslip.employee_id, Payslip.period_year
-        ).all()
-        names = _employee_names()
-        result = {}
-        for emp_id, year, cnt in rows:
-            key = f'{emp_id} ({names.get(emp_id, "?")})'
-            result.setdefault(key, {})[str(year)] = cnt
-        months_002_2026 = [
-            ps.period_month for ps in Payslip.query.filter_by(
-                employee_id='002', period_year=2026
-            ).order_by(Payslip.period_month).all()
-        ]
-        return jsonify({'payslips': result, 'months_002_2026': months_002_2026})
-
     @app.route('/login', methods=['POST'])
     def login():
         data = request.get_json(silent=True) or {}
@@ -525,6 +637,9 @@ def register_routes(app):
                         'full_name': emp.full_name,
                         'job': emp.job_title,
                         'employee_id': emp.employee_id,
+                        # Пропуск для всех последующих запросов. Старые сборки
+                        # его просто игнорируют.
+                        'token': _issue_token(emp.employee_id),
                     })
         except Exception as e:
             db.session.rollback()
@@ -536,10 +651,24 @@ def register_routes(app):
 
         return jsonify({'message': 'Failure'})
 
+    @app.route('/logout', methods=['POST'])
+    def logout():
+        """Гасит пропуск этого устройства. Остальные устройства не трогает."""
+        raw = _bearer_token()
+        if raw:
+            row = db.session.get(AuthToken, raw)
+            if row is not None:
+                db.session.delete(row)
+                db.session.commit()
+        return jsonify({'message': 'Success'})
+
     @app.route('/report', methods=['POST'])
+    @require_auth
     def report():
         data = request.get_json()
         key_suffix = data.get('key_suffix', '')
+        if not _may_view(key_suffix):
+            return _deny()
 
         records = AccessRecord.query.filter_by(employee_id=key_suffix)\
             .order_by(AccessRecord.access_date, AccessRecord.access_time).all()
@@ -551,9 +680,12 @@ def register_routes(app):
         })
 
     @app.route('/reportdate', methods=['POST'])
+    @require_auth
     def reportdate():
         data = request.get_json()
         key_suffix = data.get('key_suffix', '')
+        if not _may_view(key_suffix):
+            return _deny()
         start_date = data.get('start_date', '')
         end_date = data.get('end_date', '')
 
@@ -571,6 +703,7 @@ def register_routes(app):
         })
 
     @app.route('/director_report', methods=['POST'])
+    @require_auth
     def director_report():
         data = request.get_json()
         emp_sname = data.get('emp_sname', '')
@@ -580,6 +713,10 @@ def register_routes(app):
         emp = Employee.query.filter(Employee.full_name.contains(emp_sname)).first()
         if not emp:
             return jsonify({'message': 'Failure'})
+        # Сотрудника здесь ищут по фамилии, поэтому право проверяем после того,
+        # как узнали, кто это.
+        if not _may_view(emp.employee_id):
+            return _deny()
 
         records = AccessRecord.query.filter(
             AccessRecord.employee_id == emp.employee_id,
@@ -595,7 +732,11 @@ def register_routes(app):
         })
 
     @app.route('/api/admin/employees', methods=['GET'])
+    @require_auth
     def admin_employees():
+        # Здесь ИИН всех сотрудников — только администратору системы.
+        if not _is_admin_account():
+            return _deny()
         """Full staff directory for the admin panel, with what data each has."""
         from sqlalchemy import func as sa_func
 
@@ -625,6 +766,7 @@ def register_routes(app):
         return jsonify({'message': 'Success', 'employees': employees})
 
     @app.route('/get_sname', methods=['POST'])
+    @require_auth
     def get_sname():
         data = request.get_json()
 
@@ -660,9 +802,12 @@ def register_routes(app):
         return jsonify({'message': 'Failure'})
 
     @app.route('/payslip', methods=['POST'])
+    @require_auth
     def payslip():
         data = request.get_json()
         key_suffix = data.get('key_suffix', '')
+        if not _may_view(key_suffix):
+            return _deny()
         month = data.get('month', '')
         year = data.get('year', '')
 
@@ -829,9 +974,12 @@ def register_routes(app):
         })
 
     @app.route('/leaves', methods=['POST'])
+    @require_auth
     def leaves():
         data = request.get_json()
         key_suffix = data.get('key_suffix', '')
+        if not _may_view(key_suffix):
+            return _deny()
 
         emp = Employee.query.get(key_suffix)
         if not emp:
@@ -865,12 +1013,17 @@ def register_routes(app):
     # ── FCM token registration ────────────────────────────────────────────────
 
     @app.route('/api/fcm-token', methods=['POST'])
+    @require_auth
     def register_fcm_token():
         data = request.get_json() or {}
         employee_id = data.get('employee_id', '').strip()
         token = data.get('token', '').strip()
         if not employee_id or not token:
             return jsonify({'message': 'Failure', 'error': 'employee_id and token required'}), 400
+        # Подписаться можно только на свои уведомления: иначе чужой телефон
+        # начнёт получать проходы сотрудников вместе с их именами.
+        if not _may_view(employee_id):
+            return _deny()
         emp = Employee.query.get(employee_id)
         if not emp:
             return jsonify({'message': 'Failure', 'error': 'Employee not found'}), 404
@@ -883,6 +1036,7 @@ def register_routes(app):
         return jsonify({'message': 'Success'})
 
     @app.route('/api/fcm-token', methods=['DELETE'])
+    @require_auth
     def unregister_fcm_token():
         data = request.get_json() or {}
         token = data.get('token', '').strip()
@@ -933,7 +1087,10 @@ def register_routes(app):
     # ── Attendance statistics ─────────────────────────────────────────────────
 
     @app.route('/api/attendance', methods=['GET'])
+    @require_auth
     def attendance():
+        if not _is_manager():
+            return _deny()
         date_str = request.args.get('date', date.today().isoformat())
         try:
             query_date = date.fromisoformat(date_str)
@@ -960,7 +1117,10 @@ def register_routes(app):
         return jsonify({'message': 'Success', 'date': date_str, 'events': result})
 
     @app.route('/api/attendance/summary', methods=['GET'])
+    @require_auth
     def attendance_summary():
+        if not _is_manager():
+            return _deny()
         month_str = request.args.get('month', date.today().strftime('%Y-%m'))
         try:
             year, month = (int(x) for x in month_str.split('-'))
@@ -1006,6 +1166,7 @@ def register_routes(app):
     # ── Canteen menu ──────────────────────────────────────────────────────────
 
     @app.route('/api/menu', methods=['GET'])
+    @require_auth
     def get_menu():
         date_str = request.args.get('date', date.today().isoformat())
         try:
@@ -1024,7 +1185,10 @@ def register_routes(app):
         return jsonify({'message': 'Success', 'date': date_str, 'items': items})
 
     @app.route('/api/menu', methods=['POST'])
+    @require_auth
     def save_menu():
+        if not _may_edit_menu():
+            return _deny()
         data = request.get_json() or {}
         date_str = data.get('date', '')
         items_data = data.get('items', [])
@@ -1143,7 +1307,10 @@ def register_routes(app):
         })
 
     @app.route('/api/menu/<date_str>', methods=['DELETE'])
+    @require_auth
     def delete_menu(date_str):
+        if not _may_edit_menu():
+            return _deny()
         try:
             menu_date = date.fromisoformat(date_str)
         except ValueError:

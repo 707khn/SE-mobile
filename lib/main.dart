@@ -152,6 +152,9 @@ class MyApp extends StatelessWidget {
             job: (b['job'] as String?) ?? '',
             employeeId: (b['employee_id'] as String?) ?? '',
           );
+          // Заодно продлеваем пропуск: приложение открывают чаще, чем
+          // перезаходят, и так срок практически не истекает.
+          await secure.saveToken((b['token'] as String?) ?? '');
         }
       }
     } catch (_) {}

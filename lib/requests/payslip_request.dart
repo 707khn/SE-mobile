@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
+import '../utils/api.dart';
 
 enum PayslipErrorKind { timeout, network, notFound }
 
@@ -97,6 +98,8 @@ Future<String?> _resolveEmployeeId() async {
           final id = (b['employee_id'] as String?) ?? '';
           if (id.isNotEmpty) {
             await storage.saveEmployeeId(id);
+            // Раз уж вошли заново — забираем и свежий пропуск.
+            await storage.saveToken((b['token'] as String?) ?? '');
             return id;
           }
         } else {
@@ -138,7 +141,7 @@ Future<PayslipData> _fetchPayslip(
     response = await http
         .post(
           Uri.parse('${AppValues.baseUrl}/payslip'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await authHeaders(),
           body: jsonEncode({'key_suffix': employeeId, 'month': month, 'year': year}),
         )
         .timeout(const Duration(seconds: 50));
@@ -154,6 +157,9 @@ Future<PayslipData> _fetchPayslip(
     throw const PayslipException(PayslipErrorKind.network);
   }
 
+  if (await handledUnauthorized(response)) {
+    throw const PayslipException(PayslipErrorKind.notFound);
+  }
   if (response.statusCode != 200) {
     throw const PayslipException(PayslipErrorKind.network);
   }

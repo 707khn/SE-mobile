@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../utils/variables.dart';
+import '../utils/api.dart';
 
 /// Replaces the whole menu for [date]. The backend wipes that day's items and
 /// re-inserts what is sent, so pass the complete list, not just the changes.
@@ -12,10 +13,11 @@ Future<bool> saveMenuForDate(String date, List<Map<String, dynamic>> items) asyn
     final response = await http
         .post(
           Uri.parse('${AppValues.baseUrl}/api/menu'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await authHeaders(),
           body: jsonEncode({'date': date, 'items': items}),
         )
         .timeout(const Duration(seconds: 15));
+    if (await handledUnauthorized(response)) return false;
     if (response.statusCode == 200) {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return body['message'] == 'Success';
@@ -33,9 +35,12 @@ Future<Map<String, dynamic>> getMenuForDate(String date) async {
     final response = await http
         .get(
           Uri.parse('${AppValues.baseUrl}/api/menu?date=$date'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await authHeaders(),
         )
         .timeout(const Duration(seconds: 15));
+    if (await handledUnauthorized(response)) {
+      return {'message': 'Failure', 'items': []};
+    }
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }

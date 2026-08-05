@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
+import '../utils/api.dart';
 
 class LeaveBalance {
   final String type;
@@ -69,6 +70,8 @@ Future<String?> _resolveEmployeeId() async {
         final fresh = (b['employee_id'] as String?) ?? '';
         if (fresh.isNotEmpty) {
           await SecureStorageHelper.instance.saveEmployeeId(fresh);
+          // Раз уж вошли заново — забираем и свежий пропуск.
+          await SecureStorageHelper.instance.saveToken((b['token'] as String?) ?? '');
           return fresh;
         }
       }
@@ -88,10 +91,11 @@ Future<LeaveData?> getLeaves(BuildContext context, {String? employeeId}) async {
     var response = await http
         .post(
           Uri.parse('${AppValues.baseUrl}/leaves'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await authHeaders(),
           body: jsonEncode({'key_suffix': login}),
         )
         .timeout(const Duration(seconds: 15));
+    if (await handledUnauthorized(response)) return null;
     if (response.statusCode == 200) {
       var responseBody = jsonDecode(response.body);
       if (responseBody['message'] == 'Failure') {

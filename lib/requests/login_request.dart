@@ -69,6 +69,9 @@ Future<void> loginToAccount(
         fullName: body['full_name'],
         job: body['job'],
         employeeId: body['employee_id'] ?? '',
+        // Пропуск для всех дальнейших запросов. Старый сервер его не
+        // присылает — тогда поле пустое и заголовок просто не уходит.
+        token: body['token'] as String?,
       );
       // Everyone gets the bottom-nav shell; admin-only screens are surfaced
       // as extra quick-access cards inside it.
