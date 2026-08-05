@@ -282,6 +282,17 @@ def create_app():
     logging.info(f'DB backend: {safe_url}')
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    # Сервер на бесплатном тарифе подолгу простаивает, и соединение в пуле к
+    # этому моменту базой уже закрыто. Без pre_ping первый же запрос после
+    # простоя падает на мёртвом соединении, а следующий берёт новое и проходит
+    # — отсюда «не зарегистрирован» при первом входе и успех со второго раза.
+    # pre_ping проверяет соединение перед выдачей и молча заменяет мёртвое.
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        # Меньше типичного таймаута простоя у провайдера: соединение старше
+        # этого возраста пул переоткрывает сам.
+        'pool_recycle': 280,
+    }
 
     db.init_app(app)
 
@@ -415,7 +426,10 @@ def register_routes(app):
         except Exception as e:
             db.session.rollback()
             logging.error(f'login failed for login={login_id!r}: {e}', exc_info=True)
-            return jsonify({'message': 'Failure', 'error': 'internal'}), 200
+            # 503, а не 200: сбой базы — это не «неверный пароль». С кодом 200
+            # приложение показывало «логин не зарегистрирован» и человек думал,
+            # что перепутал пароль.
+            return jsonify({'message': 'Failure', 'error': 'internal'}), 503
 
         return jsonify({'message': 'Failure'})
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../requests/login_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/secure_storage_helper.dart';
@@ -52,6 +53,9 @@ class CustomFormState extends State<CustomForm> {
   void initState() {
     super.initState();
     _initPrefs();
+    // Пока человек набирает логин, сервер уже просыпается: на бесплатном
+    // тарифе он засыпает и первый запрос иначе ждёт 40–60 секунд.
+    warmUpServer();
   }
 
   Future<void> _initPrefs() async {
