@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import '../screens/change_password_screen.dart';
 import '../screens/home_shell.dart';
 import '../utils/dimensions.dart';
 import '../utils/secure_storage_helper.dart';
@@ -73,9 +74,19 @@ Future<void> loginToAccount(
         // присылает — тогда поле пустое и заголовок просто не уходит.
         token: body['token'] as String?,
       );
-      // Everyone gets the bottom-nav shell; admin-only screens are surfaced
-      // as extra quick-access cards inside it.
-      Get.to(() => HomeShell(fullName: body['full_name'], job: body['job']));
+      // Временный пароль (равен табельному номеру) — сначала на смену:
+      // пока он такой, учётная запись открыта любому, кто номер знает.
+      if (body['must_change_password'] == true) {
+        Get.to(() => ChangePasswordScreen(
+              fullName: body['full_name'],
+              job: body['job'],
+              currentPassword: password,
+            ));
+      } else {
+        // Everyone gets the bottom-nav shell; admin-only screens are surfaced
+        // as extra quick-access cards inside it.
+        Get.to(() => HomeShell(fullName: body['full_name'], job: body['job']));
+      }
       break;
     case _Result.wrongCredentials:
       _showNotRegistered(context);

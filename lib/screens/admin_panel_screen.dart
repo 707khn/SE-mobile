@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../requests/admin_request.dart';
+import '../requests/account_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
@@ -285,8 +287,82 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           ],
         ),
         isThreeLine: true,
-        trailing: const Icon(Icons.chevron_right, size: 20),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Сбросить пароль можно только тому, у кого есть учётная запись.
+            if (e.hasLogin)
+              IconButton(
+                icon: const Icon(Icons.lock_reset, size: 20),
+                tooltip: 'password_reset'.tr,
+                onPressed: () => _confirmReset(e),
+              ),
+            const Icon(Icons.chevron_right, size: 20),
+          ],
+        ),
         onTap: () => Get.to(() => AdminEmployeeScreen(employee: e)),
+      ),
+    );
+  }
+
+  /// Сброс пароля: временным становится табельный номер, и при первом входе
+  /// человека попросят придумать свой. Спрашиваем подтверждение — действие
+  /// выкидывает человека со всех его устройств.
+  Future<void> _confirmReset(AdminEmployee e) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('password_reset'.tr),
+        content: Text('password_reset_confirm'.trParams({'name': e.fullName})),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('password_reset'.tr),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final temporary = await resetPassword(e.login);
+    if (!mounted) return;
+    if (temporary == null) {
+      Get.snackbar('error'.tr, 'connection_error'.tr,
+          snackPosition: SnackPosition.BOTTOM, margin: const EdgeInsets.all(12));
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('password_reset_done'.tr),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('password_reset_tell'.trParams({'name': e.fullName})),
+            const SizedBox(height: 12),
+            SelectableText(
+              temporary,
+              style: const TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: temporary));
+              Navigator.pop(ctx);
+            },
+            child: Text('copy'.tr),
+          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
       ),
     );
   }

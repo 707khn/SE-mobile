@@ -15,6 +15,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     UserAccount, AuthToken)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
+from parser_employees_excel import parse_employees_excel
 
 _ONE_DAY = timedelta(days=1)
 
@@ -326,6 +327,24 @@ def _authenticate(login, password):
     return None
 
 
+_MIN_PASSWORD_LENGTH = 6
+
+
+def _password_problem(password, login):
+    """Что не так с новым паролем, или None если всё в порядке.
+
+    Правило про табельный номер здесь главное: именно им пароли и были,
+    и ради этого всё затевалось.
+    """
+    if len(password) < _MIN_PASSWORD_LENGTH:
+        return 'too_short'
+    if password.strip().lower() == (login or '').strip().lower():
+        return 'same_as_login'
+    if password.isdigit() and len(set(password)) <= 2:
+        return 'too_simple'
+    return None
+
+
 def _is_system_admin(job_title):
     return 'администратор системы' in (job_title or '').lower()
 
@@ -453,6 +472,29 @@ def _employee_names():
     помещается в память без всяких раздумий.
     """
     return dict(db.session.query(Employee.employee_id, Employee.full_name).all())
+
+
+def _resolve_employee_id(tab_number):
+    """Табельный номер из таблицы → идентификатор, который уже есть в базе.
+
+    Идентификаторы в базе разной формы: и «0000002005», и «001», и «1874» —
+    так их завели разные выгрузки. Логин при этом всегда без ведущих нулей.
+    Поэтому сначала спрашиваем учётную запись (она знает своего сотрудника),
+    потом пробуем номер как есть и дополненный нулями. Без этого загрузка
+    списка кадров заводила бы уже работающих людей заново.
+    """
+    account = db.session.get(UserAccount, tab_number)
+    if account is not None:
+        return account.employee_id
+    for candidate in (tab_number, tab_number.zfill(10)):
+        if db.session.get(Employee, candidate) is not None:
+            return candidate
+    return tab_number
+
+
+def _must_change_password(login):
+    account = db.session.get(UserAccount, login)
+    return bool(account and account.must_change_password)
 
 
 def _login_by_employee():
@@ -640,6 +682,8 @@ def register_routes(app):
                         # Пропуск для всех последующих запросов. Старые сборки
                         # его просто игнорируют.
                         'token': _issue_token(emp.employee_id),
+                        # Временный пароль: приложение сразу попросит новый.
+                        'must_change_password': _must_change_password(login_id),
                     })
         except Exception as e:
             db.session.rollback()
@@ -650,6 +694,181 @@ def register_routes(app):
             return jsonify({'message': 'Failure', 'error': 'internal'}), 503
 
         return jsonify({'message': 'Failure'})
+
+    @app.route('/change-password', methods=['POST'])
+    @require_auth
+    def change_password():
+        """Смена своего пароля. Старый обязателен — иначе чужой оставленный
+        без присмотра телефон позволил бы забрать учётную запись насовсем."""
+        viewer = getattr(g, 'employee', None)
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+
+        data = request.get_json(silent=True) or {}
+        old_password = (data.get('old_password') or '').strip()
+        new_password = (data.get('new_password') or '').strip()
+
+        account = UserAccount.query.filter_by(
+            employee_id=viewer.employee_id, is_active=True).first()
+        if account is None:
+            return jsonify({'message': 'Failure', 'error': 'no_account'}), 404
+        if not check_password_hash(account.password_hash, old_password):
+            return jsonify({'message': 'Failure', 'error': 'wrong_password'}), 403
+
+        problem = _password_problem(new_password, account.login)
+        if problem:
+            return jsonify({'message': 'Failure', 'error': problem}), 400
+
+        account.password_hash = generate_password_hash(new_password)
+        account.must_change_password = False
+        account.failed_attempts = 0
+        # Гасим все пропуска: если пароль меняют потому, что его подсмотрели,
+        # чужое устройство должно перестать работать сразу.
+        AuthToken.query.filter_by(employee_id=viewer.employee_id).delete()
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Success',
+            'token': _issue_token(viewer.employee_id),
+        })
+
+    @app.route('/api/admin/accounts', methods=['GET'])
+    @require_auth
+    def admin_accounts():
+        """Список учётных записей для админ-панели: кто заходил, кто ещё нет."""
+        if not _is_admin_account():
+            return _deny()
+        names = _employee_names()
+        rows = [{
+            'login': a.login,
+            'employee_id': a.employee_id,
+            'full_name': names.get(a.employee_id, a.employee_id),
+            'must_change_password': a.must_change_password,
+            'is_active': a.is_active,
+            'failed_attempts': a.failed_attempts,
+            'last_login_at': a.last_login_at.isoformat() if a.last_login_at else None,
+        } for a in UserAccount.query.order_by(UserAccount.login).all()]
+        never = sum(1 for r in rows if r['last_login_at'] is None)
+        return jsonify({'message': 'Success', 'accounts': rows,
+                        'total': len(rows), 'never_signed_in': never})
+
+    @app.route('/api/admin/accounts/<login>/reset', methods=['POST'])
+    @require_auth
+    def admin_reset_password(login):
+        """Сброс пароля админом: временным становится табельный номер, и при
+        первом же входе человека попросят придумать свой."""
+        if not _is_admin_account():
+            return _deny()
+        account = db.session.get(UserAccount, login)
+        if account is None:
+            return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
+
+        temporary = account.login
+        account.password_hash = generate_password_hash(temporary)
+        account.must_change_password = True
+        account.failed_attempts = 0
+        account.is_active = True
+        AuthToken.query.filter_by(employee_id=account.employee_id).delete()
+        db.session.commit()
+        logging.info('Password reset for %r by administrator', login)
+        return jsonify({'message': 'Success', 'temporary_password': temporary})
+
+    @app.route('/api/admin/employees/import-excel', methods=['POST'])
+    @require_auth
+    def import_employees_excel():
+        """Заводит сотрудников и учётные записи из таблицы отдела кадров.
+
+        Повторная загрузка того же файла безопасна: существующие обновляются,
+        новые добавляются, пароли не трогаются. Временный пароль у новых равен
+        табельному номеру, и сменить его попросят при первом входе.
+        """
+        if not _is_admin_account():
+            return _deny()
+        if 'file' not in request.files:
+            return jsonify({'message': 'Файл не передан', 'error': True}), 400
+        upload = request.files['file']
+        if not (upload.filename or '').lower().endswith(('.xlsx', '.xlsm')):
+            return jsonify({'message': 'Нужен файл Excel (.xlsx)', 'error': True}), 400
+
+        try:
+            people, skipped = parse_employees_excel(upload.read())
+        except ValueError as e:
+            return jsonify({'message': str(e), 'error': True}), 422
+
+        # ФИО тех, кто уже заведён. Совпадение имени при новом табельном
+        # номере — почти всегда опечатка в таблице, и молча плодить второго
+        # человека нельзя: именно так в базе однажды появилась вторая
+        # Кумарова с потерянными проходами. Полные тёзки бывают, поэтому
+        # не запрещаем, а показываем в отчёте.
+        existing_names = {}
+        for emp in Employee.query.all():
+            existing_names.setdefault(emp.full_name.strip().lower(),
+                                      emp.employee_id)
+        warnings = []
+
+        created_employees = updated_employees = created_accounts = 0
+        for person in people:
+            # Логин — табельный номер без ведущих нулей; сотрудник в базе
+            # может лежать под другой формой того же номера.
+            login = person['employee_id']
+            emp_id = _resolve_employee_id(login)
+            employee = db.session.get(Employee, emp_id)
+            if employee is None:
+                twin = existing_names.get(person['full_name'].strip().lower())
+                if twin:
+                    warnings.append(
+                        f"{person['full_name']}: табельный {login} новый, но "
+                        f"такое ФИО уже у сотрудника {twin} — проверьте номер")
+                employee = Employee(employee_id=emp_id,
+                                    full_name=person['full_name'],
+                                    job_title=person['job_title'])
+                db.session.add(employee)
+                existing_names.setdefault(person['full_name'].strip().lower(), emp_id)
+                created_employees += 1
+            else:
+                changed = (employee.full_name != person['full_name']
+                           or employee.job_title != person['job_title']
+                           or (employee.department or '') != person['department'])
+                employee.full_name = person['full_name']
+                employee.job_title = person['job_title']
+                if changed:
+                    updated_employees += 1
+            employee.department = person['department'] or employee.department
+            # ИИН уникален: чужой занятый номер молча пропускаем, а не роняем
+            # всю загрузку из-за одной опечатки в таблице.
+            if person['iin'] and employee.iin != person['iin']:
+                clash = Employee.query.filter(
+                    Employee.iin == person['iin'],
+                    Employee.employee_id != emp_id).first()
+                if clash is None:
+                    employee.iin = person['iin']
+                else:
+                    skipped.append({'row': 0, 'content': person['full_name'],
+                                    'reason': f"ИИН уже у {clash.full_name}"})
+
+            if db.session.get(UserAccount, login) is None:
+                db.session.add(UserAccount(
+                    login=login,
+                    employee_id=emp_id,
+                    password_hash=generate_password_hash(login),
+                    must_change_password=True,
+                ))
+                created_accounts += 1
+
+        db.session.commit()
+        logging.info('Employee import: %d new, %d updated, %d accounts, '
+                     '%d skipped, %d warnings', created_employees,
+                     updated_employees, created_accounts, len(skipped),
+                     len(warnings))
+        return jsonify({
+            'message': 'Success',
+            'employees_created': created_employees,
+            'employees_updated': updated_employees,
+            'accounts_created': created_accounts,
+            'skipped': skipped,
+            'warnings': warnings,
+            'total_employees': Employee.query.count(),
+        })
 
     @app.route('/logout', methods=['POST'])
     def logout():

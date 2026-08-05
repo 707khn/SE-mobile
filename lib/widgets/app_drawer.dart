@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
+import '../screens/change_password_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -156,6 +157,16 @@ class _AppDrawerState extends State<AppDrawer> {
                   ],
                 ],
                 const Divider(height: 1),
+                _item(
+                  icon: Icons.lock_outline,
+                  label: 'password_change_title'.tr,
+                  onTap: () => Get.to(() => ChangePasswordScreen(
+                        fullName: _fullName,
+                        job: _job,
+                        currentPassword: '',
+                        mandatory: false,
+                      )),
+                ),
                 _item(
                   icon: Icons.translate,
                   label: _lang == "KZ" ? 'Русский' : 'Қазақша',
