@@ -91,15 +91,22 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildGreetingCard(),
             SizedBox(height: Dimensions.height30 / 1.2),
-            GridView.count(
-              // The admin's few cards read better as full-width banners than
-              // as squares in a two-column grid.
-              crossAxisCount: _isAdmin ? 1 : 2,
+            GridView(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: _isAdmin ? 2.4 : 1.1,
+              // Высота ячейки задана прямо, а не через childAspectRatio.
+              // Пропорция привязывает высоту к ширине экрана, а нужного места
+              // требует содержимое: у казахских подписей по две строки, и на
+              // телефоне с крупным системным шрифтом карточки не помещались —
+              // отсюда красная полоса «BOTTOM OVERFLOWED».
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                // The admin's few cards read better as full-width banners than
+                // as squares in a two-column grid.
+                crossAxisCount: _isAdmin ? 1 : 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                mainAxisExtent: _cardHeight(context),
+              ),
               children: [
                 // The admin has no attendance, payslip or leave of their own,
                 // so only the two things they actually do are shown.
@@ -179,6 +186,22 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  /// Высота карточки быстрого доступа.
+  ///
+  /// Складывается из того, что внутри: кружок с иконкой, две строки названия
+  /// и две строки пояснения. Текст растёт вместе с системным размером шрифта
+  /// (приложение разрешает до 1,3), а иконка — нет, поэтому масштабируется
+  /// только текстовая часть.
+  double _cardHeight(BuildContext context) {
+    const padding = 12 * 2;
+    const iconCircle = 11 * 2 + 26;
+    const gaps = 8 + 3;
+    // Четыре строки: две по 13 и две по 11, с межстрочным запасом.
+    const textLines = (13 * 2 + 11 * 2) * 1.4;
+    final scale = MediaQuery.textScalerOf(context).scale(1.0);
+    return padding + iconCircle + gaps + textLines * scale;
   }
 
   Widget _buildGreetingCard() {
@@ -294,33 +317,41 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap();
         },
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: color, size: 28),
+                child: Icon(icon, color: color, size: 26),
               ),
-              const SizedBox(height: 10),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              const SizedBox(height: 8),
+              // Flexible — страховка на случай, если расчёт высоты где-то
+              // всё-таки не сойдётся: текст ужмётся с многоточием, а красной
+              // полосы переполнения не появится.
+              Flexible(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: TextStyle(fontSize: 11, color: context.mutedColor),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              Flexible(
+                child: Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 11, color: context.mutedColor),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
