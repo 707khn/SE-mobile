@@ -5,7 +5,7 @@
 # Повторный запуск безопасен — всё, что уже сделано, пропускается.
 set -euo pipefail
 
-REPO=https://github.com/707khn/SE-mobile.git
+REPO=git@github.com:707khn/SE-mobile.git
 APP_DIR=/opt/se-mobile
 DB_NAME=se_mobile
 DB_USER=se_mobile
@@ -64,6 +64,35 @@ sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 
 sudo -u postgres psql -qc "ALTER USER $DB_USER WITH PASSWORD '$DB_PASS';"
 
 say "Код приложения"
+# Репозиторий приватный, поэтому сервер ходит в него по своему ключу.
+# Открытую часть надо один раз добавить в GitHub как Deploy key.
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+if [ ! -f /root/.ssh/id_ed25519 ]; then
+    ssh-keygen -t ed25519 -N "" -C "se-mobile-server" -f /root/.ssh/id_ed25519 >/dev/null
+fi
+# Без этого git остановится на вопросе «доверяете ли вы github.com».
+grep -q '^github.com' /root/.ssh/known_hosts 2>/dev/null \
+    || ssh-keyscan -t ed25519 github.com >> /root/.ssh/known_hosts 2>/dev/null
+
+if ! ssh -o BatchMode=yes -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+    cat <<KEY
+
+────────────────────────────────────────────────────────────────
+ Сервер пока не имеет доступа к репозиторию. Добавьте этот ключ:
+
+ GitHub → репозиторий SE-mobile → Settings → Deploy keys
+        → Add deploy key → вставить строку ниже → Add key
+        (галочку «Allow write access» НЕ ставить)
+
+$(cat /root/.ssh/id_ed25519.pub)
+
+ После этого запустите setup.sh ещё раз.
+────────────────────────────────────────────────────────────────
+
+KEY
+    exit 1
+fi
+
 if [ -d "$APP_DIR/.git" ]; then
     git -C "$APP_DIR" pull --ff-only
 else

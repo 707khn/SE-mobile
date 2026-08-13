@@ -29,15 +29,41 @@ Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
 
 ---
 
-## Шаг 2. Настроить сервер
+## Шаг 2. Дать серверу доступ к репозиторию
 
-Одной командой, находясь на сервере:
+Репозиторий приватный, поэтому сервер не может просто так скачать код.
+Нужен **ключ развёртывания** — отдельный ключ только на чтение и только
+для этого репозитория.
+
+На сервере:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
-git clone --depth 1 https://github.com/707khn/SE-mobile.git /tmp/se-mobile
+sudo mkdir -p /root/.ssh && sudo chmod 700 /root/.ssh
+sudo ssh-keygen -t ed25519 -N "" -C "se-mobile-server" -f /root/.ssh/id_ed25519
+sudo cat /root/.ssh/id_ed25519.pub
+```
+
+Последняя команда выведет одну строку `ssh-ed25519 AAAA… se-mobile-server`.
+Скопируйте её и добавьте в GitHub:
+
+> репозиторий **SE-mobile** → **Settings** → **Deploy keys** →
+> **Add deploy key** → вставить строку → **Add key**
+
+Галочку **«Allow write access» не ставьте**: серверу нужно только читать.
+Если ключ утечёт, писать в репозиторий им будет нельзя.
+
+## Шаг 3. Настроить сервер
+
+Теперь код скачается:
+
+```bash
+sudo git clone --depth 1 git@github.com:707khn/SE-mobile.git /tmp/se-mobile
 sudo bash /tmp/se-mobile/deploy/setup.sh
 ```
+
+При первом подключении git спросит про доверие к `github.com` — ответьте
+`yes`.
 
 Займёт 5–10 минут. Скрипт ставит и настраивает:
 
@@ -64,7 +90,7 @@ curl -s http://localhost/ | head -c 200
 
 ---
 
-## Шаг 3. Прописать имя в DNS
+## Шаг 4. Прописать имя в DNS
 
 **Это делаете вы, у регистратора домена `se-btrz.com`.** Сертификат
 выдаётся на имя, а не на адрес, поэтому без этой записи HTTPS не включить.
@@ -85,7 +111,7 @@ dig +short api.se-btrz.com
 
 ---
 
-## Шаг 4. Получить сертификат
+## Шаг 5. Получить сертификат
 
 ```bash
 sudo certbot --nginx -d api.se-btrz.com --agree-tos -m ваша@почта --redirect
@@ -103,7 +129,7 @@ curl.exe https://api.se-btrz.com/
 
 ---
 
-## Шаг 5. Перенести данные с Render
+## Шаг 6. Перенести данные с Render
 
 На старом сервере (Render) снимите копию базы и перенесите её сюда.
 Строку подключения возьмите в панели Render → база → *External Database URL*.
@@ -137,7 +163,7 @@ sudo -u postgres psql se_mobile -c "
 
 ---
 
-## Шаг 6. Переключить приложение
+## Шаг 7. Переключить приложение
 
 В `lib/utils/variables.dart` поменять адрес:
 
@@ -157,7 +183,7 @@ static const String baseUrl = 'https://api.se-btrz.com';
 
 ---
 
-## Шаг 7. Включить проверку доступа
+## Шаг 8. Включить проверку доступа
 
 Пока в `/etc/se-mobile.env` стоит `REQUIRE_AUTH=0`, сервер принимает запросы
 без пропуска — иначе старые сборки приложения отвалились бы разом.
