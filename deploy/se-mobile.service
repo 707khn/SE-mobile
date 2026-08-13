@@ -1,0 +1,33 @@
+[Unit]
+Description=SE-mobile API
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=semobile
+Group=semobile
+WorkingDirectory=/opt/se-mobile/se-mobile-backend
+EnvironmentFile=/etc/se-mobile.env
+
+# Три процесса, а не пять: на машине 2 ГБ памяти, и каждый рабочий процесс
+# занимает около 100 МБ. Больше — начнёт вытеснять PostgreSQL.
+ExecStart=/opt/se-mobile/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    --timeout 60 \
+    --access-logfile - \
+    --error-logfile - \
+    app:app
+
+Restart=always
+RestartSec=5
+
+# Приложению нечего делать за пределами своей папки.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
