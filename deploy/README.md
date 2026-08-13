@@ -141,13 +141,20 @@ pg_dump "СТРОКА_ПОДКЛЮЧЕНИЯ_RENDER" > render.sql
 scp render.sql ubuntu@85.202.192.168:/tmp/
 ```
 
-Затем на сервере:
+Затем на сервере. **База пересоздаётся перед восстановлением** — сидеры уже
+наполнили её при первом запуске, и дамп поверх этого не ляжет: посыплются
+ошибки «таблица уже существует» и «дубль первичного ключа».
 
 ```bash
 sudo systemctl stop se-mobile
+sudo -u postgres dropdb se_mobile
+sudo -u postgres createdb -O se_mobile se_mobile
 sudo -u postgres psql se_mobile < /tmp/render.sql
 sudo systemctl start se-mobile
 ```
+
+Сидеры после восстановления повторно не отработают: журнал `applied_seeds`
+приезжает вместе с дампом, и они увидят себя уже применёнными.
 
 Сверить, что всё доехало:
 
