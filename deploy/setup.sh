@@ -74,7 +74,15 @@ fi
 grep -q '^github.com' /root/.ssh/known_hosts 2>/dev/null \
     || ssh-keyscan -t ed25519 github.com >> /root/.ssh/known_hosts 2>/dev/null
 
-if ! ssh -o BatchMode=yes -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+# Ответ ssh забираем в переменную, а не через конвейер: GitHub всегда
+# завершает сеанс кодом 1 («shell access не предоставляется»), а при
+# set -o pipefail такой конвейер считается неуспешным, даже когда grep
+# нашёл нужное — проверка не проходила никогда.
+GITHUB_REPLY=$(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+    -T git@github.com 2>&1 || true)
+
+if ! echo "$GITHUB_REPLY" | grep -q "successfully authenticated"; then
+    echo "Ответ GitHub: $GITHUB_REPLY"
     cat <<KEY
 
 ────────────────────────────────────────────────────────────────
