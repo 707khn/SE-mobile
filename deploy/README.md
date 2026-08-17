@@ -3,19 +3,44 @@
 Инструкция для чистого сервера PS Cloud с Ubuntu 24.04 LTS.
 Всё делается с компьютера с Windows, из PowerShell.
 
-Сервер: `85.202.192.168` (Астана, kz-ast-1)
+Сервер: `87.199.130.179` (Астана) · 2 CPU · 2 ГБ · 40 ГБ · тариф Basic-2
 Адрес приложения после настройки: `https://api.se-btrz.com`
 
 ---
 
-## Шаг 1. Проверить вход
+## Шаг 1. Войти и закрыть парольный вход
+
+Сервер выдаётся с паролем в письме. Пароль к SSH подбирают боты
+круглосуточно, поэтому первым делом — ключ, и пароль выключить.
 
 ```powershell
-ssh ubuntu@85.202.192.168
+ssh -l ubuntu 87.199.130.179
 ```
 
-При первом подключении спросит, доверяете ли вы серверу — ответьте `yes`.
-Должно появиться приглашение вида `ubuntu@se-mobile:~$`.
+Форма `-l ubuntu` вместо `ubuntu@` — потому что символ `@` теряется при
+вставке в некоторых терминалах Windows. По той же причине ниже везде
+полные пути вместо `~`.
+
+Положить свой ключ (на сервере, по одной команде):
+
+```bash
+mkdir -p /home/ubuntu/.ssh
+chmod 700 /home/ubuntu/.ssh
+nano /home/ubuntu/.ssh/authorized_keys
+chmod 600 /home/ubuntu/.ssh/authorized_keys
+```
+
+В `nano` вставить содержимое `id_ed25519.pub` со своего компьютера
+(в PowerShell: `Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | Set-Clipboard`),
+сохранить Ctrl+O, Enter, Ctrl+X.
+
+Проверить вход по ключу **из нового окна**, не закрывая текущее. Когда
+зашло без пароля:
+
+```bash
+sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo systemctl restart ssh
+```
 
 **Если пишет `Permission denied (publickey)`** — ключ не подошёл. Проверьте,
 что в PS Cloud загружена именно публичная часть:
@@ -58,9 +83,12 @@ sudo cat /root/.ssh/id_ed25519.pub
 Теперь код скачается:
 
 ```bash
-sudo git clone --depth 1 git@github.com:707khn/SE-mobile.git /tmp/se-mobile
+sudo git -c core.sshCommand="ssh -l git" clone --depth 1 ssh://github.com/707khn/SE-mobile.git /tmp/se-mobile
 sudo bash /tmp/se-mobile/deploy/setup.sh
 ```
+
+Адрес записан как `ssh://github.com/...` вместо `git@github.com:...` по той
+же причине — чтобы не потерялась «собачка».
 
 При первом подключении git спросит про доверие к `github.com` — ответьте
 `yes`.
@@ -98,7 +126,7 @@ curl -s http://localhost/ | head -c 200
 Добавьте запись:
 
 ```
-api.se-btrz.com.   A   85.202.192.168
+api.se-btrz.com.   A   87.199.130.179
 ```
 
 Разойдётся обычно за 10–30 минут, иногда до суток. Проверить с сервера:
@@ -107,7 +135,7 @@ api.se-btrz.com.   A   85.202.192.168
 dig +short api.se-btrz.com
 ```
 
-Когда команда покажет `85.202.192.168` — переходите дальше.
+Когда команда покажет `87.199.130.179` — переходите дальше.
 
 ---
 
@@ -138,7 +166,7 @@ curl.exe https://api.se-btrz.com/
 
 ```powershell
 pg_dump "СТРОКА_ПОДКЛЮЧЕНИЯ_RENDER" > render.sql
-scp render.sql ubuntu@85.202.192.168:/tmp/
+scp render.sql ubuntu@87.199.130.179:/tmp/
 ```
 
 Затем на сервере. **База пересоздаётся перед восстановлением** — сидеры уже
