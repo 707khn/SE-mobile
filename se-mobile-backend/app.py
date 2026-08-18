@@ -513,9 +513,9 @@ def _login_by_employee():
 # отработает один раз на боевой базе. Отсутствующие здесь считаются версией '1'.
 _SEED_VERSIONS = {
     # Даурембекова переехала с временного D013 на табельный 0000001465.
-    '_seed_org_directory': '2',
+    '_seed_org_directory': '3',
     # Вместе с ней в списке дублей появилась вторая пара.
-    '_merge_duplicate_employees': '2',
+    '_merge_duplicate_employees': '3',
     # Должность и подразделение на листках переписаны с печатных на настоящие.
     '_seed_daurembekova': '2',
 }
@@ -619,6 +619,7 @@ def create_app():
             _seed_admin_account,
             _seed_otk_july_2026,
             _seed_daurembekova,
+            _seed_beisekina,
             _merge_duplicate_employees,
             _remove_departed_employees,
             # Последним: ссылается на сотрудников, которых сидеры выше ещё
@@ -4279,7 +4280,7 @@ _ORG_DIRECTORY = [
     ('D003', 'Шаяхметов Данияр Бексултанович', 'Заместитель Генерального директора по экономике и финансам', 'Руководство'),
     ('0000002063', 'Тусупжанова Айым Темирболаткызы', 'Офис-менеджер', 'Приемная'),
     ('D004', 'Иманбеков Ринат Мейрамбекович', 'Руководитель службы внутреннего аудита', 'Служба внутреннего аудита'),
-    ('D005', 'Бейсекина Айман Муратовна', 'Корпоративный секретарь', 'Корпоративный отдел'),
+    ('0000000083', 'Бейсекина Айман Муратовна', 'Корпоративный секретарь', 'Корпоративный отдел'),
     ('D006', 'Матаев Ахмет Хафизович', 'Комплаенс-офицер', 'Комплаенс-офицер'),
     ('D007', 'Утепов Нурлан Кутайбаевич', 'Главный менеджер по ЗГС', 'Защита Государственных секретов (ЗГС)'),
     ('D008', 'Нургали Эльвира Андреевна', 'Специалист по мобилизационной работе', 'Защита Государственных секретов (ЗГС)'),
@@ -4773,6 +4774,7 @@ def _seed_daurembekova():
 _DUPLICATE_EMPLOYEES = [
     ('1874', '0000001874'),  # Кумарова Мадина Кумаровна
     ('D013', '0000001465'),  # Даурембекова Умут Ергазыевна
+    ('D005', '0000000083'),  # Бейсекина Айман Муратовна
 ]
 
 
@@ -4851,6 +4853,179 @@ def _seed_user_accounts():
         db.session.commit()
     logging.info('user_accounts: %d created, %d total',
                  created, UserAccount.query.count())
+
+
+_BEISEKINA_ID = '0000000083'
+_BEISEKINA_POSITION = 'Корпоративный секретарь'
+_BEISEKINA_DEPARTMENT = 'Корпоративный отдел'
+
+
+def _seed_beisekina():
+    """Сотрудник 83 (Бейсекина) и её расчётные листки за июнь-июль 2026.
+
+    Как и Даурембекова, в справочнике она стояла под временным номером —
+    D005; листки принесли настоящий, 0000000083.
+
+    В листках напечатана другая должность, «Представитель руководства по
+    СМК»: это роль по системе менеджмента качества, её держат вдобавок к
+    основной. В карточке оставлена должность из справочника, как и
+    подразделение, — «АУП» на листке снова категория персонала, а не отдел.
+
+    В отпускных строках период — диапазон дней, а не месяц: в июле вторая
+    строка уходит в август, отпуск оплачен вперёд.
+    """
+    if not Employee.query.filter_by(employee_id=_BEISEKINA_ID).first():
+        db.session.add(Employee(
+            employee_id=_BEISEKINA_ID,
+            full_name='Бейсекина Айман Муратовна',
+            job_title=_BEISEKINA_POSITION,
+            department=_BEISEKINA_DEPARTMENT,
+        ))
+        db.session.flush()
+
+    # ── Июнь 2026 ────────────────────────────────────────────────────────────
+    if not Payslip.query.filter_by(
+            employee_id=_BEISEKINA_ID, period_year=2026, period_month=6).first():
+        ps = Payslip(
+            employee_id=_BEISEKINA_ID,
+            period_month=6,
+            period_year=2026,
+            period_display='Июнь 2026',
+            total_accruals=1_620_323.0,
+            total_deductions=327_135.0,
+            net_pay=1_293_188.0,
+            total_paid=1_489_022.0,
+            position=_BEISEKINA_POSITION,
+            department=_BEISEKINA_DEPARTMENT,
+            salary_rate=436_706.0,
+            debt_start=485_028.0,
+            debt_end=289_194.0,
+        )
+        db.session.add(ps)
+        db.session.flush()
+
+        p = '06.2026'
+        for name, amt, days, hours, period in [
+            ('Оклад по дням',                              238_203.0, 12, 96.0, p),
+            ('Выплаты вследствии экологического бедствия',   6_488.0, None, None, p),
+            ('Доплата за выслугу лет (по дням)',            47_641.0, 12, 96.0, p),
+            ('Материальная помощь',                        873_412.0, None, None, p),
+            ('Оплата за совмещение пост.',                  76_704.0, 12, 96.0, p),
+            ('Оплата отпуска',                              75_575.0,  2, 16.0, '15-16.06.2026'),
+            ('Оплата отпуска',                             302_300.0,  8, 64.0, '17-28.06.2026'),
+        ]:
+            db.session.add(PayslipAccrual(
+                payslip_id=ps.id, name=name, amount=amt, period=period,
+                working_days=days, working_hours=hours))
+
+        for name, amt in [
+            ('Питание',                    1_933.0),
+            ('Профсоюзный сбор',           2_382.0),
+            ('ИПН исчисленный',          129_030.0),
+            ('ОПВ исчисленные',          161_384.0),
+            ('Взносы ОСМС исчисленные',   32_406.0),
+        ]:
+            db.session.add(PayslipDeduction(payslip_id=ps.id, name=name, amount=amt, period=p))
+
+        db.session.add(PayslipPaid(
+            payslip_id=ps.id, payment_type='Перечислено в банк',
+            period=p, amount=1_489_022.0))
+
+        for name, amt in [
+            ('Вычет ОПВ',     161_384.0),
+            ('Вычет ВОСМС',    32_406.0),
+            ('Базовый вычет', 129_750.0),
+        ]:
+            db.session.add(PayslipBenefit(payslip_id=ps.id, name=name, amount=amt))
+
+        for name, amt in [
+            ('ОПВР с начала года',    159_970.0),
+            ('ОПВР за месяц',          56_484.0),
+            ('ООСМС с начала года',   138_286.0),
+            ('ООСМС за месяц',         48_610.0),
+            ('ВОСМС с начала года',    92_189.0),
+        ]:
+            db.session.add(PayslipReference(payslip_id=ps.id, name=name, amount=amt))
+
+    # ── Июль 2026 ────────────────────────────────────────────────────────────
+    if not Payslip.query.filter_by(
+            employee_id=_BEISEKINA_ID, period_year=2026, period_month=7).first():
+        ps = Payslip(
+            employee_id=_BEISEKINA_ID,
+            period_month=7,
+            period_year=2026,
+            period_display='Июль 2026',
+            total_accruals=1_262_613.0,
+            total_deductions=251_113.0,
+            net_pay=1_011_500.0,
+            total_paid=1_009_567.0,
+            position=_BEISEKINA_POSITION,
+            department=_BEISEKINA_DEPARTMENT,
+            salary_rate=436_706.0,
+            debt_start=289_194.0,
+            debt_end=291_127.0,
+        )
+        db.session.add(ps)
+        db.session.flush()
+
+        p = '07.2026'
+        for name, amt, days, hours, period in [
+            ('Оклад по дням',                              238_203.0, 12, 96.0, p),
+            ('Выплаты вследствии экологического бедствия',   6_488.0, None, None, p),
+            ('Доплата за выслугу лет (по дням)',            47_641.0, 12, 96.0, p),
+            ('Оплата за совмещение пост.',                  76_704.0, 12, 96.0, p),
+            ('Оплата отпуска',                             380_726.0, 10, 80.0, '20-31.07.2026'),
+            ('Оплата отпуска',                              76_145.0,  2, 16.0, '01-04.08.2026'),
+            ('Премия постоянная для ср',                   436_706.0, None, None, p),
+        ]:
+            db.session.add(PayslipAccrual(
+                payslip_id=ps.id, name=name, amount=amt, period=period,
+                working_days=days, working_hours=hours))
+
+        for name, amt in [
+            ('Профсоюзный сбор',           2_382.0),
+            ('ИПН исчисленный',           97_684.0),
+            ('ОПВ исчисленные',          125_764.0),
+            ('Взносы ОСМС исчисленные',   25_283.0),
+        ]:
+            db.session.add(PayslipDeduction(payslip_id=ps.id, name=name, amount=amt, period=p))
+
+        db.session.add(PayslipPaid(
+            payslip_id=ps.id, payment_type='Перечислено в банк',
+            period=p, amount=1_009_567.0))
+
+        for name, amt in [
+            ('Вычет ОПВ',     125_764.0),
+            ('Вычет ВОСМС',    25_283.0),
+            ('Базовый вычет', 129_750.0),
+        ]:
+            db.session.add(PayslipBenefit(payslip_id=ps.id, name=name, amount=amt))
+
+        # Натуральный доход в «Всего начислено» не входит — держим справочно,
+        # чтобы не разошлась сумма начислений.
+        for name, amt in [
+            ('ОПВР с начала года',                                    203_987.0),
+            ('ОПВР за месяц',                                          44_017.0),
+            ('ООСМС с начала года',                                   176_210.0),
+            ('ООСМС за месяц',                                         37_924.0),
+            ('ВОСМС с начала года',                                   117_472.0),
+            ('Натуральный доход: дополнительный доход от работодателя', 1_516.0),
+        ]:
+            db.session.add(PayslipReference(payslip_id=ps.id, name=name, amount=amt))
+
+    # Пароль — табельный номер, со сменой при первом входе. Без учётной записи
+    # листки ей негде смотреть: их увидел бы только администратор.
+    if db.session.get(UserAccount, '83') is None:
+        db.session.add(UserAccount(
+            login='83',
+            employee_id=_BEISEKINA_ID,
+            password_hash=generate_password_hash('83'),
+            must_change_password=True,
+        ))
+
+    db.session.commit()
+    logging.info('Seeded employee %s (Бейсекина) with Jun/Jul 2026 payslips',
+                 _BEISEKINA_ID)
 
 
 # Учётки, которым пора сменить временный пароль. Пока он равен табельному
