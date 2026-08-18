@@ -64,6 +64,10 @@ sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 
 sudo -u postgres psql -qc "ALTER USER $DB_USER WITH PASSWORD '$DB_PASS';"
 
 say "Код приложения"
+# Папка принадлежит semobile, а git работает от root — без этой отметки он
+# отказывается: "detected dubious ownership in repository".
+git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+
 # Репозиторий приватный, поэтому сервер ходит в него по своему ключу.
 # Открытую часть надо один раз добавить в GitHub как Deploy key.
 mkdir -p /root/.ssh && chmod 700 /root/.ssh
