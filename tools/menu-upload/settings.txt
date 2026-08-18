@@ -2,7 +2,7 @@
 
 # Адрес сервера приложения — тот же, что использует приложение
 # (см. baseUrl в lib/utils/variables.dart)
-server = https://se-mobile.onrender.com
+server = https://api.se-btrz.com
 
 # Логин и пароль технолога столовой (те же, что и в приложении)
 login = 44

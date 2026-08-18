@@ -1,6 +1,7 @@
 class AppValues {
   static const String LANG = "Language";
-  // Демо-бэкенд: замените URL после деплоя на Render.com
-  // Оригинал: static const String baseUrl = 'https://cp.se-btrz.com';
-  static const String baseUrl = 'https://se-mobile.onrender.com';
+  // Свой сервер в Астане (PS Cloud). До этого приложение ходило на
+  // se-mobile.onrender.com — бесплатный тариф в США, засыпавший после
+  // простоя, с базой во Франкфурте.
+  static const String baseUrl = 'https://api.se-btrz.com';
 }
