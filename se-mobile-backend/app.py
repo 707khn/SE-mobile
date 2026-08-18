@@ -622,6 +622,8 @@ def create_app():
             # Последним: ссылается на сотрудников, которых сидеры выше ещё
             # создают, склеивают и удаляют.
             _seed_user_accounts,
+            # После него: до этого момента учётки может ещё не существовать.
+            _force_password_change,
         ]:
             _name = _fn.__name__
             _version = _SEED_VERSIONS.get(_name, '1')
@@ -4835,6 +4837,42 @@ def _seed_user_accounts():
         db.session.commit()
     logging.info('user_accounts: %d created, %d total',
                  created, UserAccount.query.count())
+
+
+# Учётки, которым пора сменить временный пароль. Пока он равен табельному
+# номеру, войти может любой, кто видел табель.
+_FORCE_PASSWORD_CHANGE = [
+    '2114',  # Сарсекенов Батырхан Арманұлы
+]
+
+
+def _force_password_change():
+    """Просит сменить пароль тех, у кого он остался временным.
+
+    Флаг ставится, только если пароль всё ещё равен логину. Человек мог
+    сменить его сам, пока сидер ехал до боевой базы, — тогда просить не за
+    что, и новый пароль остаётся при нём. Журнал applied_seeds и так не даст
+    сидеру отработать дважды, но проверка страхует на случай, если ему
+    когда-нибудь поднимут версию.
+
+    Запускается после _seed_user_accounts: до него учётки может ещё не быть.
+    """
+    changed = 0
+    for login in _FORCE_PASSWORD_CHANGE:
+        account = db.session.get(UserAccount, login)
+        if account is None:
+            logging.warning('Смена пароля не включена: учётки %r нет', login)
+            continue
+        if account.must_change_password:
+            continue
+        if not check_password_hash(account.password_hash, login):
+            logging.info('Смена пароля не нужна: %r уже сменил', login)
+            continue
+        account.must_change_password = True
+        changed += 1
+    if changed:
+        db.session.commit()
+        logging.info('Обязательная смена пароля включена для %d учётки(-ок)', changed)
 
 
 app = create_app()
