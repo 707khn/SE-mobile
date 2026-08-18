@@ -516,6 +516,8 @@ _SEED_VERSIONS = {
     '_seed_org_directory': '2',
     # Вместе с ней в списке дублей появилась вторая пара.
     '_merge_duplicate_employees': '2',
+    # Должность и подразделение на листках переписаны с печатных на настоящие.
+    '_seed_daurembekova': '2',
 }
 
 
@@ -4586,6 +4588,8 @@ def _seed_admin_account():
 
 
 _DAUREMBEKOVA_ID = '0000001465'
+_DAUREMBEKOVA_POSITION = 'Начальник ОИТиС'
+_DAUREMBEKOVA_DEPARTMENT = 'Отдел информационных технологий и связи (ОИТиС)'
 
 
 def _seed_daurembekova():
@@ -4595,17 +4599,19 @@ def _seed_daurembekova():
     ещё не знали. Листки его принесли — 0000001465, — и справочник теперь
     ведёт на него, а строку D013 подбирает _merge_duplicate_employees.
 
-    Должность и подразделение в самих листках свои («Начальник отдела»,
-    «АУП»): АУП — это категория персонала в расчёте зарплаты, а не отдел.
-    Поэтому в карточке сотрудника остаётся ОИТиС из справочника, а то, что
-    напечатано на листке, лежит на самом листке — как у Кумаровой.
+    В листках напечатано «Начальник отдела» и «АУП», но АУП — категория
+    персонала в расчёте зарплаты, а не отдел. Экран листка склеивает
+    должность с подразделением через точку, и получалось «Начальник отдела ·
+    АУП» — читается как будто она начальник АУП, тогда как она начальник
+    ОИТиС. Поэтому и в карточке, и на листках стоит настоящее: у остальных
+    листков в подразделении тоже живой отдел, а не категория.
     """
     if not Employee.query.filter_by(employee_id=_DAUREMBEKOVA_ID).first():
         db.session.add(Employee(
             employee_id=_DAUREMBEKOVA_ID,
             full_name='Даурембекова Умут Ергазыевна',
-            job_title='Начальник ОИТиС',
-            department='Отдел информационных технологий и связи (ОИТиС)',
+            job_title=_DAUREMBEKOVA_POSITION,
+            department=_DAUREMBEKOVA_DEPARTMENT,
         ))
         db.session.flush()
 
@@ -4621,8 +4627,8 @@ def _seed_daurembekova():
             total_deductions=215_710.0,
             net_pay=854_498.0,
             total_paid=761_039.0,
-            position='Начальник отдела',
-            department='АУП',
+            position=_DAUREMBEKOVA_POSITION,
+            department=_DAUREMBEKOVA_DEPARTMENT,
             salary_rate=731_498.0,
             debt_start=761_039.0,
             debt_end=854_498.0,
@@ -4680,8 +4686,8 @@ def _seed_daurembekova():
             total_deductions=313_405.0,
             net_pay=1_488_301.0,
             total_paid=1_924_806.0,
-            position='Начальник отдела',
-            department='АУП',
+            position=_DAUREMBEKOVA_POSITION,
+            department=_DAUREMBEKOVA_DEPARTMENT,
             salary_rate=731_498.0,
             debt_start=854_498.0,
             debt_end=417_993.0,
@@ -4740,6 +4746,14 @@ def _seed_daurembekova():
     # перенесённых из _CREDENTIALS, со сменой при первом входе: экран смены
     # в сборке уже есть. Сам этот пароль оставить нельзя — он короче шести
     # знаков и совпадает с логином, обе проверки его отклонят.
+    # Листки, уже попавшие в базу, тоже приводим к этим значениям: первая
+    # версия сидера переносила их с листка как есть, и экран, склеивающий
+    # должность с подразделением через точку, показывал «Начальник отдела ·
+    # АУП» — читается как будто она начальник АУП.
+    for slip in Payslip.query.filter_by(employee_id=_DAUREMBEKOVA_ID).all():
+        slip.position = _DAUREMBEKOVA_POSITION
+        slip.department = _DAUREMBEKOVA_DEPARTMENT
+
     if db.session.get(UserAccount, '1465') is None:
         db.session.add(UserAccount(
             login='1465',
