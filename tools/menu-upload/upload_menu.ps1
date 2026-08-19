@@ -3,13 +3,16 @@
 # Запускается через "Загрузить меню.bat" — перетаскиванием файла на ярлык
 # либо двойным щелчком (тогда откроется окно выбора файла).
 #
+# С ключом -Today (ярлык "Меню на сегодня.bat") дата из файла не важна: меню
+# ложится на сегодняшний день, чтобы оно сразу было видно в приложении.
+#
 # Файл сохранён в UTF-8 С BOM: Windows PowerShell 5.1 читает .ps1 без BOM
 # как ANSI, и кириллица ломается ещё на разборе скрипта.
 #
 # Разбор таблицы делает сервер: если 1С поменяет разметку выгрузки, править
 # нужно только сервер, а этот скрипт на компьютере в столовой — нет.
 
-param([string]$FilePath)
+param([string]$FilePath, [switch]$Today)
 
 $logPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'upload_log.txt'
 
@@ -31,7 +34,7 @@ function Show-Message($text, $title, $icon) {
 # Всё в одном try: раньше Add-Type стоял снаружи, и при сбое показывать ошибку
 # было уже нечем — окно просто не появлялось.
 try {
-    Write-Log "--- запуск, аргумент: '$FilePath' ---"
+    Write-Log "--- запуск, аргумент: '$FilePath', на сегодня: $Today ---"
 
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
     Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
@@ -64,7 +67,11 @@ try {
     # --- выбор файла -------------------------------------------------------
     if ([string]::IsNullOrWhiteSpace($FilePath)) {
         $dialog = New-Object System.Windows.Forms.OpenFileDialog
-        $dialog.Title = 'Выберите файл меню, выгруженный из 1С'
+        $dialog.Title = if ($Today) {
+            'Выберите файл меню — оно встанет на сегодня'
+        } else {
+            'Выберите файл меню, выгруженный из 1С'
+        }
         $dialog.Filter = 'Excel (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls'
         $dialog.InitialDirectory =
             if ($settings.ContainsKey('folder') -and $settings['folder'] -ne '' -and (Test-Path $settings['folder'])) {
@@ -93,6 +100,11 @@ try {
     $content.Add((New-Object System.Net.Http.StringContent($settings['password'])), 'password')
     if ($settings.ContainsKey('default_date') -and $settings['default_date'] -ne '') {
         $content.Add((New-Object System.Net.Http.StringContent($settings['default_date'])), 'date')
+    }
+    if ($Today) {
+        $todayIso = (Get-Date).ToString('yyyy-MM-dd')
+        $content.Add((New-Object System.Net.Http.StringContent($todayIso)), 'force_date')
+        Write-Log "меню ставится на сегодня: $todayIso"
     }
 
     $bytes = [System.IO.File]::ReadAllBytes($FilePath)

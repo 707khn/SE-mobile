@@ -1490,10 +1490,36 @@ def register_routes(app):
             except ValueError:
                 return jsonify({'message': 'Неверная дата', 'error': True}), 400
 
+        # Загрузка «на сегодня»: что бы ни стояло в файле, меню ложится на
+        # этот день. 1С проставляет дату по своему расписанию, а в столовой
+        # нужно одно — чтобы в приложении было видно сегодняшнее меню.
+        forced = None
+        if request.form.get('force_date'):
+            try:
+                forced = date.fromisoformat(request.form['force_date'])
+            except ValueError:
+                return jsonify({'message': 'Неверная дата', 'error': True}), 400
+            # Файл может быть и вовсе без дат — тогда блюда без этой подсказки
+            # разбор просто пропустит.
+            if fallback is None:
+                fallback = forced
+
         try:
             days = parse_menu_excel(upload.read(), fallback_date=fallback)
         except ValueError as e:
             return jsonify({'message': str(e), 'error': True}), 422
+
+        if forced is not None:
+            if len(days) > 1:
+                dates = ', '.join(d['date'].strftime('%d.%m.%Y') for d in days)
+                return jsonify({
+                    'message': ('В файле несколько дней (' + dates + ') — какой '
+                                'из них сегодняшний, программе не решить. '
+                                'Загрузите такой файл обычной кнопкой '
+                                '«Загрузить меню»: даты возьмутся из файла.'),
+                    'error': True,
+                }), 422
+            days[0]['date'] = forced
 
         summary = []
         for day in days:
