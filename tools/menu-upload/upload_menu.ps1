@@ -130,9 +130,26 @@ try {
     throw $text
 }
 catch {
-    $detail = $_.Exception.Message
-    Write-Log "ОШИБКА: $detail"
+    # У сетевых сбоев внешнее сообщение всегда одно — «Произошла ошибка при
+    # отправке запроса», и по нему не понять ничего. Настоящая причина —
+    # недоверенный сертификат, закрытый порт, неизвестное имя — лежит во
+    # вложенном исключении, поэтому разворачиваем всю цепочку.
+    $messages = @()
+    $error_ = $_.Exception
+    while ($error_) {
+        $messages += $error_.Message
+        Write-Log ("ОШИБКА: " + $error_.GetType().FullName + ': ' + $error_.Message)
+        $error_ = $error_.InnerException
+    }
     Write-Log $_.ScriptStackTrace
+
+    # Человеку — только текст, без имён классов. Когда причина вложена,
+    # показываем и её: внешнее сообщение у сетевых сбоев неинформативно.
+    $detail = $messages[0]
+    if ($messages.Count -gt 1) {
+        $detail = $messages[0] + [Environment]::NewLine + [Environment]::NewLine +
+                  'Причина: ' + $messages[-1]
+    }
     Show-Message ("Не удалось загрузить меню." + [Environment]::NewLine + [Environment]::NewLine + $detail + [Environment]::NewLine + [Environment]::NewLine + "Подробности в файле upload_log.txt") 'Меню столовой' 'Error'
     exit 1
 }
