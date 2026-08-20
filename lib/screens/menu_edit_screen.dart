@@ -127,8 +127,6 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
     final nameController = TextEditingController(text: existing?.name ?? '');
     final priceController = TextEditingController(
         text: existing?.price != null ? existing!.price!.toStringAsFixed(0) : '');
-    final portionController =
-        TextEditingController(text: existing?.portion ?? '');
     // Default to the section the technologist last used — most dishes are
     // entered section by section.
     var category = existing?.category ??
@@ -185,17 +183,6 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
                   children: [
                     Expanded(
                       child: TextField(
-                        controller: portionController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'menu_portion'.tr,
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
                         controller: priceController,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
@@ -244,20 +231,17 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
     category = categoryController.text.trim();
     final name = nameController.text.trim();
     final price = double.tryParse(priceController.text.trim().replaceAll(',', '.'));
-    final portionText = portionController.text.trim();
-    final portion = portionText.isEmpty ? null : portionText;
-
     setState(() {
       _dirty = true;
       if (existing == null) {
-        _items.add(_MenuEntry(
-            category: category, name: name, price: price, portion: portion));
+        _items.add(_MenuEntry(category: category, name: name, price: price));
       } else {
+        // portion намеренно не трогаем: его больше нигде не показывают и не
+        // вводят, но 1С его присылает — правка блюда не должна его стирать.
         existing
           ..category = category
           ..name = name
-          ..price = price
-          ..portion = portion;
+          ..price = price;
       }
     });
   }
@@ -413,16 +397,9 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
     return ListView(children: tiles);
   }
 
-  /// Portion and price, whichever the dish has — 1C exports often carry only
-  /// the portion.
+  /// Цена, если она у блюда есть.
   Widget? _subtitleFor(_MenuEntry item) {
     final parts = <String>[];
-    final portion = item.portion?.trim() ?? '';
-    if (portion.isNotEmpty) {
-      parts.add(RegExp(r'^[\d.,]+$').hasMatch(portion)
-          ? '$portion ${'menu_portion_unit'.tr}'
-          : portion);
-    }
     if (item.price != null) {
       parts.add('${NumberFormat('#,##0', 'ru').format(item.price)} ₸');
     }
