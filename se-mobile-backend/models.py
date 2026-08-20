@@ -175,6 +175,31 @@ class MenuItem(db.Model):
     portion = db.Column(db.String(50))
 
 
+class DirectoryEntry(db.Model):
+    """Строка телефонного справочника предприятия.
+
+    Отдельно от employees намеренно: справочник — свой документ. В нём есть
+    посты без человека («КПП», «Электроцех»), один человек может стоять
+    дважды в разных ролях, а у половины предприятия внутреннего номера нет
+    вовсе, и в справочник они не попадают.
+
+    Загружается целиком: при импорте таблица заменяется, поэтому уволенные
+    исчезают сами, а не остаются висеть.
+    """
+    __tablename__ = 'directory_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    # Порядок из файла: справочник печатают по отделам, и алфавит внутри
+    # отдела там не соблюдается — начальник стоит первым.
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    department = db.Column(db.String(200))
+    name = db.Column(db.String(255), nullable=False)
+    position = db.Column(db.String(200))
+    extension = db.Column(db.String(20))
+    email = db.Column(db.String(200))
+    mobile = db.Column(db.String(50))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class AppliedSeed(db.Model):
     """Журнал отработавших сидеров.
 

@@ -12,9 +12,10 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
-                    UserAccount, AuthToken)
+                    UserAccount, AuthToken, DirectoryEntry)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
+from parser_directory_excel import parse_directory_excel
 from parser_employees_excel import parse_employees_excel
 
 _ONE_DAY = timedelta(days=1)
@@ -1560,6 +1561,92 @@ def register_routes(app):
         return jsonify({
             'message': 'Загружено:\n' + '\n'.join(lines),
             'days': summary,
+        })
+
+    @app.route('/api/directory', methods=['GET'])
+    @require_auth
+    def get_directory():
+        """Телефонный справочник предприятия — всем сотрудникам.
+
+        Отдаётся целиком: 129 строк, меньше сотни килобайт. Поиск и разбивку
+        по отделам делает приложение, зато справочник открывается мгновенно и
+        работает, когда связь пропала.
+        """
+        rows = DirectoryEntry.query.order_by(DirectoryEntry.sort_order).all()
+        # Все строки приезжают одной загрузкой, поэтому дата у них общая —
+        # приложение показывает её как «справочник от такого-то числа».
+        updated = max((r.updated_at for r in rows if r.updated_at), default=None)
+        return jsonify({
+            'message': 'Success',
+            'entries': [{
+                'department': row.department or '',
+                'name': row.name,
+                'position': row.position or '',
+                'extension': row.extension or '',
+                'email': row.email or '',
+                'mobile': row.mobile or '',
+            } for row in rows],
+            'updated_at': updated.isoformat() if updated else None,
+        })
+
+    @app.route('/api/directory/import-excel', methods=['POST'])
+    def import_directory_excel():
+        """Загружает справочник из Excel. Логин и пароль — в теле запроса.
+
+        Как и у меню: отдельного секрета не заводим, у администратора уже
+        есть учётная запись. Отправляет программка с рабочего стола.
+        """
+        login = (request.form.get('login') or '').strip()
+        password = (request.form.get('password') or '').strip()
+        employee_id = _authenticate(login, password)
+        if not employee_id:
+            return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
+
+        uploader = Employee.query.get(employee_id)
+        if not _is_system_admin(uploader.job_title if uploader else ''):
+            return jsonify({
+                'message': 'Загружать справочник может администратор',
+                'error': True,
+            }), 403
+
+        if 'file' not in request.files:
+            return jsonify({'message': 'Файл не передан', 'error': True}), 400
+        upload = request.files['file']
+        if not (upload.filename or '').lower().endswith(('.xlsx', '.xlsm', '.xls')):
+            return jsonify({'message': 'Ожидается файл Excel', 'error': True}), 400
+
+        try:
+            entries = parse_directory_excel(upload.read())
+        except ValueError as e:
+            return jsonify({'message': str(e), 'error': True}), 422
+
+        # Заменяем целиком: справочник — снимок на дату, а не журнал. Иначе
+        # уволенные остались бы в нём навсегда.
+        DirectoryEntry.query.delete()
+        now = datetime.utcnow()
+        for order, entry in enumerate(entries):
+            db.session.add(DirectoryEntry(
+                sort_order=order,
+                department=entry['department'],
+                name=entry['name'],
+                position=entry['position'] or None,
+                extension=entry['extension'] or None,
+                email=entry['email'] or None,
+                mobile=entry['mobile'] or None,
+                updated_at=now,
+            ))
+        db.session.commit()
+
+        departments = []
+        for entry in entries:
+            if entry['department'] and entry['department'] not in departments:
+                departments.append(entry['department'])
+        logging.info('Directory import by %s: %d entries', login, len(entries))
+        return jsonify({
+            'message': (f'Загружено: {len(entries)} записей, '
+                        f'{len(departments)} подразделений'),
+            'count': len(entries),
+            'departments': len(departments),
         })
 
     @app.route('/api/menu/<date_str>', methods=['DELETE'])
