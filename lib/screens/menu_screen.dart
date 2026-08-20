@@ -209,39 +209,17 @@ class _MenuScreenState extends State<MenuScreen> {
         right: Dimensions.width20,
         bottom: 4,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              category,
-              style: TextStyle(
-                color: context.accentColor,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          // Names the right-hand column, so a bare "100 г" is not a mystery.
-          if (_hasPortions)
-            SizedBox(
-              width: 62 + 16,
-              child: Text(
-                'menu_portion'.tr,
-                textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 11, color: context.mutedColor),
-              ),
-            ),
-        ],
+      child: Text(
+        category,
+        style: TextStyle(
+          color: context.accentColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
-
-  /// True when at least one dish of the day carries a portion — the header
-  /// label is pointless otherwise.
-  bool get _hasPortions => _items.any((item) =>
-      ((item as Map<String, dynamic>)['portion'] as String?)?.trim().isNotEmpty ??
-      false);
 
   Widget _buildItemTile(Map<String, dynamic> item) {
     final name = item['name'] as String? ?? '—';
@@ -249,14 +227,6 @@ class _MenuScreenState extends State<MenuScreen> {
     final priceStr = price != null
         ? NumberFormat('#,##0', 'ru').format(price) + ' ₸'
         : '';
-    // Unit is unknown — grams for food, millilitres for drinks — so the number
-    // is shown as the export wrote it, with a neutral suffix.
-    final portionRaw = (item['portion'] as String?)?.trim() ?? '';
-    final portionStr = portionRaw.isEmpty
-        ? ''
-        : (RegExp(r'^[\d.,]+$').hasMatch(portionRaw)
-            ? '$portionRaw ${'menu_portion_unit'.tr}'
-            : portionRaw);
 
     return Container(
       margin: EdgeInsets.symmetric(
@@ -275,24 +245,6 @@ class _MenuScreenState extends State<MenuScreen> {
             Expanded(
               child: Text(name, style: const TextStyle(fontSize: 15)),
             ),
-            // Portion in its own right-hand column, as in the source table.
-            // Fixed width so the numbers line up down the list.
-            if (portionStr.isNotEmpty) ...[
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 62,
-                child: Text(
-                  portionStr,
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: context.mutedColor,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-            ],
             if (priceStr.isNotEmpty) ...[
               const SizedBox(width: 10),
               Text(
