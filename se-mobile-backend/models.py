@@ -202,6 +202,43 @@ class DirectoryEntry(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class NewsItem(db.Model):
+    """Лента: новости с сайта и объявления по предприятию.
+
+    Одна таблица на оба вида намеренно — в приложении это один список, и
+    сортировка у них общая. Различает `source`.
+
+    Новости с сайта публикуются сразу: их уже отредактировали на сайте.
+    Объявления ждут одобрения — то, что рассылают по почте, писалось для
+    сотрудников отдела, а не для пятисот экранов, и попадать в ленту без
+    просмотра не должно.
+    """
+    __tablename__ = 'news_items'
+    __table_args__ = (
+        db.Index('ix_news_items_published', 'is_published', 'published_at'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+
+    # 'site' — с сайта, 'announcement' — объявление.
+    source = db.Column(db.String(20), nullable=False, default='announcement')
+
+    # По чему узнаём уже загруженную новость: guid или ссылка из ленты.
+    # У объявлений пусто — они приходят по одному.
+    external_id = db.Column(db.String(500), unique=True)
+
+    title = db.Column(db.String(500), nullable=False)
+    summary = db.Column(db.Text)
+    url = db.Column(db.String(500))
+    image_url = db.Column(db.String(500))
+
+    # Кто прислал объявление: отправитель письма или имя администратора.
+    author = db.Column(db.String(255))
+
+    published_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_published = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class AppliedSeed(db.Model):
     """Журнал отработавших сидеров.
 

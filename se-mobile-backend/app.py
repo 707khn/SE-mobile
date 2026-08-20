@@ -3,7 +3,7 @@ import logging
 import re
 import secrets
 from functools import wraps
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 # Werkzeug идёт вместе с Flask, ставить ничего не нужно. По умолчанию scrypt.
@@ -12,10 +12,11 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
-                    UserAccount, AuthToken, DirectoryEntry)
+                    UserAccount, AuthToken, DirectoryEntry, NewsItem)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import parse_directory_excel
+from parser_news_feed import parse_news_feed
 from parser_employees_excel import parse_employees_excel
 
 _ONE_DAY = timedelta(days=1)
@@ -540,6 +541,79 @@ def _login_by_employee():
 # Версия сидера. Пока она совпадает с записанной в журнале, сидер не
 # запускается. Изменили данные внутри сидера — повысьте здесь версию, и он
 # отработает один раз на боевой базе. Отсутствующие здесь считаются версией '1'.
+# Как часто ходим на сайт за новостями. Реже — сайт не заметит нагрузки,
+# чаще — незачем: новости там появляются не ежеминутно.
+_NEWS_REFRESH = timedelta(minutes=15)
+_news_checked_at = None
+
+
+def _refresh_site_news():
+    """Забирает ленту сайта, если давно не забирали.
+
+    Ходим лениво, при чтении ленты приложением, а не по расписанию: отдельный
+    таймер — ещё одна деталь, которая ломается молча. Ошибка сети здесь не
+    ошибка запроса: показываем то, что уже лежит в базе.
+    """
+    global _news_checked_at
+    feed_url = os.environ.get('NEWS_FEED_URL', '').strip()
+    if not feed_url:
+        return
+    now = datetime.utcnow()
+    if _news_checked_at and now - _news_checked_at < _NEWS_REFRESH:
+        return
+    _news_checked_at = now
+
+    try:
+        import urllib.request
+        request = urllib.request.Request(
+            feed_url, headers={'User-Agent': 'SE-mobile/1.0'})
+        with urllib.request.urlopen(request, timeout=8) as response:
+            items = parse_news_feed(response.read())
+    except Exception as e:
+        logging.warning('Не удалось обновить новости с сайта: %s', e)
+        return
+
+    added = 0
+    for item in items:
+        if not item['external_id']:
+            continue
+        if NewsItem.query.filter_by(external_id=item['external_id']).first():
+            continue
+        db.session.add(NewsItem(
+            source='site',
+            external_id=item['external_id'],
+            title=item['title'],
+            summary=item['summary'],
+            url=item['url'] or None,
+            image_url=item['image_url'] or None,
+            published_at=item['published_at'] or now,
+            # С сайта — сразу в ленту: там материал уже прошёл редактуру.
+            is_published=True,
+        ))
+        added += 1
+    if added:
+        try:
+            db.session.commit()
+            logging.info('Новостей с сайта добавлено: %d', added)
+        except Exception as e:
+            db.session.rollback()
+            logging.error('Не удалось сохранить новости: %s', e)
+
+
+def _news_json(item):
+    return {
+        'id': item.id,
+        'source': item.source,
+        'title': item.title,
+        'summary': item.summary or '',
+        'url': item.url or '',
+        'image_url': item.image_url or '',
+        'author': item.author or '',
+        'published_at': item.published_at.isoformat() if item.published_at else None,
+        'is_published': item.is_published,
+    }
+
+
 _SEED_VERSIONS = {
     # Даурембекова переехала с временного D013 на табельный 0000001465.
     '_seed_org_directory': '3',
@@ -1635,6 +1709,136 @@ def register_routes(app):
             'message': 'Загружено:\n' + '\n'.join(lines),
             'days': summary,
         })
+
+    @app.route('/api/news', methods=['GET'])
+    @require_auth
+    def get_news():
+        """Лента для сотрудников: новости сайта и одобренные объявления."""
+        _refresh_site_news()
+        limit = min(int(request.args.get('limit', 50) or 50), 200)
+        rows = (NewsItem.query
+                .filter_by(is_published=True)
+                .order_by(NewsItem.published_at.desc())
+                .limit(limit).all())
+        return jsonify({'message': 'Success',
+                        'items': [_news_json(r) for r in rows]})
+
+    @app.route('/api/admin/news', methods=['GET'])
+    @require_auth
+    def admin_news_list():
+        """Всё, включая неодобренное: очередь объявлений."""
+        if not _is_admin_account():
+            return _deny()
+        rows = NewsItem.query.order_by(
+            NewsItem.is_published.asc(), NewsItem.published_at.desc()).limit(200).all()
+        pending = sum(1 for r in rows if not r.is_published)
+        return jsonify({'message': 'Success', 'pending': pending,
+                        'items': [_news_json(r) for r in rows]})
+
+    @app.route('/api/admin/news', methods=['POST'])
+    @require_auth
+    def admin_news_create():
+        """Объявление, набранное администратором прямо в приложении."""
+        if not _is_admin_account():
+            return _deny()
+        data = request.get_json(silent=True) or {}
+        title = (data.get('title') or '').strip()
+        summary = (data.get('summary') or '').strip()
+        if not title:
+            return jsonify({'message': 'Failure', 'error': 'title_required'}), 400
+
+        viewer = getattr(g, 'employee', None)
+        item = NewsItem(
+            source='announcement',
+            title=title[:500],
+            summary=summary,
+            author=(data.get('author') or (viewer.full_name if viewer else ''))[:255] or None,
+            published_at=datetime.utcnow(),
+            # Набрал администратор — значит уже одобрено, второй раз не спрашиваем.
+            is_published=True,
+        )
+        db.session.add(item)
+        db.session.commit()
+        return jsonify({'message': 'Success', 'item': _news_json(item)})
+
+    @app.route('/api/admin/news/<int:item_id>', methods=['POST', 'DELETE'])
+    @require_auth
+    def admin_news_change(item_id):
+        """Одобрить объявление из очереди или убрать его из ленты."""
+        if not _is_admin_account():
+            return _deny()
+        item = db.session.get(NewsItem, item_id)
+        if item is None:
+            return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
+
+        if request.method == 'DELETE':
+            db.session.delete(item)
+            db.session.commit()
+            return jsonify({'message': 'Success'})
+
+        data = request.get_json(silent=True) or {}
+        if 'is_published' in data:
+            item.is_published = bool(data['is_published'])
+        if (data.get('title') or '').strip():
+            item.title = data['title'].strip()[:500]
+        if 'summary' in data:
+            item.summary = (data.get('summary') or '').strip()
+        db.session.commit()
+        return jsonify({'message': 'Success', 'item': _news_json(item)})
+
+    @app.route('/api/news/announcements', methods=['POST'])
+    def push_announcement():
+        """Приём объявления извне — от программы, читающей почту.
+
+        Почтовый сервер стоит внутри сети предприятия, а этот сервер снаружи,
+        и достучаться до почты он не может. Поэтому направление обратное:
+        программа на конторском компьютере читает ящик и присылает письма
+        сюда. Логин и пароль в теле запроса — как у загрузки меню.
+
+        Присланное **не публикуется**: ждёт одобрения в админ-панели.
+        """
+        data = request.get_json(silent=True) or {}
+        employee_id = _authenticate((data.get('login') or '').strip(),
+                                    (data.get('password') or '').strip())
+        if not employee_id:
+            return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
+        uploader = Employee.query.get(employee_id)
+        if not _is_system_admin(uploader.job_title if uploader else ''):
+            return jsonify({'message': 'Присылать объявления может администратор',
+                            'error': True}), 403
+
+        title = (data.get('title') or '').strip()
+        if not title:
+            return jsonify({'message': 'Пустая тема письма', 'error': True}), 400
+
+        # Письмо узнаём по Message-ID: рассылку читают повторно, и одно и то
+        # же письмо не должно попасть в очередь дважды.
+        external = (data.get('message_id') or '').strip()[:500] or None
+        if external and NewsItem.query.filter_by(external_id=external).first():
+            return jsonify({'message': 'Уже принято', 'duplicate': True})
+
+        published = None
+        if data.get('sent_at'):
+            try:
+                published = datetime.fromisoformat(data['sent_at'].replace('Z', '+00:00'))
+                if published.tzinfo is not None:
+                    published = published.astimezone(timezone.utc).replace(tzinfo=None)
+            except ValueError:
+                published = None
+
+        item = NewsItem(
+            source='announcement',
+            external_id=external,
+            title=title[:500],
+            summary=(data.get('summary') or '').strip(),
+            author=(data.get('author') or '').strip()[:255] or None,
+            published_at=published or datetime.utcnow(),
+            is_published=False,
+        )
+        db.session.add(item)
+        db.session.commit()
+        logging.info('Объявление принято в очередь: %r', title[:80])
+        return jsonify({'message': 'Принято, ждёт одобрения', 'id': item.id})
 
     @app.route('/api/directory', methods=['GET'])
     @require_auth

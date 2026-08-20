@@ -129,6 +129,8 @@ REQUIRE_AUTH=0
 # Секрет для системы турникета и токен для загрузки расчётных листков.
 TURNSTILE_SECRET=$(openssl rand -hex 16)
 ADMIN_TOKEN=$(openssl rand -hex 16)
+# Лента новостей сайта. Пусто — раздел показывает только объявления.
+NEWS_FEED_URL=https://se-btrz.com/news/feed/
 
 FIREBASE_CREDENTIALS_PATH=/etc/se-mobile-firebase.json
 ENV

@@ -8,6 +8,7 @@ import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/directory_screen.dart';
+import '../screens/news_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -162,6 +163,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   ],
                 ],
                 const Divider(height: 1),
+                _item(
+                  icon: Icons.campaign_outlined,
+                  label: 'news'.tr,
+                  onTap: () => Get.to(() => NewsScreen(job: _job)),
+                ),
                 _item(
                   icon: Icons.contact_phone_outlined,
                   label: 'directory'.tr,
