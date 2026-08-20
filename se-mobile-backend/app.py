@@ -199,6 +199,17 @@ def _migrate_schema():
         },
     }
 
+    # Расширение колонок, которым не хватило объявленной длины. Добавить
+    # колонку умеет блок выше, а вот растянуть существующую — только это:
+    # PostgreSQL режет значение длиннее объявленного и валит весь запрос,
+    # тогда как SQLite длину не проверяет вовсе, и на ней это не всплывает.
+    widen = {
+        'directory_entries': {
+            'extension': 100,
+            'mobile': 100,
+        },
+    }
+
     # Индексы. db.create_all() создаёт их только вместе с новой таблицей —
     # к уже существующей ни один индекс он не добавит, поэтому здесь.
     # Порядок колонок в составном индексе важен: сначала то, по чему равенство,
@@ -222,6 +233,23 @@ def _migrate_schema():
                 if col not in existing:
                     conn.execute(text(f'ALTER TABLE {table} ADD COLUMN "{col}" {typedef}'))
                     logging.info(f'Migration: added {table}.{col}')
+
+        # ALTER COLUMN TYPE есть в PostgreSQL; в SQLite длина не проверяется,
+        # поэтому там расширять нечего.
+        if db.engine.dialect.name == 'postgresql':
+            for table, columns in widen.items():
+                if table not in tables:
+                    continue
+                current = {c['name']: c['type'] for c in inspector.get_columns(table)}
+                for col, length in columns.items():
+                    existing_type = current.get(col)
+                    if existing_type is None:
+                        continue
+                    if (getattr(existing_type, 'length', None) or 0) >= length:
+                        continue
+                    conn.execute(text(
+                        f'ALTER TABLE {table} ALTER COLUMN "{col}" TYPE VARCHAR({length})'))
+                    logging.info(f'Migration: widened {table}.{col} to VARCHAR({length})')
 
         for table, defs in indexes.items():
             if table not in tables:
@@ -1622,20 +1650,35 @@ def register_routes(app):
 
         # Заменяем целиком: справочник — снимок на дату, а не журнал. Иначе
         # уволенные остались бы в нём навсегда.
-        DirectoryEntry.query.delete()
-        now = datetime.utcnow()
-        for order, entry in enumerate(entries):
-            db.session.add(DirectoryEntry(
-                sort_order=order,
-                department=entry['department'],
-                name=entry['name'],
-                position=entry['position'] or None,
-                extension=entry['extension'] or None,
-                email=entry['email'] or None,
-                mobile=entry['mobile'] or None,
-                updated_at=now,
-            ))
-        db.session.commit()
+        try:
+            DirectoryEntry.query.delete()
+            now = datetime.utcnow()
+            for order, entry in enumerate(entries):
+                db.session.add(DirectoryEntry(
+                    sort_order=order,
+                    department=entry['department'],
+                    name=entry['name'],
+                    position=entry['position'] or None,
+                    extension=entry['extension'] or None,
+                    email=entry['email'] or None,
+                    mobile=entry['mobile'] or None,
+                    updated_at=now,
+                ))
+            db.session.commit()
+        except Exception as e:
+            # Прежде отсюда уходил голый 500 в виде страницы HTML, и в окне
+            # программы на другом конце было нечего прочесть.
+            db.session.rollback()
+            logging.error('Directory import failed: %s', e, exc_info=True)
+            # Только суть: у ошибки SQLAlchemy в str() лежит весь запрос
+            # вместе со всеми строками справочника — читать невозможно, да и
+            # незачем отправлять телефоны всего предприятия обратно в ответе.
+            cause = str(getattr(e, 'orig', e)).strip().splitlines()
+            detail = cause[0][:200] if cause else e.__class__.__name__
+            return jsonify({
+                'message': f'Сервер не смог сохранить справочник: {detail}',
+                'error': True,
+            }), 500
 
         departments = []
         for entry in entries:

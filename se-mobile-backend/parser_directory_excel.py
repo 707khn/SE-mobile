@@ -17,6 +17,7 @@
 """
 
 import io
+import re
 
 from openpyxl import load_workbook
 
@@ -37,7 +38,10 @@ def _text(value) -> str:
         return ''
     if isinstance(value, float) and value.is_integer():
         value = int(value)
-    return str(value).strip()
+    # Схлопываем пробелы и переносы: в ячейку с двумя телефонами их разделяют
+    # то десятком пробелов, то переводом строки, и строка выходит втрое
+    # длиннее самих номеров.
+    return re.sub(r'\s+', ' ', str(value)).strip()
 
 
 def _find_header(rows):
