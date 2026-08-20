@@ -194,9 +194,11 @@ class DirectoryEntry(db.Model):
     department = db.Column(db.String(200))
     name = db.Column(db.String(255), nullable=False)
     position = db.Column(db.String(200))
-    extension = db.Column(db.String(20))
+    # С запасом: в столбце внутреннего номера у представительства стоят два
+    # городских телефона, а мобильных у некоторых тоже два.
+    extension = db.Column(db.String(100))
     email = db.Column(db.String(200))
-    mobile = db.Column(db.String(50))
+    mobile = db.Column(db.String(100))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
