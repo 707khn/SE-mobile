@@ -624,56 +624,101 @@ def create_app():
             db.session.rollback()
             logging.error(f'_migrate_schema failed (non-fatal): {e}', exc_info=True)
 
-        _applied = _load_applied_seeds()
-        _ran = _skipped = 0
-        for _fn in [
-            _auto_seed,
-            _update_employee_names,
-            _update_employee_iins,
-            _seed_2024_full,
-            _seed_2025_full,
-            _seed_2026,
-            _seed_2026_full,
-            _ensure_payslips_jan_apr_2026,
-            _seed_may_2026,
-            _ensure_all_payslips,
-            _seed_sarseken,
-            _seed_turnstile_events,
-            _seed_leave_2026,
-            _update_april_2026_001,
-            _seed_april_2026_access_001,
-            _seed_kumarova,
-            _seed_docx_employees_2026,
-            _seed_org_directory,
-            _seed_admin_account,
-            _seed_otk_july_2026,
-            _seed_daurembekova,
-            _seed_beisekina,
-            _merge_duplicate_employees,
-            _remove_departed_employees,
-            # Последним: ссылается на сотрудников, которых сидеры выше ещё
-            # создают, склеивают и удаляют.
-            _seed_user_accounts,
-            # После него: до этого момента учётки может ещё не существовать.
-            _force_password_change,
-        ]:
-            _name = _fn.__name__
-            _version = _SEED_VERSIONS.get(_name, '1')
-            if _applied.get(_name) == _version:
-                _skipped += 1
-                continue
-            _ran += 1
+        # Сеем под замком. Gunicorn держит три процесса, и каждый при старте
+        # доходит сюда; журнал applied_seeds спасает, только если первый успел
+        # в него записаться. При одновременном старте не успевает — все трое
+        # читают «не отработано» и вставляют одно и то же. Замок пропускает
+        # по одному: пока первый сеет, остальные ждут, а дождавшись, читают
+        # журнал уже заполненным и пропускают всё.
+        #
+        # Замок берётся на отдельном соединении и живёт до его закрытия, так
+        # что упавший процесс его не удержит. В SQLite процесс всего один —
+        # там делить нечего.
+        _lock = None
+        if db.engine.dialect.name == 'postgresql':
+            from sqlalchemy import text as _text
             try:
-                _fn()
+                _lock = db.engine.connect()
+                _lock.execute(_text('SELECT pg_advisory_lock(:key)'),
+                              {'key': _SEED_LOCK_KEY})
+                _lock.commit()
             except Exception as e:
-                db.session.rollback()
-                logging.error(f'{_name} failed (non-fatal): {e}', exc_info=True)
-            else:
-                _mark_seed_applied(_name, _version)
-        logging.info('Seeders: %d executed, %d skipped', _ran, _skipped)
+                logging.warning(f'Cannot take the seeding lock ({e}); seeding anyway')
+                if _lock is not None:
+                    _lock.close()
+                _lock = None
+
+        try:
+            _seed_all()
+        finally:
+            if _lock is not None:
+                try:
+                    _lock.execute(_text('SELECT pg_advisory_unlock(:key)'),
+                                  {'key': _SEED_LOCK_KEY})
+                    _lock.commit()
+                except Exception as e:
+                    logging.warning(f'Cannot release the seeding lock ({e})')
+                _lock.close()
 
     register_routes(app)
     return app
+
+
+# Произвольное число: важно лишь, чтобы все процессы брали один и тот же замок.
+_SEED_LOCK_KEY = 8_146_501
+
+
+def _seed_all():
+    """Прогоняет сидеры по журналу. Вызывается под замком — см. create_app."""
+    _applied = _load_applied_seeds()
+    _ran = _skipped = 0
+    for _fn in [
+        _auto_seed,
+        _update_employee_names,
+        _update_employee_iins,
+        _seed_2024_full,
+        _seed_2025_full,
+        _seed_2026,
+        _seed_2026_full,
+        _ensure_payslips_jan_apr_2026,
+        _seed_may_2026,
+        _ensure_all_payslips,
+        _seed_sarseken,
+        _seed_turnstile_events,
+        _seed_leave_2026,
+        _update_april_2026_001,
+        _seed_april_2026_access_001,
+        _seed_kumarova,
+        _seed_docx_employees_2026,
+        _seed_org_directory,
+        _seed_admin_account,
+        _seed_otk_july_2026,
+        _seed_daurembekova,
+        _seed_beisekina,
+        _merge_duplicate_employees,
+        _remove_departed_employees,
+        # Последним: ссылается на сотрудников, которых сидеры выше ещё
+        # создают, склеивают и удаляют.
+        _seed_user_accounts,
+        # После него: до этого момента учётки может ещё не существовать.
+        _force_password_change,
+        # Последним: подчищает следы прежних одновременных запусков.
+        _dedupe_access_records,
+    ]:
+        _name = _fn.__name__
+        _version = _SEED_VERSIONS.get(_name, '1')
+        if _applied.get(_name) == _version:
+            _skipped += 1
+            continue
+        _ran += 1
+        try:
+            _fn()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f'{_name} failed (non-fatal): {e}', exc_info=True)
+        else:
+            _mark_seed_applied(_name, _version)
+    logging.info('Seeders: %d executed, %d skipped', _ran, _skipped)
 
 
 def register_routes(app):
@@ -4717,6 +4762,32 @@ def _remove_departed_employees():
 
 _ADMIN_EMPLOYEE_ID = 'ADMIN'
 _ADMIN_DISPLAY_NAME = 'Админ'
+
+
+def _dedupe_access_records():
+    """Убирает задвоенные проходы турникета, оставляя по одному.
+
+    Gunicorn поднимает три процесса, и каждый при старте прогоняет сидеры.
+    Журнал applied_seeds их обычно и останавливает, но при одновременном
+    старте все трое успевают прочитать его до того, как первый отметится, —
+    и вставляют одно и то же. У расчётных листков от этого есть ограничение
+    уникальности, а у проходов не было, поэтому задвоились именно они.
+
+    Саму гонку закрывает блокировка в create_app; здесь — уборка следов.
+    Дубль — полное совпадение сотрудника, даты, времени, события и двери:
+    два прохода в одну минуту турникет пишет и по-настоящему, но тогда
+    отличается хотя бы что-то одно.
+    """
+    from sqlalchemy import text
+    removed = db.session.execute(text("""
+        DELETE FROM access_records WHERE id NOT IN (
+            SELECT MIN(id) FROM access_records
+            GROUP BY employee_id, access_date, access_time, event_type, door_location
+        )
+    """)).rowcount
+    db.session.commit()
+    if removed:
+        logging.info('Removed %d duplicate access records', removed)
 
 
 def _seed_admin_account():
