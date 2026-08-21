@@ -143,7 +143,7 @@ def _notify_menu_published():
     Одно, а не по дню на каждый: в файле из 1С бывает сразу неделя, и семь
     сообщений подряд означают только то, что уведомления отключат.
     """
-    _push_to_everyone('Столовая', 'Меню выложено', {'type': 'menu'})
+    _push_to_everyone('Столовая', 'Меню на сегодня 🍽️', {'type': 'menu'})
 
 
 def _send_turnstile_notification(employee_name: str, direction: str, timestamp_str: str, employee_id: str):
