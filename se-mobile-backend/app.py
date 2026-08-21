@@ -66,6 +66,86 @@ def _is_admin_role(job_title: str) -> bool:
     return any(k in j for k in ('руководитель', 'начальник', 'директор', 'главный', 'заместитель'))
 
 
+# FCM принимает не больше 500 адресатов за раз, а на предприятии их ровно
+# столько же — шлём частями.
+_PUSH_BATCH = 450
+
+
+def _push_to(employee_ids, title, body, data=None):
+    """Шлёт уведомление на устройства перечисленных сотрудников.
+
+    Возвращает, скольким устройствам ушло. Молчит, если Firebase не настроен
+    или ни у кого нет установленного приложения: уведомление — не повод
+    ломать запрос, из-за которого оно отправляется.
+    """
+    if not _get_firebase():
+        return 0
+    employee_ids = [e for e in set(employee_ids or []) if e]
+    if not employee_ids:
+        return 0
+
+    tokens = [t.token for t in FcmToken.query.filter(
+        FcmToken.employee_id.in_(employee_ids)).all()]
+    if not tokens:
+        return 0
+
+    sent = 0
+    invalid = set()
+    for start in range(0, len(tokens), _PUSH_BATCH):
+        chunk = tokens[start:start + _PUSH_BATCH]
+        message = fb_messaging.MulticastMessage(
+            tokens=chunk,
+            notification=fb_messaging.Notification(title=title, body=body),
+            data={k: str(v) for k, v in (data or {}).items()},
+        )
+        try:
+            response = fb_messaging.send_each_for_multicast(message)
+        except Exception as e:
+            logging.warning('Уведомление не ушло: %s', e)
+            continue
+        for index, result in enumerate(response.responses):
+            if result.success:
+                sent += 1
+                continue
+            code = getattr(result.exception, 'code', '')
+            # Приложение снесли или переустановили — держать такой пропуск
+            # незачем, иначе список адресатов растёт без конца.
+            if code in ('registration-token-not-registered', 'invalid-argument'):
+                invalid.add(chunk[index])
+
+    if invalid:
+        try:
+            FcmToken.query.filter(FcmToken.token.in_(invalid)).delete(
+                synchronize_session=False)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    return sent
+
+
+def _push_to_everyone(title, body, data=None):
+    """Уведомление всем, у кого установлено приложение."""
+    return _push_to([t.employee_id for t in FcmToken.query.all()],
+                    title, body, data)
+
+
+_MONTHS_RU = ('январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль',
+              'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь')
+
+
+def _month_name(month):
+    return _MONTHS_RU[month - 1] if 1 <= month <= 12 else str(month)
+
+
+def _notify_menu_published():
+    """Одно уведомление на выкладку меню.
+
+    Одно, а не по дню на каждый: в файле из 1С бывает сразу неделя, и семь
+    сообщений подряд означают только то, что уведомления отключат.
+    """
+    _push_to_everyone('Столовая', 'Меню выложено', {'type': 'menu'})
+
+
 def _send_turnstile_notification(employee_name: str, direction: str, timestamp_str: str, employee_id: str):
     if not _get_firebase():
         return
@@ -595,6 +675,16 @@ def _refresh_site_news():
         try:
             db.session.commit()
             logging.info('Новостей с сайта добавлено: %d', added)
+            # Об одной новости говорим по заголовку, о нескольких — счётом:
+            # выкладывать пять уведомлений подряд значит, что их отключат.
+            newest = (NewsItem.query.filter_by(source='site', is_published=True)
+                      .order_by(NewsItem.published_at.desc()).first())
+            if added == 1 and newest is not None:
+                _push_to_everyone('Новость', newest.title, {'type': 'news'})
+            elif newest is not None:
+                _push_to_everyone(
+                    'Новости', f'На сайте появилось новых материалов: {added}',
+                    {'type': 'news'})
         except Exception as e:
             db.session.rollback()
             logging.error('Не удалось сохранить новости: %s', e)
@@ -1252,6 +1342,7 @@ def register_routes(app):
             return jsonify({'message': str(e), 'error': True}), 422
 
         imported = []
+        latest = {}
         for slip in payslips:
             emp_id = slip['employee_1c_id']
 
@@ -1343,8 +1434,26 @@ def register_routes(app):
                 'full_name': slip['full_name'],
                 'period': slip['period_display'],
             })
+            # У кого какой период приехал: по одному человеку может прийти
+            # сразу несколько месяцев, а сказать надо про самый свежий.
+            key = (slip['period_year'], slip['period_month'])
+            if key >= latest.get(emp_id, ((0, 0), ''))[0]:
+                latest[emp_id] = (key, slip['period_display'])
 
         db.session.commit()
+
+        # Шлём по одному сообщению на период, а не на человека: зарплату
+        # выгружают за месяц сразу на всех, и это одна отправка вместо пятисот.
+        by_period = {}
+        for emp_id, (_, display) in latest.items():
+            by_period.setdefault(display, []).append(emp_id)
+        for display, employee_ids in by_period.items():
+            # «Июль 2026» в середине фразы читается как заголовок — снижаем.
+            period = display[:1].lower() + display[1:] if display else ''
+            _push_to(employee_ids, 'Зарплата',
+                     f'Расчётный лист за {period} готов'.replace('  ', ' '),
+                     {'type': 'payslip'})
+
         return jsonify({
             'message': 'Success',
             'imported': len(imported),
@@ -1576,6 +1685,9 @@ def register_routes(app):
             return jsonify({'message': 'Failure', 'error': 'Invalid or missing date'}), 400
 
         menu = MenuDate.query.filter_by(date=menu_date).first()
+        # Правка уже выложенного дня — не повод для уведомления: технолог
+        # поправит цену одного блюда, а разбудит всё предприятие.
+        was_new = menu is None
         if menu:
             MenuItem.query.filter_by(menu_date_id=menu.id).delete()
         else:
@@ -1599,6 +1711,8 @@ def register_routes(app):
             ))
 
         db.session.commit()
+        if was_new:
+            _notify_menu_published()
         return jsonify({'message': 'Success'})
 
     @app.route('/api/menu/import-excel', methods=['POST'])
@@ -1698,6 +1812,7 @@ def register_routes(app):
             })
 
         db.session.commit()
+        _notify_menu_published()
 
         lines = [
             f"{d['date_display']} — {d['count']} блюд "
@@ -1777,6 +1892,9 @@ def register_routes(app):
             return jsonify({'message': 'Success'})
 
         data = request.get_json(silent=True) or {}
+        # Запоминаем до правки: уведомление шлём только на переходе
+        # «в очереди» → «в ленте», иначе правка опечатки разбудит всех заново.
+        was_published = item.is_published
         if 'is_published' in data:
             item.is_published = bool(data['is_published'])
         if (data.get('title') or '').strip():
@@ -1784,6 +1902,10 @@ def register_routes(app):
         if 'summary' in data:
             item.summary = (data.get('summary') or '').strip()
         db.session.commit()
+
+        if item.is_published and not was_published:
+            _push_to_everyone('Объявление', item.title,
+                              {'type': 'news', 'id': item.id})
         return jsonify({'message': 'Success', 'item': _news_json(item)})
 
     @app.route('/api/news/announcements', methods=['POST'])

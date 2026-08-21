@@ -19,6 +19,28 @@ class FcmService {
         .requestPermission(alert: true, badge: true, sound: true);
   }
 
+  /// Каналы уведомлений по поводам.
+  ///
+  /// Раздельно, а не одним каналом на всё: Android даёт человеку отключить
+  /// канал, не отключая приложение целиком. Сторожу нужны проходы турникета,
+  /// остальным — зарплата и столовая, и пусть каждый оставит своё.
+  static const Map<String, List<String>> _channels = {
+    'payslip': ['payslip_channel', 'Зарплата'],
+    'menu': ['menu_channel', 'Столовая'],
+    'news': ['news_channel', 'Новости и объявления'],
+    'turnstile': ['turnstile_channel', 'Проходы турникета'],
+  };
+
+  static AndroidNotificationDetails _androidDetails(String? type) {
+    final channel = _channels[type] ?? const ['general_channel', 'Прочее'];
+    return AndroidNotificationDetails(
+      channel[0],
+      channel[1],
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+  }
+
   static void setupForegroundHandler() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       final notification = message.notification;
@@ -27,13 +49,8 @@ class FcmService {
         notification.hashCode,
         notification.title,
         notification.body,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'turnstile_channel',
-            'СКУД уведомления',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
+        NotificationDetails(
+          android: _androidDetails(message.data['type'] as String?),
         ),
       );
     });
