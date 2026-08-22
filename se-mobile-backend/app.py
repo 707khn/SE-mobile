@@ -256,6 +256,9 @@ def _migrate_schema():
         'menu_items': {
             'portion': 'VARCHAR(50)',
         },
+        'user_accounts': {
+            'locked_until': 'TIMESTAMP',
+        },
         'payslips': {
             'position':    'VARCHAR(200)',
             'department':  'VARCHAR(200)',
@@ -396,6 +399,34 @@ _CREDENTIALS = {
 }
 
 
+# Сколько неудач подряд терпим, прежде чем закрыть вход, и на сколько.
+#
+# Пятая подряд закрывает на минуту, каждая следующая удваивает срок до
+# получаса. Человеку, перепутавшему раскладку, это стоит минуты; перебору
+# четырёхзначного номера — десятков лет. Замок отпирается сам: администратор
+# для этого не нужен, хотя сброс пароля его тоже снимает.
+_LOCK_AFTER = 5
+_LOCK_BASE = timedelta(minutes=1)
+_LOCK_MAX = timedelta(minutes=30)
+
+
+def _lock_delay(failed_attempts):
+    """На сколько закрыть вход после стольких неудач подряд."""
+    if failed_attempts < _LOCK_AFTER:
+        return None
+    doubling = 2 ** min(failed_attempts - _LOCK_AFTER, 16)
+    return min(_LOCK_BASE * doubling, _LOCK_MAX)
+
+
+def locked_for(login):
+    """Сколько секунд ещё закрыт вход под этим логином, или 0."""
+    account = UserAccount.query.filter_by(login=(login or '').strip()).first()
+    if account is None or account.locked_until is None:
+        return 0
+    left = (account.locked_until - datetime.utcnow()).total_seconds()
+    return int(left) if left > 0 else 0
+
+
 def _authenticate(login, password):
     """Проверяет пару логин/пароль. Возвращает employee_id или None.
 
@@ -410,6 +441,14 @@ def _authenticate(login, password):
 
     account = UserAccount.query.filter_by(login=login, is_active=True).first()
     if account is not None:
+        now = datetime.utcnow()
+        # Пока замок держит, пароль даже не проверяем: иначе перебор просто
+        # замедлился бы, а не остановился.
+        if account.locked_until is not None and account.locked_until > now:
+            logging.warning('Вход под %r закрыт ещё %d с', login,
+                            (account.locked_until - now).total_seconds())
+            return None
+
         try:
             ok = check_password_hash(account.password_hash, password)
         except Exception as e:
@@ -418,10 +457,16 @@ def _authenticate(login, password):
             ok = False
         try:
             if ok:
-                account.last_login_at = datetime.utcnow()
+                account.last_login_at = now
                 account.failed_attempts = 0
+                account.locked_until = None
             else:
                 account.failed_attempts = (account.failed_attempts or 0) + 1
+                delay = _lock_delay(account.failed_attempts)
+                if delay is not None:
+                    account.locked_until = now + delay
+                    logging.warning('Вход под %r закрыт на %s после %d неудач',
+                                    login, delay, account.failed_attempts)
             db.session.commit()
         except Exception:
             # Счётчик и отметка о входе не должны ломать сам вход.
@@ -746,7 +791,14 @@ def _mark_seed_applied(name, version):
 
 def create_app():
     app = Flask(__name__)
-    CORS(app)
+    # Только те источники, которые названы явно. Приложению на телефоне CORS
+    # не нужен вовсе — заголовок Origin шлёт браузер, — поэтому по умолчанию
+    # список пуст и чужой сайт до сервера не достучится.
+    origins = [o.strip() for o in
+               os.environ.get('CORS_ORIGINS', '').split(',') if o.strip()]
+    if origins:
+        CORS(app, origins=origins)
+        logging.info('CORS разрешён для: %s', ', '.join(origins))
 
     logging.basicConfig(level=logging.INFO)
 
@@ -942,6 +994,12 @@ def register_routes(app):
             # что перепутал пароль.
             return jsonify({'message': 'Failure', 'error': 'internal'}), 503
 
+        # Отличаем «не тот пароль» от «слишком много попыток»: иначе человек
+        # будет молотить по кнопке и продлевать себе замок.
+        seconds = locked_for(login_id)
+        if seconds:
+            return jsonify({'message': 'Failure', 'error': 'locked',
+                            'retry_after': seconds}), 429
         return jsonify({'message': 'Failure'})
 
     @app.route('/change-password', methods=['POST'])
@@ -971,6 +1029,7 @@ def register_routes(app):
         account.password_hash = generate_password_hash(new_password)
         account.must_change_password = False
         account.failed_attempts = 0
+        account.locked_until = None
         # Гасим все пропуска: если пароль меняют потому, что его подсмотрели,
         # чужое устройство должно перестать работать сразу.
         AuthToken.query.filter_by(employee_id=viewer.employee_id).delete()
@@ -995,6 +1054,7 @@ def register_routes(app):
             'must_change_password': a.must_change_password,
             'is_active': a.is_active,
             'failed_attempts': a.failed_attempts,
+            'locked_seconds': locked_for(a.login),
             'last_login_at': a.last_login_at.isoformat() if a.last_login_at else None,
         } for a in UserAccount.query.order_by(UserAccount.login).all()]
         never = sum(1 for r in rows if r['last_login_at'] is None)
@@ -1016,6 +1076,7 @@ def register_routes(app):
         account.password_hash = generate_password_hash(temporary)
         account.must_change_password = True
         account.failed_attempts = 0
+        account.locked_until = None
         account.is_active = True
         AuthToken.query.filter_by(employee_id=account.employee_id).delete()
         db.session.commit()
@@ -1324,10 +1385,15 @@ def register_routes(app):
     @app.route('/api/admin/upload-payslip-xml', methods=['POST'])
     def upload_payslip_xml():
         admin_token = os.environ.get('ADMIN_TOKEN', '')
-        if admin_token:
-            provided = request.headers.get('X-Admin-Token', '')
-            if provided != admin_token:
-                return jsonify({'message': 'Forbidden'}), 403
+        # Как и у турникета: незаданный секрет — не повод пускать всех.
+        # Иначе этот путь заводит сотрудников и грузит расчётные листки
+        # вообще без спроса.
+        provided = request.headers.get('X-Admin-Token', '')
+        if not admin_token or provided != admin_token:
+            if not admin_token:
+                logging.error('ADMIN_TOKEN не задан — загрузка расчётных листков '
+                              'отклоняется. Проверьте /etc/se-mobile.env')
+            return jsonify({'message': 'Forbidden'}), 403
 
         if 'file' not in request.files:
             return jsonify({'message': 'Файл не передан', 'error': True}), 400
@@ -1540,7 +1606,13 @@ def register_routes(app):
         data = request.get_json() or {}
         secret = data.get('secret', '')
         expected = os.environ.get('TURNSTILE_SECRET', '')
-        if expected and secret != expected:
+        # Отказ в безопасную сторону: пустой секрет раньше отключал проверку
+        # целиком, и кто угодно мог слать поддельные проходы. Теперь пустой
+        # TURNSTILE_SECRET значит «настроить забыли», а не «пускать всех».
+        if not expected or secret != expected:
+            if not expected:
+                logging.error('TURNSTILE_SECRET не задан — события турникета '
+                              'отклоняются. Проверьте /etc/se-mobile.env')
             return jsonify({'message': 'Failure', 'error': 'Unauthorized'}), 403
 
         employee_id = data.get('employee_id', '').strip()
@@ -5675,4 +5747,8 @@ def _force_password_change():
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Без debug=True. Отладчик Flask позволяет выполнять произвольный код
+    # через браузер, и один запуск «python app.py» на боевом сервере открыл
+    # бы её наружу. Разработке хватит FLASK_DEBUG=1 в окружении.
+    app.run(host='127.0.0.1', port=5000,
+            debug=os.environ.get('FLASK_DEBUG', '').strip() == '1')

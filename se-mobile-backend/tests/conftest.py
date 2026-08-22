@@ -5,6 +5,10 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+# Выгрузка расчётных листков теперь отказывает при незаданном секрете, а не
+# пропускает всех. На боевом сервере его ставит setup.sh; здесь — тоже, иначе
+# тесты проверяли бы поведение, которого в работе не бывает.
+os.environ.setdefault('ADMIN_TOKEN', 'test-admin-token')
 
 import pytest
 from app import create_app  # noqa: E402

@@ -273,10 +273,14 @@ class UserAccount(db.Model):
     must_change_password = db.Column(db.Boolean, nullable=False, default=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
-    # Считаем неудачные попытки, но пока не блокируем: блокировку включаем
-    # вместе с кнопкой сброса в админ-панели, иначе человека будет некому
-    # разблокировать.
+    # Неудачные попытки подряд. Обнуляются удачным входом и сбросом пароля.
     failed_attempts = db.Column(db.Integer, nullable=False, default=0)
+
+    # До какого времени вход закрыт после череды неудач. Замок временный и
+    # отпирается сам: пароль забывают вечером, а администратор приходит утром,
+    # и глухая блокировка означала бы ночь без расчётного листка. Перебору
+    # хватает и этого — четырёхзначный номер так не подобрать.
+    locked_until = db.Column(db.DateTime)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login_at = db.Column(db.DateTime)

@@ -24,13 +24,17 @@ def _post(client, path, body):
                        content_type='application/json')
 
 
+_ADMIN_HEADERS = {'X-Admin-Token': os.environ['ADMIN_TOKEN']}
+
+
 def _xml_upload(client, filename='test_payslip.xml', content=None):
     if content is None:
         with open(_TEST_XML, 'rb') as f:
             content = f.read()
     data = {'file': (io.BytesIO(content), filename)}
     return client.post('/api/admin/upload-payslip-xml',
-                       data=data, content_type='multipart/form-data')
+                       data=data, content_type='multipart/form-data',
+                       headers=_ADMIN_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +235,8 @@ def test_upload_xml_wrong_extension(client):
 
 def test_upload_xml_no_file(client):
     r = client.post('/api/admin/upload-payslip-xml',
-                    data={}, content_type='multipart/form-data')
+                    data={}, content_type='multipart/form-data',
+                    headers=_ADMIN_HEADERS)
     assert r.status_code == 400
 
 
