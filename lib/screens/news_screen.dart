@@ -7,6 +7,8 @@ import '../requests/news_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
+import '../utils/offline_cache.dart';
+import '../widgets/offline_notice.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import 'news_admin_screen.dart';
@@ -28,6 +30,7 @@ class _NewsScreenState extends State<NewsScreen> {
   bool _loading = true;
   bool _error = false;
   List<_NewsItem> _items = [];
+  DateTime? _cachedAt;
 
   @override
   void initState() {
@@ -50,6 +53,7 @@ class _NewsScreenState extends State<NewsScreen> {
       return;
     }
     setState(() {
+      _cachedAt = cachedAt(body);
       _items = (body['items'] as List)
           .map((e) => _NewsItem.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -86,7 +90,12 @@ class _NewsScreenState extends State<NewsScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          OfflineNotice(at: _cachedAt),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 

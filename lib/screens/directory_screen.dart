@@ -5,7 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../requests/directory_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/dimensions.dart';
+import '../utils/offline_cache.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/offline_notice.dart';
 import '../widgets/custom_text.dart';
 
 /// Телефонный справочник предприятия.
@@ -26,6 +28,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
   bool _loading = true;
   bool _error = false;
   List<_Entry> _all = [];
+  DateTime? _cachedAt;
   String _query = '';
 
   @override
@@ -55,6 +58,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       return;
     }
     setState(() {
+      _cachedAt = cachedAt(body);
       _all = (body['entries'] as List)
           .map((e) => _Entry.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -107,6 +111,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       ),
       body: Column(
         children: [
+          OfflineNotice(at: _cachedAt),
           Padding(
             padding: EdgeInsets.symmetric(
                 horizontal: Dimensions.width20, vertical: 10),

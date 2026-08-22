@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../utils/variables.dart';
 import '../utils/api.dart';
+import '../utils/offline_cache.dart';
 
 /// Лента для сотрудника: новости сайта и одобренные объявления.
 Future<Map<String, dynamic>> getNews() async {
@@ -17,14 +18,24 @@ Future<Map<String, dynamic>> getNews() async {
       return {'message': 'Failure', 'items': []};
     }
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      await OfflineCache.save('news', body);
+      return body;
     }
-    return {'message': 'Failure', 'items': []};
+    return await _cachedNews();
   } on TimeoutException {
-    return {'message': 'Failure', 'items': []};
+    return await _cachedNews();
   } catch (_) {
-    return {'message': 'Failure', 'items': []};
+    return await _cachedNews();
   }
+}
+
+/// Лента, полученная в прошлый раз. Связи нет — показываем её с пометкой,
+/// а не пустой экран с ошибкой.
+Future<Map<String, dynamic>> _cachedNews() async {
+  final saved = await OfflineCache.read('news');
+  if (saved != null) return saved;
+  return {'message': 'Failure', 'items': []};
 }
 
 /// Всё вместе с неодобренным — для администратора.

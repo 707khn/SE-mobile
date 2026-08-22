@@ -8,6 +8,7 @@ import '../requests/payslip_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/offline_notice.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/skeleton.dart';
 import '../utils/app_theme.dart';
@@ -268,6 +269,7 @@ class _PayslipPageState extends State<PayslipPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              OfflineNotice(at: _payslip?.cachedAt),
               // Month picker card
               Card(
                 child: Padding(
