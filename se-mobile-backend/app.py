@@ -916,6 +916,7 @@ def _seed_all():
         # Последним: ссылается на сотрудников, которых сидеры выше ещё
         # создают, склеивают и удаляют.
         _seed_user_accounts,
+        _seed_extra_accounts,
         # После него: до этого момента учётки может ещё не существовать.
         _force_password_change,
         # Последним: подчищает следы прежних одновременных запусков.
@@ -5713,6 +5714,45 @@ def _seed_beisekina():
 _FORCE_PASSWORD_CHANGE = [
     '2114',  # Сарсекенов Батырхан Арманұлы
 ]
+
+
+# Входы, заведённые поимённо для людей из справочника, у которых учётной
+# записи ещё не было: (логин, employee_id).
+#
+# Табельный номер тут не выдумывается. У кого он известен — стоит полный,
+# как у всех; у кого нет — временный номер из справочника, и когда придёт
+# расчётный лист с настоящим, учётку перенесёт _merge_duplicate_employees
+# вместе с остальным.
+_EXTRA_ACCOUNTS = [
+    ('2222', 'D003'),  # Шаяхметов Данияр Бексултанович
+]
+
+
+def _seed_extra_accounts():
+    """Заводит перечисленные входы. Пароль равен логину и меняется при первом
+    входе — как у всех заводимых вручную.
+
+    Идёт после переносов и после _seed_user_accounts: к этому времени
+    сотрудник уже создан справочником, а дубли склеены.
+    """
+    created = 0
+    for login, employee_id in _EXTRA_ACCOUNTS:
+        if db.session.get(UserAccount, login) is not None:
+            continue
+        if db.session.get(Employee, employee_id) is None:
+            logging.warning('Учётка %r пропущена: сотрудника %s нет',
+                            login, employee_id)
+            continue
+        db.session.add(UserAccount(
+            login=login,
+            employee_id=employee_id,
+            password_hash=generate_password_hash(login),
+            must_change_password=True,
+        ))
+        created += 1
+    if created:
+        db.session.commit()
+        logging.info('Заведено учётных записей: %d', created)
 
 
 def _force_password_change():
