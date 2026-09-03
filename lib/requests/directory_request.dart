@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../utils/variables.dart';
 import '../utils/api.dart';
+import '../utils/offline_cache.dart';
 
 /// Телефонный справочник предприятия целиком.
 ///
@@ -22,12 +23,22 @@ Future<Map<String, dynamic>> getDirectory() async {
       return {'message': 'Failure', 'entries': []};
     }
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      await OfflineCache.save('directory', body);
+      return body;
     }
-    return {'message': 'Failure', 'entries': []};
+    return await _cachedDirectory();
   } on TimeoutException {
-    return {'message': 'Failure', 'entries': []};
+    return await _cachedDirectory();
   } catch (_) {
-    return {'message': 'Failure', 'entries': []};
+    return await _cachedDirectory();
   }
+}
+
+/// Справочник, полученный в прошлый раз: внутренний номер нужен как раз
+/// там, где связи нет.
+Future<Map<String, dynamic>> _cachedDirectory() async {
+  final saved = await OfflineCache.read('directory');
+  if (saved != null) return saved;
+  return {'message': 'Failure', 'entries': []};
 }

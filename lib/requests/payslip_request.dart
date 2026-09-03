@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../utils/api.dart';
+import '../utils/offline_cache.dart';
 
 enum PayslipErrorKind { timeout, network, notFound }
 
@@ -50,6 +51,10 @@ class PayslipData {
   final double debtStart;
   final double debtEnd;
 
+  /// Когда листок был получен с сервера. У свежего пусто, у показанного
+  /// без связи — время последнего удачного запроса.
+  final DateTime? cachedAt;
+
   const PayslipData({
     required this.period,
     required this.employee,
@@ -66,6 +71,7 @@ class PayslipData {
     required this.netPay,
     required this.debtStart,
     required this.debtEnd,
+    this.cachedAt,
   });
 }
 
@@ -146,6 +152,8 @@ Future<PayslipData> _fetchPayslip(
         )
         .timeout(const Duration(seconds: 50));
   } on TimeoutException {
+    final saved = await _cachedPayslip(month, year);
+    if (saved != null) return saved;
     throw const PayslipException(PayslipErrorKind.timeout);
   } catch (_) {
     // Render.com free tier closes connections during cold-start (~40-60 s).
@@ -154,6 +162,8 @@ Future<PayslipData> _fetchPayslip(
       await Future.delayed(const Duration(seconds: 20));
       return _fetchPayslip(month, year, attempt + 1, overrideId);
     }
+    final saved = await _cachedPayslip(month, year);
+    if (saved != null) return saved;
     throw const PayslipException(PayslipErrorKind.network);
   }
 
@@ -169,9 +179,16 @@ Future<PayslipData> _fetchPayslip(
     throw const PayslipException(PayslipErrorKind.notFound);
   }
 
+  await OfflineCache.save('payslip_${year}_$month', body);
+  return _payslipFrom(body);
+}
+
+/// Собирает листок из ответа сервера — своего или сохранённого ранее.
+PayslipData _payslipFrom(Map<String, dynamic> body) {
   final p = body['payslip'] as Map<String, dynamic>;
 
   return PayslipData(
+    cachedAt: cachedAt(body),
     period: p['period'] as String,
     employee: p['employee'] as String,
     position: (p['position'] as String?) ?? '',
@@ -197,4 +214,16 @@ Future<PayslipData> _fetchPayslip(
     debtStart: ((p['debt_start'] ?? 0) as num).toDouble(),
     debtEnd: ((p['debt_end'] ?? 0) as num).toDouble(),
   );
+}
+
+/// Листок, полученный в прошлый раз. Свой листок человек открывает и в
+/// дороге, и в цеху, где связи нет, — пусть открывается.
+Future<PayslipData?> _cachedPayslip(String month, String year) async {
+  final saved = await OfflineCache.read('payslip_${year}_$month');
+  if (saved == null || saved['payslip'] is! Map) return null;
+  try {
+    return _payslipFrom(saved);
+  } catch (_) {
+    return null;
+  }
 }

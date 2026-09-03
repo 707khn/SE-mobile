@@ -6,7 +6,9 @@ import '../requests/menu_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
+import '../utils/offline_cache.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/offline_notice.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
 import '../widgets/skeleton.dart';
@@ -32,6 +34,7 @@ class _MenuScreenState extends State<MenuScreen> {
   bool _loading = false;
   bool _error = false;
   List<dynamic> _items = [];
+  DateTime? _cachedAt;
 
   @override
   void initState() {
@@ -46,6 +49,7 @@ class _MenuScreenState extends State<MenuScreen> {
     if (!mounted) return;
     setState(() {
       _loading = false;
+      _cachedAt = cachedAt(result);
       if (result['message'] == 'Success') {
         _items = result['items'] as List<dynamic>;
       } else {
@@ -123,6 +127,7 @@ class _MenuScreenState extends State<MenuScreen> {
           child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
+            SliverToBoxAdapter(child: OfflineNotice(at: _cachedAt)),
             SliverToBoxAdapter(child: _buildDateNavigation()),
             if (_loading)
               const SliverToBoxAdapter(child: SkeletonList(rows: 5))

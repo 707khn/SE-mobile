@@ -24,13 +24,17 @@ def _post(client, path, body):
                        content_type='application/json')
 
 
+_ADMIN_HEADERS = {'X-Admin-Token': os.environ['ADMIN_TOKEN']}
+
+
 def _xml_upload(client, filename='test_payslip.xml', content=None):
     if content is None:
         with open(_TEST_XML, 'rb') as f:
             content = f.read()
     data = {'file': (io.BytesIO(content), filename)}
     return client.post('/api/admin/upload-payslip-xml',
-                       data=data, content_type='multipart/form-data')
+                       data=data, content_type='multipart/form-data',
+                       headers=_ADMIN_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -49,11 +53,14 @@ def test_index(client):
 # ---------------------------------------------------------------------------
 
 def test_login_success(client):
-    r = _post(client, '/login', {'iin': '900101350123'})
+    # Вход по логину и паролю. Раньше тест слал ИИН — так вход работал в
+    # старой версии, и с тех пор он проверял несуществующий путь.
+    r = _post(client, '/login', {'login': '2114', 'password': '2114'})
     body = r.get_json()
     assert body['message'] == 'Success'
     assert 'full_name' in body
     assert 'job' in body
+    assert body['token']
     assert body['employee_id'] == '001'
 
 
@@ -108,7 +115,8 @@ def test_reportdate_no_records(client):
 
 def test_director_report_success(client):
     r = _post(client, '/director_report', {
-        'emp_sname': 'Ахметов',
+        # Сотрудник 002 из сидеров. Прежняя фамилия из них давно ушла.
+        'emp_sname': 'Касымов',
         'start_date': '2024-01-01',
         'end_date': '2024-01-31',
     })
@@ -138,10 +146,12 @@ def test_get_sname_list(client):
 
 
 def test_get_sname_by_iin(client):
-    r = _post(client, '/get_sname', {'emp_iin': '900101350123'})
+    # ИИН сотрудника 001 в нынешних сидерах; демонстрационный из ранней
+    # версии оттуда убрали, а тест остался на него смотреть.
+    r = _post(client, '/get_sname', {'emp_iin': '000000002114'})
     body = r.get_json()
     assert body['message'] == 'Success'
-    assert body['employee'][0]['iin'] == '900101350123'
+    assert body['employee'][0]['iin'] == '000000002114'
 
 
 def test_get_sname_unknown_iin(client):
@@ -231,7 +241,8 @@ def test_upload_xml_wrong_extension(client):
 
 def test_upload_xml_no_file(client):
     r = client.post('/api/admin/upload-payslip-xml',
-                    data={}, content_type='multipart/form-data')
+                    data={}, content_type='multipart/form-data',
+                    headers=_ADMIN_HEADERS)
     assert r.status_code == 400
 
 

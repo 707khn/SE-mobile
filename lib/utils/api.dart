@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../screens/start_screen.dart';
+import 'offline_cache.dart';
 import 'secure_storage_helper.dart';
 import 'variables.dart';
 
@@ -52,6 +53,9 @@ Future<void> returnToLogin() async {
   _returningToLogin = true;
   try {
     await SecureStorageHelper.instance.clearCredentials();
+    // И сохранённое для работы без связи: на одном телефоне может войти
+    // другой человек, чужой расчётный лист ему видеть незачем.
+    await OfflineCache.clear();
     CustomFormState.loginController.clear();
     CustomFormState.passwordController.clear();
     Get.offAll(() => const StartPage());

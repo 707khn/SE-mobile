@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../utils/variables.dart';
 import '../utils/api.dart';
+import '../utils/offline_cache.dart';
 
 /// Replaces the whole menu for [date]. The backend wipes that day's items and
 /// re-inserts what is sent, so pass the complete list, not just the changes.
@@ -42,12 +43,22 @@ Future<Map<String, dynamic>> getMenuForDate(String date) async {
       return {'message': 'Failure', 'items': []};
     }
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      await OfflineCache.save('menu_$date', body);
+      return body;
     }
-    return {'message': 'Failure', 'items': []};
+    return await _cachedMenu(date);
   } on TimeoutException {
-    return {'message': 'Failure', 'items': []};
+    return await _cachedMenu(date);
   } catch (_) {
-    return {'message': 'Failure', 'items': []};
+    return await _cachedMenu(date);
   }
+}
+
+/// Меню за этот день, полученное в прошлый раз. В столовой связь ловит хуже
+/// всего, а меню нужно именно там.
+Future<Map<String, dynamic>> _cachedMenu(String date) async {
+  final saved = await OfflineCache.read('menu_$date');
+  if (saved != null) return saved;
+  return {'message': 'Failure', 'items': []};
 }
