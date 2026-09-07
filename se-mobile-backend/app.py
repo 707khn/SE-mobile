@@ -16,7 +16,8 @@ from models import (db, Employee, AccessRecord, Payslip,
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import parse_directory_excel
-from parser_news_feed import parse_news_feed
+from parser_news_feed import parse_news_feed, looks_like_feed, feed_links
+from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
 
 _ONE_DAY = timedelta(days=1)
@@ -663,43 +664,130 @@ def _login_by_employee():
     return mapping
 
 
-# Версия сидера. Пока она совпадает с записанной в журнале, сидер не
-# запускается. Изменили данные внутри сидера — повысьте здесь версию, и он
-# отработает один раз на боевой базе. Отсутствующие здесь считаются версией '1'.
 # Как часто ходим на сайт за новостями. Реже — сайт не заметит нагрузки,
 # чаще — незачем: новости там появляются не ежеминутно.
 _NEWS_REFRESH = timedelta(minutes=15)
 _news_checked_at = None
 
+# Откуда берём новости, если в окружении ничего не задано. Раздел новостей
+# сайта предприятия: адрес постоянный, а переменную NEWS_FEED_URL на боевом
+# сервере ещё нужно не забыть прописать — вот и забыли.
+_NEWS_SOURCE = 'https://se-btrz.com/news/'
 
-def _refresh_site_news():
-    """Забирает ленту сайта, если давно не забирали.
+# Куда заглядываем за лентой, если страница о ней не объявила. Так ленту
+# кладут распространённые системы управления сайтом.
+_FEED_GUESSES = ('feed/', 'rss/', 'feed.xml', 'rss.xml', '?feed=rss2')
+
+# Чем закончился последний поход за новостями — для админ-панели. Отсюда
+# видно, нашлась ли лента, и почему в ленте пусто.
+_news_status = {'checked_at': None, 'source': '', 'kind': '',
+                'found': 0, 'added': 0, 'error': ''}
+
+# Найденный адрес ленты — чтобы не искать её заново при каждом обходе.
+_news_feed_url = ''
+
+
+def _fetch(url, timeout=8):
+    import urllib.request
+    request_ = urllib.request.Request(
+        url, headers={'User-Agent': 'SE-mobile/1.0',
+                      'Accept': 'application/rss+xml, application/xml, text/html'})
+    with urllib.request.urlopen(request_, timeout=timeout) as response:
+        return response.read(), response.geturl()
+
+
+def _load_site_news(page_url):
+    """Новости с сайта: сначала лента, потом сама страница.
+
+    Порядок именно такой. Лента описана стандартом и живёт годами, разбор
+    страницы держится на вёрстке и ломается при первом же обновлении сайта.
+    Но если ленты у сайта нет, новости всё равно нужны — тогда страница.
+
+    Ходим отсюда же, из обработчика запроса, поэтому держим общий срок: пока
+    сайт молчит, у сотрудника крутится ожидание ленты.
+
+    Возвращает (список новостей, чем именно взяли).
+    """
+    global _news_feed_url
+    import time
+    deadline = time.monotonic() + 12
+
+    # Ленту, найденную в прошлый раз, пробуем первой: искать её заново каждые
+    # четверть часа значит каждые четверть часа ждать чужой сайт.
+    if _news_feed_url:
+        try:
+            data, _ = _fetch(_news_feed_url, timeout=8)
+            if looks_like_feed(data):
+                return parse_news_feed(data), f'лента {_news_feed_url}'
+        except Exception as e:
+            logging.info('Прежняя лента %s не отвечает: %s', _news_feed_url, e)
+        _news_feed_url = ''
+
+    try:
+        body, final_url = _fetch(page_url)
+    except Exception:
+        # Адрес в окружении может указывать на ленту, которой у сайта нет.
+        # Тогда возвращаемся к разделу новостей — он-то на месте.
+        if page_url == _NEWS_SOURCE:
+            raise
+        logging.info('Адрес %s не отвечает, берём раздел новостей', page_url)
+        body, final_url = _fetch(_NEWS_SOURCE)
+
+    if looks_like_feed(body):
+        _news_feed_url = final_url
+        return parse_news_feed(body), 'лента'
+
+    # Страница. Спрашиваем у неё саму, где её лента, и только потом гадаем.
+    candidates = feed_links(body, final_url)
+    for guess in _FEED_GUESSES:
+        url = (final_url.rstrip('/') + '/' + guess if not guess.startswith('?')
+               else final_url + guess)
+        if url not in candidates:
+            candidates.append(url)
+
+    for url in candidates[:6]:
+        if time.monotonic() > deadline:
+            logging.info('Ленту искать некогда, берём страницу')
+            break
+        try:
+            data, _ = _fetch(url, timeout=5)
+            if not looks_like_feed(data):
+                continue
+            items = parse_news_feed(data)
+            _news_feed_url = url
+            return items, f'лента {url}'
+        except Exception as e:
+            logging.debug('Лента %s не подошла: %s', url, e)
+
+    return parse_news_html(body, final_url), 'страница'
+
+
+def _refresh_site_news(force=False):
+    """Забирает новости сайта, если давно не забирали.
 
     Ходим лениво, при чтении ленты приложением, а не по расписанию: отдельный
     таймер — ещё одна деталь, которая ломается молча. Ошибка сети здесь не
     ошибка запроса: показываем то, что уже лежит в базе.
     """
     global _news_checked_at
-    feed_url = os.environ.get('NEWS_FEED_URL', '').strip()
-    if not feed_url:
-        return
+    page_url = os.environ.get('NEWS_FEED_URL', '').strip() or _NEWS_SOURCE
     now = datetime.utcnow()
-    if _news_checked_at and now - _news_checked_at < _NEWS_REFRESH:
+    if not force and _news_checked_at and now - _news_checked_at < _NEWS_REFRESH:
         return
     _news_checked_at = now
+    _news_status.update({'checked_at': now.isoformat(), 'source': page_url,
+                         'kind': '', 'found': 0, 'added': 0, 'error': ''})
 
     try:
-        import urllib.request
-        request = urllib.request.Request(
-            feed_url, headers={'User-Agent': 'SE-mobile/1.0'})
-        with urllib.request.urlopen(request, timeout=8) as response:
-            items = parse_news_feed(response.read())
+        items, kind = _load_site_news(page_url)
     except Exception as e:
+        _news_status['error'] = f'{type(e).__name__}: {e}'
         logging.warning('Не удалось обновить новости с сайта: %s', e)
         return
+    _news_status.update({'kind': kind, 'found': len(items)})
 
     added = 0
-    for item in items:
+    for order, item in enumerate(items):
         if not item['external_id']:
             continue
         if NewsItem.query.filter_by(external_id=item['external_id']).first():
@@ -711,28 +799,39 @@ def _refresh_site_news():
             summary=item['summary'],
             url=item['url'] or None,
             image_url=item['image_url'] or None,
-            published_at=item['published_at'] or now,
+            # Без даты — сохраняем порядок страницы: первая сверху.
+            published_at=item['published_at'] or (now - timedelta(minutes=order)),
             # С сайта — сразу в ленту: там материал уже прошёл редактуру.
             is_published=True,
         ))
         added += 1
-    if added:
-        try:
-            db.session.commit()
-            logging.info('Новостей с сайта добавлено: %d', added)
-            # Об одной новости говорим по заголовку, о нескольких — счётом:
-            # выкладывать пять уведомлений подряд значит, что их отключат.
-            newest = (NewsItem.query.filter_by(source='site', is_published=True)
-                      .order_by(NewsItem.published_at.desc()).first())
-            if added == 1 and newest is not None:
-                _push_to_everyone('Новость', newest.title, {'type': 'news'})
-            elif newest is not None:
-                _push_to_everyone(
-                    'Новости', f'На сайте появилось новых материалов: {added}',
-                    {'type': 'news'})
-        except Exception as e:
-            db.session.rollback()
-            logging.error('Не удалось сохранить новости: %s', e)
+    if not added:
+        return
+    try:
+        db.session.commit()
+    except Exception as e:
+        # Три работника gunicorn ходят за новостями каждый сам по себе, и на
+        # одинаковый external_id база отвечает отказом. Это не потеря: новость
+        # уже записал сосед.
+        db.session.rollback()
+        _news_status['error'] = f'{type(e).__name__}: {str(getattr(e, "orig", e)).splitlines()[0]}'
+        logging.warning('Не удалось сохранить новости: %s', e)
+        return
+
+    _news_status['added'] = added
+    logging.info('Новостей с сайта добавлено: %d', added)
+    # Об одной новости говорим по заголовку, о нескольких — счётом:
+    # выкладывать пять уведомлений подряд значит, что их отключат.
+    newest = (NewsItem.query.filter_by(source='site', is_published=True)
+              .order_by(NewsItem.published_at.desc()).first())
+    if newest is None:
+        return
+    if added == 1:
+        _push_to_everyone('Новость', newest.title, {'type': 'news'})
+    else:
+        _push_to_everyone('Новости',
+                          f'На сайте появилось новых материалов: {added}',
+                          {'type': 'news'})
 
 
 def _news_json(item):
@@ -749,6 +848,9 @@ def _news_json(item):
     }
 
 
+# Версия сидера. Пока она совпадает с записанной в журнале, сидер не
+# запускается. Изменили данные внутри сидера — повысьте здесь версию, и он
+# отработает один раз на боевой базе. Отсутствующие здесь считаются версией '1'.
 _SEED_VERSIONS = {
     # Даурембекова переехала с временного D013 на табельный 0000001465.
     '_seed_org_directory': '3',
@@ -1922,6 +2024,23 @@ def register_routes(app):
         pending = sum(1 for r in rows if not r.is_published)
         return jsonify({'message': 'Success', 'pending': pending,
                         'items': [_news_json(r) for r in rows]})
+
+    @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])
+    @require_auth
+    def admin_news_refresh():
+        """Сходить за новостями прямо сейчас и рассказать, чем кончилось.
+
+        Из приложения не видно, почему лента пуста: сайт недоступен, ленты у
+        него нет, разбор не удался — снаружи всё выглядит одинаково. Здесь
+        видно.
+        """
+        if not _is_admin_account():
+            return _deny()
+        if request.method == 'POST':
+            _refresh_site_news(force=True)
+        total = NewsItem.query.filter_by(source='site').count()
+        return jsonify({'message': 'Success', 'status': dict(_news_status),
+                        'site_items': total})
 
     @app.route('/api/admin/news', methods=['POST'])
     @require_auth

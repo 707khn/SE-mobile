@@ -39,7 +39,8 @@ def _clean(html: str, limit: int = 400) -> str:
     if len(text) <= limit:
         return text
     # Обрезаем по границе слова, чтобы не оборвать на полуслове.
-    cut = text[:limit].rsplit(' ', 1)[0]
+    # limit - 1: многоточие тоже занимает место, а в базе поле не резиновое.
+    cut = text[:limit - 1].rsplit(' ', 1)[0]
     return cut + '…'
 
 
@@ -130,3 +131,49 @@ def parse_news_feed(data: bytes):
     if not news:
         raise ValueError('В ленте нет ни одной новости с заголовком.')
     return news
+
+
+_LINK = re.compile(r'<link\b([^>]*)>', re.I)
+_ATTR = re.compile(r'''(\w[\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))''')
+
+
+def looks_like_feed(data: bytes) -> bool:
+    """Лента это или страница. Смотрим на начало: у ленты там корневой тег."""
+    head = (data or b'')[:400].lstrip()
+    if head.startswith(b'<?xml'):
+        head = head.split(b'?>', 1)[-1].lstrip()
+    lowered = head.lower()
+    return lowered.startswith((b'<rss', b'<feed', b'<rdf:rdf'))
+
+
+def feed_links(data: bytes, base_url: str):
+    """Адреса лент, объявленных самой страницей.
+
+    Любая система управления сайтом ставит в <head> строку
+    <link rel="alternate" type="application/rss+xml" href="...">. Спросить у
+    страницы, где её лента, надёжнее, чем угадывать адрес.
+    """
+    from urllib.parse import urljoin
+
+    try:
+        html = (data or b'').decode('utf-8', errors='replace')
+    except Exception:
+        return []
+
+    links = []
+    for tag in _LINK.finditer(html[:200_000]):
+        attrs = {}
+        for attr in _ATTR.finditer(tag.group(1)):
+            name = attr.group(1).lower()
+            attrs[name] = (attr.group(2) or attr.group(3) or attr.group(4) or '')
+        if 'alternate' not in attrs.get('rel', '').lower():
+            continue
+        kind = attrs.get('type', '').lower()
+        if 'rss' not in kind and 'atom' not in kind:
+            continue
+        href = attrs.get('href', '').strip()
+        if href:
+            url = urljoin(base_url, href)
+            if url not in links:
+                links.append(url)
+    return links
