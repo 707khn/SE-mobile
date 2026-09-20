@@ -14,6 +14,7 @@ import 'package:se_mobile/utils/variables.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/pin_screen.dart';
+import 'utils/api.dart';
 import 'utils/app_lock.dart';
 import 'utils/secure_storage_helper.dart';
 
@@ -136,6 +137,9 @@ class MyApp extends StatelessWidget {
   }
   Future<Map<String, String?>> authCheck() async {
     final secure = SecureStorageHelper.instance;
+    // Пароль, оставшийся в хранилище от прежних сборок: теперь он не нужен
+    // ни для чего, а лежать на телефоне ему незачем.
+    await secure.forgetStoredPassword();
     final isLogged = await secure.isLoggedIn();
     if (isLogged) {
       // Always re-read the profile: job title and department drive which
@@ -145,7 +149,9 @@ class MyApp extends StatelessWidget {
       // Без await: пока человек набирает код, запрос успевает пройти, и
       // экран кода не ждёт сервер. Без связи ожидание было бы десятисекундным
       // — перед тем, как спросить четыре цифры, которые сервера не требуют.
-      unawaited(_refreshProfile(secure));
+      unawaited(_refreshProfile(secure).then((mustChange) async {
+        if (mustChange) await secure.markPasswordExpired();
+      }));
       return {
         'loggedIn': 'true',
         'fullName': await secure.getFullName(),
@@ -157,29 +163,33 @@ class MyApp extends StatelessWidget {
     }
   }
 
-  Future<void> _refreshProfile(SecureStorageHelper secure) async {
-    final login = await secure.getLogin();
-    final password = await secure.getPassword();
-    if (login == null || login.isEmpty || password == null || password.isEmpty) return;
+  /// Перечитывает имя и должность по пропуску.
+  ///
+  /// Раньше для этого приложение входило заново — то есть хранило на
+  /// телефоне пароль и посылало его при каждом запуске. Пропуск делает то
+  /// же самое и продлевается сам, а пароля на телефоне больше нет.
+  ///
+  /// Возвращает true, если сервер сказал, что пароль пора сменить: так
+  /// узнаёт о сбросе тот, кто уже вошёл, — до этого о сбросе знал один
+  /// экран входа.
+  Future<bool> _refreshProfile(SecureStorageHelper secure) async {
     try {
-      final r = await http.post(
-        Uri.parse('${AppValues.baseUrl}/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'login': login, 'password': password}),
-      ).timeout(const Duration(seconds: 10));
-      if (r.statusCode == 200) {
-        final b = jsonDecode(r.body) as Map<String, dynamic>;
-        if (b['message'] == 'Success') {
-          await secure.saveProfile(
-            fullName: (b['full_name'] as String?) ?? '',
-            job: (b['job'] as String?) ?? '',
-            employeeId: (b['employee_id'] as String?) ?? '',
-          );
-          // Заодно продлеваем пропуск: приложение открывают чаще, чем
-          // перезаходят, и так срок практически не истекает.
-          await secure.saveToken((b['token'] as String?) ?? '');
-        }
-      }
-    } catch (_) {}
+      final r = await http
+          .get(Uri.parse('${AppValues.baseUrl}/api/me'),
+              headers: await authHeaders())
+          .timeout(const Duration(seconds: 10));
+      if (r.statusCode != 200) return false;
+      final b = jsonDecode(r.body) as Map<String, dynamic>;
+      if (b['message'] != 'Success') return false;
+      await secure.saveProfile(
+        fullName: (b['full_name'] as String?) ?? '',
+        job: (b['job'] as String?) ?? '',
+        employeeId: (b['employee_id'] as String?) ?? '',
+      );
+      return b['must_change_password'] == true;
+    } catch (_) {
+      // Без связи работаем на сохранённом: код и пропуск лежат на телефоне.
+      return false;
+    }
   }
 }

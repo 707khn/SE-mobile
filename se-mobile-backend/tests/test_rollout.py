@@ -54,3 +54,24 @@ def test_rollout_report_is_for_admins_only(app, client):
     assert body['accounts'] > 100
     assert isinstance(body['by_version'], dict)
     assert body['without_pass'], 'счётчик запросов без пропуска пуст'
+
+
+def test_api_me_answers_by_the_pass(app, client):
+    """Приложение узнаёт, кто оно, по пропуску — без пароля на телефоне."""
+    token = _token(app, '0000001465')
+    r = client.get('/api/me', headers={'Authorization': f'Bearer {token}'})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body['employee_id'] == '0000001465'
+    assert 'Даурембекова' in body['full_name']
+    assert body['job']
+    assert 'must_change_password' in body
+
+
+def test_api_me_refuses_without_a_pass(app, client):
+    """Без пропуска — отказ, даже пока обязательная проверка выключена.
+
+    Иначе этот путь отдавал бы имя и должность любому, кто знает адрес.
+    """
+    r = client.get('/api/me')
+    assert r.status_code == 401

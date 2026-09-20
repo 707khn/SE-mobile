@@ -6,6 +6,7 @@ import '../requests/account_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
+import '../utils/secure_storage_helper.dart';
 import 'pin_screen.dart';
 import '../utils/app_theme.dart';
 
@@ -26,8 +27,10 @@ class ChangePasswordScreen extends StatefulWidget {
   final String fullName;
   final String job;
 
-  /// Текущий пароль. При обязательной смене он уже известен — человек только
-  /// что им вошёл, и спрашивать его второй раз незачем.
+  /// Текущий пароль. При обязательной смене сразу после входа он известен —
+  /// человек только что им вошёл, и спрашивать второй раз незачем. А вот
+  /// когда пароль сбросили, пока человек пользовался кодом, известен он
+  /// только самому человеку: тогда пусто, и поле показываем.
   final String currentPassword;
 
   /// false — человек пришёл сюда сам из меню и может уйти.
@@ -88,6 +91,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           margin: const EdgeInsets.all(12),
         );
         if (widget.mandatory) {
+          await SecureStorageHelper.instance.clearPasswordExpired();
           await enterApp(fullName: widget.fullName, job: widget.job);
         } else {
           Get.back();
@@ -138,7 +142,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             children: [
               if (widget.mandatory) _buildWhy(),
               if (widget.mandatory) SizedBox(height: Dimensions.height30 / 1.5),
-              if (!widget.mandatory) ...[
+              if (!widget.mandatory || widget.currentPassword.isEmpty) ...[
                 _field(
                   controller: _oldController,
                   label: 'password_old'.tr,
@@ -226,7 +230,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'password_change_why'.tr,
+              widget.currentPassword.isEmpty
+                  ? 'password_change_why_reset'.tr
+                  : 'password_change_why'.tr,
               style: const TextStyle(fontSize: 13.5, height: 1.45),
             ),
           ),

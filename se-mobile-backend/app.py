@@ -1232,6 +1232,33 @@ def register_routes(app):
                             'retry_after': seconds}), 429
         return jsonify({'message': 'Failure'})
 
+    @app.route('/api/me', methods=['GET'])
+    @require_auth
+    def whoami():
+        """Кто я, по пропуску.
+
+        Приложение спрашивает это при каждом запуске. Раньше оно для этого
+        входило заново — хранило на телефоне пароль и отправляло его. Пароль
+        там больше не нужен: пропуск и сам продлевается этим запросом.
+
+        Заодно отсюда приложение узнаёт, что пароль сброшен и его пора
+        сменить: до этого о сбросе знал только экран входа, и человек,
+        который уже вошёл, не узнавал о нём никогда.
+        """
+        viewer = getattr(g, 'employee', None)
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        account = UserAccount.query.filter_by(
+            employee_id=viewer.employee_id).first()
+        return jsonify({
+            'message': 'Success',
+            'employee_id': viewer.employee_id,
+            'full_name': viewer.full_name,
+            'job': viewer.job_title,
+            'department': viewer.department or '',
+            'must_change_password': bool(account and account.must_change_password),
+        })
+
     @app.route('/change-password', methods=['POST'])
     @require_auth
     def change_password():

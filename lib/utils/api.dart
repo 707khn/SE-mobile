@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -25,6 +27,27 @@ Future<Map<String, String>> authHeaders() async {
     'X-App-Version': appVersionLabel(),
     if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
   };
+}
+
+/// Табельный номер по пропуску — когда сохранённого на телефоне нет.
+///
+/// Такое бывает после обновления с очень старой сборки. Раньше для этого
+/// приложение входило заново сохранённым паролем; теперь хватает пропуска.
+Future<String?> employeeIdFromServer() async {
+  try {
+    final r = await http
+        .get(Uri.parse('${AppValues.baseUrl}/api/me'), headers: await authHeaders())
+        .timeout(const Duration(seconds: 10));
+    if (r.statusCode != 200) return null;
+    final body = jsonDecode(r.body) as Map<String, dynamic>;
+    if (body['message'] != 'Success') return null;
+    final id = (body['employee_id'] as String?) ?? '';
+    if (id.isEmpty) return null;
+    await SecureStorageHelper.instance.saveEmployeeId(id);
+    return id;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Гасит пропуск на сервере при выходе, чтобы он не остался годным ещё месяц.
