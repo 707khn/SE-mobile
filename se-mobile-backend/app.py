@@ -1102,6 +1102,7 @@ def _seed_all():
         # ему важно видеть, у кого учётная запись уже есть.
         _seed_directory_staff_2026,
         _seed_access_august_2026,
+        _seed_payslips_july_2026,
         # Последним: подчищает следы прежних одновременных запусков.
         _dedupe_access_records,
     ]:
@@ -5426,11 +5427,16 @@ def _seed_directory_staff_2026():
             emp.department = row['dept'].strip()[:200]
     db.session.commit()
 
-    # Временная запись вида D0xx и настоящая — это один человек. Переносим
-    # на настоящую всё, что успело накопиться на временной, и удаляем её.
+    # Прежняя запись и настоящая — это один человек. Переносим на настоящую
+    # всё, что успело накопиться на прежней, и удаляем её.
+    #
+    # Условие именно «номер другой», а не «номер начинается с D»: у техника
+    # ОИТиС прежний номер был «001», под ним лежали его листки и проходы, и
+    # по признаку D он бы не склеился — в базе оказались бы два Сарсекеновых
+    # и две учётные записи, одна из них пустая.
     for row in rows:
         tab, old_id = row['tab'].strip(), row['old_id'].strip()
-        if old_id.startswith('D') and _absorb_employee(old_id, tab) is not None:
+        if old_id and old_id != tab and _absorb_employee(old_id, tab) is not None:
             merged += 1
 
     accounts = {a.employee_id for a in UserAccount.query.all()}
@@ -5512,6 +5518,89 @@ def _seed_access_august_2026():
     logging.info('Август: проходов добавлено %d, событий турникета %d, '
                  'пропущено (нет такого сотрудника) %d',
                  added_rec, added_ev, skipped)
+
+
+def _seed_payslips_july_2026():
+    """Грузит расчётные листки за июль из книги 1С.
+
+    Листков в книге 374 — всё предприятие; кладём те, чей табельный номер
+    есть в базе. Остальные не пропадают: появится сотрудник — повторный
+    запуск сидера подберёт и его листок.
+
+    Повторный запуск ничего не задваивает: на (сотрудник, год, месяц) в
+    базе стоит требование неповторимости, и уже загруженные пропускаются.
+    """
+    import json
+    path = os.path.join(_DATA_DIR, 'payslips_2026_07.json')
+    if not os.path.exists(path):
+        logging.warning('Файла %s нет — пропускаю', path)
+        return
+    with open(path, encoding='utf-8') as f:
+        slips = json.load(f)
+
+    known = {e.employee_id for e in Employee.query.all()}
+    have = {p.employee_id for p in Payslip.query.filter_by(
+        period_year=2026, period_month=7).all()}
+
+    added = skipped = 0
+    for slip in slips:
+        tab = (slip.get('tab') or '').strip()
+        if tab not in known:
+            skipped += 1
+            continue
+        if tab in have:
+            continue
+
+        accruals = slip.get('total_accruals') or 0.0
+        deductions = slip.get('total_deductions') or 0.0
+        payslip = Payslip(
+            employee_id=tab,
+            period_month=7,
+            period_year=2026,
+            period_display='Июль 2026',
+            total_accruals=accruals,
+            total_deductions=deductions,
+            # «К выплате» — начисленное минус удержанное. Выплаченное и долги
+            # живут отдельными полями: выплатить могли и больше, и меньше.
+            net_pay=round(accruals - deductions, 2),
+            position=(slip.get('position') or '')[:200] or None,
+            department=(slip.get('department') or '')[:200] or None,
+            salary_rate=slip.get('salary_rate'),
+            debt_start=slip.get('debt_start') or 0.0,
+            debt_end=slip.get('debt_end') or 0.0,
+            total_paid=slip.get('total_paid') or 0.0,
+        )
+        db.session.add(payslip)
+        db.session.flush()          # нужен id для строк листка
+
+        for row in slip.get('accruals', []):
+            db.session.add(PayslipAccrual(
+                payslip_id=payslip.id, name=row['name'][:200],
+                amount=row['amount'], period=(row.get('period') or '')[:50],
+                working_days=row.get('days'), working_hours=row.get('hours')))
+        for row in slip.get('deductions', []):
+            db.session.add(PayslipDeduction(
+                payslip_id=payslip.id, name=row['name'][:200],
+                amount=row['amount'], period=(row.get('period') or '')[:50]))
+        for row in slip.get('paid', []):
+            db.session.add(PayslipPaid(
+                payslip_id=payslip.id,
+                payment_type=(row.get('payment_type') or '')[:200],
+                period=(row.get('period') or '')[:50], amount=row['amount']))
+        for row in slip.get('benefits', []):
+            db.session.add(PayslipBenefit(
+                payslip_id=payslip.id, name=row['name'][:200],
+                amount=row['amount']))
+        for row in slip.get('reference', []):
+            db.session.add(PayslipReference(
+                payslip_id=payslip.id, name=row['name'][:200],
+                amount=row['amount']))
+        have.add(tab)
+        added += 1
+
+    db.session.commit()
+    logging.info('Июль: листков добавлено %d, пропущено (нет такого '
+                 'сотрудника) %d', added, skipped)
 
 
 def _dedupe_access_records():
@@ -5855,8 +5944,17 @@ def _absorb_employee(stale_id, keep_id):
     # листков и перезапишет только что сделанное присваивание.
     db.session.commit()
 
+    # ИИН — колонка самой записи, а не отдельная строка, и вместе с дублем он
+    # бы пропал: поиск сотрудника по ИИН перестал бы его находить. Переносим
+    # после удаления — на ИИН стоит требование неповторимости, и до удаления
+    # дубля такое присваивание не прошло бы.
+    orphan_iin = stale.iin
     db.session.delete(stale)
     db.session.commit()
+    if orphan_iin and not keep.iin:
+        keep.iin = orphan_iin
+        db.session.commit()
+
     logging.info('Merged duplicate employee %s into %s (%d rows moved)',
                  stale_id, keep_id, moved)
     return moved
