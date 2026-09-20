@@ -86,6 +86,24 @@ class LocaleString extends Translations {
           'app_version': 'Нұсқа',
           'session_expired_title': 'Сеанс аяқталды',
           'session_expired_body': 'Қайта кіріңіз.',
+          'pin_create_title': 'Кіру коды',
+          'pin_unlock_title': 'Кіру',
+          'pin_change_title': 'Кодты өзгерту',
+          'pin_why': 'Бұдан әрі қолданбаға осы кодпен кіресіз — логин мен '
+              'құпиясөз қажет болмайды. Код тек осы телефонда сақталады.',
+          'pin_create_hint': '4 саннан тұратын код ойлап табыңыз',
+          'pin_repeat_hint': 'Кодты қайталаңыз',
+          'pin_unlock_hint': 'Кодты енгізіңіз',
+          'pin_current_hint': 'Қазіргі кодты енгізіңіз',
+          'pin_mismatch': 'Кодтар сәйкес келмеді',
+          'pin_too_simple': 'Мұндай кодты бірден тауып алады',
+          'pin_wrong': 'Код қате',
+          'pin_attempts_left': 'Қалған әрекет: @count',
+          'pin_locked_out': 'Код бес рет қате енгізілді. Логин және құпиясөзбен кіріңіз.',
+          'pin_forgot': 'Кодты ұмыттыңыз ба?',
+          'pin_forgot_body': 'Логин мен құпиясөзбен қайта кіресіз, содан кейін '
+              'жаңа код ойлап табасыз.',
+          'pin_changed': 'Код өзгертілді',
           'password_change_title': 'Құпиясөзді өзгерту',
           'password_change_why': 'Сіздің құпиясөзіңіз табельдік нөміріңізбен '
               'бірдей, ал оны басқалар да біледі. Тек өзіңіз білетін '
@@ -288,6 +306,25 @@ class LocaleString extends Translations {
           'app_version': 'Версия',
           'session_expired_title': 'Сеанс завершён',
           'session_expired_body': 'Войдите заново.',
+          'pin_create_title': 'Код для входа',
+          'pin_unlock_title': 'Вход',
+          'pin_change_title': 'Смена кода',
+          'pin_why': 'Дальше приложение будет открываться по этому коду — '
+              'логин и пароль вводить не придётся. Код хранится только на '
+              'этом телефоне.',
+          'pin_create_hint': 'Придумайте код из 4 цифр',
+          'pin_repeat_hint': 'Повторите код',
+          'pin_unlock_hint': 'Введите код',
+          'pin_current_hint': 'Введите текущий код',
+          'pin_mismatch': 'Коды не совпали',
+          'pin_too_simple': 'Такой код подберут с первого раза',
+          'pin_wrong': 'Неверный код',
+          'pin_attempts_left': 'Осталось попыток: @count',
+          'pin_locked_out': 'Код ввели неверно пять раз. Войдите по логину и паролю.',
+          'pin_forgot': 'Забыли код?',
+          'pin_forgot_body': 'Вы войдёте по логину и паролю, а потом придумаете '
+              'новый код.',
+          'pin_changed': 'Код изменён',
           'password_change_title': 'Смена пароля',
           'password_change_why': 'Ваш пароль совпадает с табельным номером, '
               'а его знают и другие. Придумайте пароль, который знаете '

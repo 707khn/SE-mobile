@@ -31,6 +31,14 @@ Future<void> confirmAndLogout(BuildContext context) async {
   if (confirmed != true) return;
 
   HapticFeedback.mediumImpact();
+  await forceLogout();
+}
+
+/// Выход без вопросов: пять неверных кодов подряд, погашенный пропуск.
+///
+/// Спрашивать здесь нечего — решение уже принято, а `message` объясняет,
+/// почему человек вдруг оказался на экране входа.
+Future<void> forceLogout({String? message}) async {
   // Гасим пропуск на сервере, чтобы он не остался годным ещё месяц.
   // Не получилось — не беда: локально его всё равно стираем.
   await revokeToken();
@@ -43,4 +51,10 @@ Future<void> confirmAndLogout(BuildContext context) async {
   CustomFormState.loginController.clear();
   CustomFormState.passwordController.clear();
   Get.offAll(() => const StartPage());
+  if (message != null && message.isNotEmpty) {
+    Get.snackbar('log_out_title'.tr, message,
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 5));
+  }
 }
