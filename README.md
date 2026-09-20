@@ -125,22 +125,45 @@ Android APK**, готовый файл лежит в artifacts под имене
 установлено». Для пятисот человек это означает «удалите и поставьте заново»
 при каждом обновлении, с потерей кода входа и повторным вводом логина.
 
-Свой ключ делает подпись постоянной. Создать — на своём компьютере:
+Свой ключ делает подпись постоянной. Создаёт его `keytool` — он входит в
+Java. На рабочей Windows-машине Java может не стоять (apk собирается в
+Actions, Android Studio не нужна), поэтому проще сделать ключ на сервере, а
+потом забрать файл себе.
 
-```powershell
-keytool -genkey -v -keystore se-mobile.jks -keyalg RSA -keysize 2048 `
-        -validity 10000 -alias se-mobile
+**На сервере** (`ssh -l ubuntu 87.199.130.179`):
+
+```bash
+sudo apt install -y openjdk-17-jre-headless
+
+keytool -genkeypair -v -keystore ~/se-mobile.jks -storetype PKCS12 \
+    -keyalg RSA -keysize 2048 -validity 10000 -alias se-mobile \
+    -dname "CN=AO Semey Engineering, OU=OITiS, O=AO Semey Engineering, L=Semey, C=KZ"
 ```
 
-Спросит пароль и данные владельца. **Файл `se-mobile.jks` и пароль храните
-вне репозитория и не теряйте**: без них следующая версия не встанет поверх
-этой, и всё вернётся к «удалите и поставьте заново».
+Спросит пароль — дважды, и это единственное, что нужно ввести. Хранилище
+PKCS12 держит один пароль на всё, поэтому пароль ключа тот же самый.
 
-Дальше перевести файл в текст:
+Дальше перевести файл в текст — эту строку целиком кладём в секрет:
+
+```bash
+base64 -w0 ~/se-mobile.jks; echo
+```
+
+**Забрать файл себе и убрать с сервера.** В PowerShell у себя:
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("se-mobile.jks")) | Set-Clipboard
+scp ubuntu@87.199.130.179:~/se-mobile.jks .
 ```
+
+и обратно на сервере:
+
+```bash
+shred -u ~/se-mobile.jks
+```
+
+**Файл `se-mobile.jks` и пароль храните вне репозитория и не теряйте**: без
+них следующая версия не встанет поверх этой, и всё вернётся к «удалите и
+поставьте заново» — уже навсегда.
 
 И положить в **Settings → Secrets and variables → Actions → New repository
 secret**, четыре штуки:
@@ -150,7 +173,7 @@ secret**, четыре штуки:
 | `KEYSTORE_BASE64` | то, что только что скопировалось |
 | `KEYSTORE_PASSWORD` | пароль хранилища |
 | `KEY_ALIAS` | `se-mobile` |
-| `KEY_PASSWORD` | пароль ключа (обычно тот же) |
+| `KEY_PASSWORD` | тот же пароль (в PKCS12 он один) |
 
 После этого в журнале сборки, в шаге «Чем подписано», будет видно имя
 владельца из вашего ключа, а не `CN=Android Debug`.
