@@ -99,11 +99,16 @@ jobs:
           PROPS
           echo "Ключ подписи на месте, хранилище открывается"
 
-      # android-arm и android-arm64 — все телефоны предприятия. Третья
-      # платформа, x86_64, нужна только эмулятору, а машинный код под неё
-      # собирается столько же, сколько под настоящую.
+      # Все платформы, включая x86_64. Ограничение экономило минуту-две, но
+      # на устройстве, которого нет в списке, приложение падает при запуске:
+      # своей библиотеки в файле просто нет. Минуты столько не стоят.
       - name: Build APK
-        run: flutter build apk --release --target-platform android-arm,android-arm64
+        run: flutter build apk --release
+
+      # Отладочная сборка рядом — как запасной путь и как способ отличить
+      # «не работает вообще» от «не работает только release».
+      - name: Build debug APK
+        run: flutter build apk --debug
 
       # Чтобы по файлу было видно, чем он подписан: с «своим» ключом сборка
       # встанет поверх прежней, с отладочным — нет.
@@ -124,6 +129,15 @@ jobs:
         with:
           name: se-mobile-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+          overwrite: true
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: se-mobile-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 7
           overwrite: true
 

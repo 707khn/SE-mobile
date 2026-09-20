@@ -14,10 +14,12 @@ from flask import g
 import app as app_module
 from models import db, Employee, TurnstileEvent
 
-_FINANCE = 'D003'      # Шаяхметов, зам. по экономике и финансам
-_CEO = 'D001'          # Асқаров, Генеральный директор
-_PRODUCTION = 'D002'   # Мусипов, зам. по производству
-_ORDINARY = '001'      # Сарсекенов, техник-программист
+# Табельные номера, а не временные D-номера: с загрузкой июльских листков
+# справочник переехал на настоящие номера, а временные записи удалены.
+_FINANCE = '0000002184'      # Шаяхметов, зам. по экономике и финансам
+_CEO = '0000002183'          # Асқаров, Генеральный директор
+_PRODUCTION = '0000002191'   # Мусипов, зам. по производству
+_ORDINARY = '0000002114'     # Сарсекенов, техник-программист
 
 
 @pytest.fixture
@@ -55,7 +57,7 @@ def test_department_rule_is_untouched(app):
     with app.test_request_context():
         g.employee = db.session.get(Employee, '0000001465')   # начальник ОИТиС
         assert g.employee.department != 'Руководство'
-        assert app_module._may_view('001')        # её отдел
+        assert app_module._may_view(_ORDINARY)    # её отдел
         assert not app_module._may_view(_CEO)     # чужой
 
 

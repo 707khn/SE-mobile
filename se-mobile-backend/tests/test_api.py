@@ -3,12 +3,20 @@
 The app fixture in conftest.py boots the app with an in-memory SQLite DB and
 runs auto-seeding, which inserts employees '001', '002', '003' with attendance
 records (Jan–Feb 2024) and payslips (Jan–Feb 2024 for '001'/'002', Jan 2024
-for '003').  Tests that upload the XML fixture create employees '0000001874'
-and '0000002031' which do not exist in the seed data.
+for '003').  '001' is Сарсекенов, and the July payslip book gave him his real
+personnel number: his record, and everything on it, now lives under
+_SARSEKEN below — '001' itself is gone.
+
+Tests that upload the XML fixture create employees '0000001874' and
+'0000002031' which do not exist in the seed data.
 """
 import io
 import json
 import os
+
+# Табельный номер техника-программиста. Прежде он значился под «001»; с
+# загрузкой июльских листков записи склеены на настоящий номер.
+_SARSEKEN = '0000002114'
 
 import pytest
 
@@ -61,7 +69,7 @@ def test_login_success(client):
     assert 'full_name' in body
     assert 'job' in body
     assert body['token']
-    assert body['employee_id'] == '001'
+    assert body['employee_id'] == _SARSEKEN
 
 
 def test_login_failure(client):
@@ -74,7 +82,7 @@ def test_login_failure(client):
 # ---------------------------------------------------------------------------
 
 def test_report_success(client):
-    r = _post(client, '/report', {'key_suffix': '001'})
+    r = _post(client, '/report', {'key_suffix': _SARSEKEN})
     body = r.get_json()
     assert body['message'] == 'Success'
     assert len(body['report']) > 0
@@ -91,7 +99,7 @@ def test_report_failure(client):
 
 def test_reportdate_success(client):
     r = _post(client, '/reportdate', {
-        'key_suffix': '001',
+        'key_suffix': _SARSEKEN,
         'start_date': '2024-01-01',
         'end_date': '2024-01-31',
     })
@@ -102,7 +110,7 @@ def test_reportdate_success(client):
 
 def test_reportdate_no_records(client):
     r = _post(client, '/reportdate', {
-        'key_suffix': '001',
+        'key_suffix': _SARSEKEN,
         'start_date': '2000-01-01',
         'end_date': '2000-01-31',
     })
@@ -139,7 +147,7 @@ def test_director_report_failure(client):
 # ---------------------------------------------------------------------------
 
 def test_get_sname_list(client):
-    r = _post(client, '/get_sname', {'key_suffix': '001'})
+    r = _post(client, '/get_sname', {'key_suffix': _SARSEKEN})
     body = r.get_json()
     assert 'fio' in body
     assert len(body['fio']) >= 3
@@ -164,7 +172,7 @@ def test_get_sname_unknown_iin(client):
 # ---------------------------------------------------------------------------
 
 def test_payslip_success(client):
-    r = _post(client, '/payslip', {'key_suffix': '001', 'month': '1', 'year': '2024'})
+    r = _post(client, '/payslip', {'key_suffix': _SARSEKEN, 'month': '1', 'year': '2024'})
     body = r.get_json()
     assert body['message'] == 'Success'
     ps = body['payslip']
@@ -175,7 +183,7 @@ def test_payslip_success(client):
 
 
 def test_payslip_failure(client):
-    r = _post(client, '/payslip', {'key_suffix': '001', 'month': '12', 'year': '1999'})
+    r = _post(client, '/payslip', {'key_suffix': _SARSEKEN, 'month': '12', 'year': '1999'})
     assert r.get_json()['message'] == 'Failure'
 
 
@@ -184,7 +192,7 @@ def test_payslip_failure(client):
 # ---------------------------------------------------------------------------
 
 def test_leaves_success(client):
-    r = _post(client, '/leaves', {'key_suffix': '001'})
+    r = _post(client, '/leaves', {'key_suffix': _SARSEKEN})
     body = r.get_json()
     assert body['message'] == 'Success'
     assert len(body['leaves']['balances']) > 0
@@ -255,7 +263,7 @@ _FCM_TOKEN = 'test-fcm-token-abc123'
 
 def test_fcm_register(client):
     r = _post(client, '/api/fcm-token', {
-        'employee_id': '001',
+        'employee_id': _SARSEKEN,
         'token': _FCM_TOKEN,
     })
     assert r.status_code == 200
@@ -264,8 +272,8 @@ def test_fcm_register(client):
 
 def test_fcm_register_idempotent(client):
     """Re-registering the same token must not create duplicates."""
-    _post(client, '/api/fcm-token', {'employee_id': '001', 'token': _FCM_TOKEN})
-    r = _post(client, '/api/fcm-token', {'employee_id': '001', 'token': _FCM_TOKEN})
+    _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN})
+    r = _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN})
     assert r.status_code == 200
 
     from models import FcmToken
@@ -275,9 +283,9 @@ def test_fcm_register_idempotent(client):
 
 
 def test_fcm_delete(client):
-    _post(client, '/api/fcm-token', {'employee_id': '001', 'token': _FCM_TOKEN})
+    _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN})
     r = client.delete('/api/fcm-token',
-                      data=json.dumps({'employee_id': '001', 'token': _FCM_TOKEN}),
+                      data=json.dumps({'employee_id': _SARSEKEN, 'token': _FCM_TOKEN}),
                       content_type='application/json')
     assert r.status_code == 200
     assert r.get_json()['message'] == 'Success'

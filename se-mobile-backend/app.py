@@ -1098,6 +1098,11 @@ def _seed_all():
         _seed_extra_accounts,
         # После него: до этого момента учётки может ещё не существовать.
         _force_password_change,
+        # После учёток из кода: справочник заводит людей и логины пачкой, и
+        # ему важно видеть, у кого учётная запись уже есть.
+        _seed_directory_staff_2026,
+        _seed_access_august_2026,
+        _seed_payslips_from_data,
         # Последним: подчищает следы прежних одновременных запусков.
         _dedupe_access_records,
     ]:
@@ -5367,6 +5372,255 @@ _ADMIN_EMPLOYEE_ID = 'ADMIN'
 _ADMIN_DISPLAY_NAME = 'Админ'
 
 
+# ── Учётные записи по справочнику и проходы за август ────────────────────
+#
+# Данные лежат в файлах рядом, а не в коде: людей 123, проходов почти три
+# тысячи, и в исходнике это была бы тысяча строк, которую никто не прочтёт.
+#
+#   data/employees_2026_07.csv — табельный номер, временный id, ФИО,
+#       должность, подразделение. Номера взяты из июльских расчётных
+#       листков: в самом справочнике их нет.
+#   data/access_2026_08.csv — проходы с 1 по 20 августа. Направление
+#       проставлено только для дверей на улицу; считыватели у кабинетов
+#       стоят внутри, и «выход» по дороге к своему столу — не выход.
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+
+
+def _read_data_csv(name):
+    import csv
+    path = os.path.join(_DATA_DIR, name)
+    if not os.path.exists(path):
+        logging.warning('Файла %s нет — пропускаю', path)
+        return []
+    with open(path, newline='', encoding='utf-8') as f:
+        return list(csv.DictReader(f, delimiter=';'))
+
+
+def _seed_directory_staff_2026():
+    """Заводит сотрудников и учётные записи по справочнику.
+
+    Логин и пароль — табельный номер, смена пароля при первом входе
+    обязательна. Тому, у кого учётная запись уже есть (под любым логином),
+    вторую не заводим: человек входит так, как привык.
+    """
+    rows = _read_data_csv('employees_2026_07.csv')
+    if not rows:
+        return
+
+    accounts = {a.employee_id for a in UserAccount.query.all()}
+    created_emp = created_acc = merged = 0
+
+    for row in rows:
+        tab, old_id = row['tab'].strip(), row['old_id'].strip()
+        emp = db.session.get(Employee, tab)
+        if emp is None:
+            db.session.add(Employee(
+                employee_id=tab,
+                full_name=row['fio'].strip(),
+                job_title=row['job'].strip()[:100],
+                department=row['dept'].strip()[:200],
+            ))
+            created_emp += 1
+        else:
+            # Справочник главнее: должности в нём свежее, чем в базе.
+            emp.job_title = row['job'].strip()[:100]
+            emp.department = row['dept'].strip()[:200]
+    db.session.commit()
+
+    # Прежняя запись и настоящая — это один человек. Переносим на настоящую
+    # всё, что успело накопиться на прежней, и удаляем её.
+    #
+    # Условие именно «номер другой», а не «номер начинается с D»: у техника
+    # ОИТиС прежний номер был «001», под ним лежали его листки и проходы, и
+    # по признаку D он бы не склеился — в базе оказались бы два Сарсекеновых
+    # и две учётные записи, одна из них пустая.
+    for row in rows:
+        tab, old_id = row['tab'].strip(), row['old_id'].strip()
+        if old_id and old_id != tab and _absorb_employee(old_id, tab) is not None:
+            merged += 1
+
+    accounts = {a.employee_id for a in UserAccount.query.all()}
+    for row in rows:
+        tab = row['tab'].strip()
+        if tab in accounts or db.session.get(UserAccount, tab) is not None:
+            continue
+        db.session.add(UserAccount(
+            login=tab,
+            employee_id=tab,
+            password_hash=generate_password_hash(tab),
+            must_change_password=True,
+        ))
+        accounts.add(tab)
+        created_acc += 1
+    db.session.commit()
+    logging.info('Справочник: сотрудников заведено %d, склеено %d, '
+                 'учётных записей заведено %d',
+                 created_emp, merged, created_acc)
+
+
+def _seed_access_august_2026():
+    """Грузит проходы за август из файла отчёта турникета.
+
+    Две таблицы на один проход: access_records — то, что показывает «Отчёт
+    сотрудников» (время, событие, дверь), turnstile_events — то, из чего
+    считается табель (вход/выход). Повторный запуск ничего не задваивает:
+    уже загруженные строки узнаём по сотруднику, дате, времени и двери.
+    """
+    rows = _read_data_csv('access_2026_08.csv')
+    if not rows:
+        return
+
+    known = {e.employee_id for e in Employee.query.all()}
+    start, end = date(2026, 8, 1), date(2026, 8, 31)
+
+    existing = {(r.employee_id, r.access_date, r.access_time, r.door_location)
+                for r in AccessRecord.query.filter(
+                    AccessRecord.access_date >= start,
+                    AccessRecord.access_date <= end).all()}
+    existing_events = {(e.employee_id, e.timestamp)
+                       for e in TurnstileEvent.query.filter(
+                           TurnstileEvent.timestamp >= datetime(2026, 8, 1),
+                           TurnstileEvent.timestamp < datetime(2026, 9, 1)).all()}
+
+    added_rec = added_ev = skipped = 0
+    for row in rows:
+        tab = row['tab'].strip()
+        if tab not in known:
+            skipped += 1
+            continue
+        day = date.fromisoformat(row['date'])
+        at = row['time'].strip()
+        door = row['door'].strip()[:100]
+
+        direction = row['direction'].strip()
+        # В отчёте человек читает слово, а не код: «Вход» и «Выход» — как в
+        # прежних записях. У внутренних дверей направления нет, и выдумывать
+        # его нечестно: там просто «Проход».
+        event = {'in': 'Вход', 'out': 'Выход'}.get(direction, 'Проход')
+
+        if (tab, day, at, door) not in existing:
+            db.session.add(AccessRecord(
+                employee_id=tab, access_date=day, access_time=at,
+                event_type=event, door_location=door))
+            existing.add((tab, day, at, door))
+            added_rec += 1
+
+        if direction:
+            hour, minute = (int(x) for x in at.split(':'))
+            stamp = datetime(day.year, day.month, day.day, hour, minute)
+            if (tab, stamp) not in existing_events:
+                db.session.add(TurnstileEvent(
+                    employee_id=tab, direction=direction, timestamp=stamp))
+                existing_events.add((tab, stamp))
+                added_ev += 1
+
+    db.session.commit()
+    logging.info('Август: проходов добавлено %d, событий турникета %d, '
+                 'пропущено (нет такого сотрудника) %d',
+                 added_rec, added_ev, skipped)
+
+
+# Расчётные листки лежат по месяцам: data/payslips_ГОД_МЕСЯЦ.json. Чтобы
+# добавить новый месяц, достаточно положить рядом такой же файл — и поднять
+# версию сидера в _SEED_VERSIONS, иначе на боевой базе он второй раз не
+# запустится: журнал посчитает, что своё уже отработал.
+_PAYSLIP_FILE = re.compile(r'^payslips_(\d{4})_(\d{2})\.json$')
+
+_MONTHS_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль',
+              'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+
+
+def _seed_payslips_from_data():
+    """Грузит все книги расчётных листков, какие лежат в data/."""
+    if not os.path.isdir(_DATA_DIR):
+        return
+    for name in sorted(os.listdir(_DATA_DIR)):
+        found = _PAYSLIP_FILE.match(name)
+        if found:
+            _load_payslip_book(name, int(found.group(1)), int(found.group(2)))
+
+
+def _load_payslip_book(name, year, month):
+    """Кладёт в базу книгу листков за один месяц.
+
+    В книге всё предприятие — 374 листка; кладём те, чей табельный номер
+    есть в базе. Остальные не пропадают: появится сотрудник — следующий
+    запуск подберёт и его листок.
+
+    Повторный запуск ничего не задваивает: на (сотрудник, год, месяц) в базе
+    стоит требование неповторимости, и уже загруженные пропускаются.
+    """
+    import json
+    path = os.path.join(_DATA_DIR, name)
+    with open(path, encoding='utf-8') as f:
+        slips = json.load(f)
+
+    known = {e.employee_id for e in Employee.query.all()}
+    have = {p.employee_id for p in Payslip.query.filter_by(
+        period_year=year, period_month=month).all()}
+    period_display = f'{_MONTHS_RU[month - 1]} {year}'
+
+    added = skipped = 0
+    for slip in slips:
+        tab = (slip.get('tab') or '').strip()
+        if tab not in known:
+            skipped += 1
+            continue
+        if tab in have:
+            continue
+
+        accruals = slip.get('total_accruals') or 0.0
+        deductions = slip.get('total_deductions') or 0.0
+        payslip = Payslip(
+            employee_id=tab,
+            period_month=month,
+            period_year=year,
+            period_display=period_display,
+            total_accruals=accruals,
+            total_deductions=deductions,
+            # «К выплате» — начисленное минус удержанное. Выплаченное и долги
+            # живут отдельными полями: выплатить могли и больше, и меньше.
+            net_pay=round(accruals - deductions, 2),
+            position=(slip.get('position') or '')[:200] or None,
+            department=(slip.get('department') or '')[:200] or None,
+            salary_rate=slip.get('salary_rate'),
+            debt_start=slip.get('debt_start') or 0.0,
+            debt_end=slip.get('debt_end') or 0.0,
+            total_paid=slip.get('total_paid') or 0.0,
+        )
+        db.session.add(payslip)
+        db.session.flush()          # нужен id для строк листка
+
+        for row in slip.get('accruals', []):
+            db.session.add(PayslipAccrual(
+                payslip_id=payslip.id, name=row['name'][:200],
+                amount=row['amount'], period=(row.get('period') or '')[:50],
+                working_days=row.get('days'), working_hours=row.get('hours')))
+        for row in slip.get('deductions', []):
+            db.session.add(PayslipDeduction(
+                payslip_id=payslip.id, name=row['name'][:200],
+                amount=row['amount'], period=(row.get('period') or '')[:50]))
+        for row in slip.get('paid', []):
+            db.session.add(PayslipPaid(
+                payslip_id=payslip.id,
+                payment_type=(row.get('payment_type') or '')[:200],
+                period=(row.get('period') or '')[:50], amount=row['amount']))
+        for row in slip.get('benefits', []):
+            db.session.add(PayslipBenefit(
+                payslip_id=payslip.id, name=row['name'][:200],
+                amount=row['amount']))
+        for row in slip.get('reference', []):
+            db.session.add(PayslipReference(
+                payslip_id=payslip.id, name=row['name'][:200],
+                amount=row['amount']))
+        have.add(tab)
+        added += 1
+
+    db.session.commit()
+    logging.info('%s: листков добавлено %d, пропущено (нет такого '
+                 'сотрудника) %d', period_display, added, skipped)
+
+
 def _dedupe_access_records():
     """Убирает задвоенные проходы турникета, оставляя по одному.
 
@@ -5671,40 +5925,57 @@ def _merge_duplicate_employees():
     Идемпотентно: повторный запуск не находит, что переносить.
     """
     for stale_id, keep_id in _DUPLICATE_EMPLOYEES:
-        stale = Employee.query.get(stale_id)
-        keep = Employee.query.get(keep_id)
-        if stale is None or keep is None:
-            continue
+        _absorb_employee(stale_id, keep_id)
 
-        moved = 0
-        for model in (AccessRecord, LeaveBalance, LeaveHistory,
-                      FcmToken, TurnstileEvent, UserAccount):
-            moved += model.query.filter_by(employee_id=stale_id).update(
-                {'employee_id': keep_id})
 
-        # У расчётных листков есть ограничение на (сотрудник, год, месяц):
-        # переносим только те периоды, которых у действующей записи нет.
-        for slip in Payslip.query.filter_by(employee_id=stale_id).all():
-            clash = Payslip.query.filter_by(
-                employee_id=keep_id,
-                period_year=slip.period_year,
-                period_month=slip.period_month).first()
-            if clash:
-                db.session.delete(slip)
-            else:
-                slip.employee_id = keep_id
-                moved += 1
+def _absorb_employee(stale_id, keep_id):
+    """Переносит всё с записи-дубля на действующую и удаляет дубль.
 
-        # Сначала фиксируем перенос и только потом удаляем дубль: если удалить
-        # его в том же flush, SQLAlchemy обнулит employee_id у «осиротевших»
-        # листков и перезапишет только что сделанное присваивание.
+    Возвращает число перенесённых строк, None — если переносить нечего.
+    """
+    stale = db.session.get(Employee, stale_id)
+    keep = db.session.get(Employee, keep_id)
+    if stale is None or keep is None:
+        return None
+
+    moved = 0
+    for model in (AccessRecord, LeaveBalance, LeaveHistory,
+                  FcmToken, TurnstileEvent, UserAccount):
+        moved += model.query.filter_by(employee_id=stale_id).update(
+            {'employee_id': keep_id})
+
+    # У расчётных листков есть ограничение на (сотрудник, год, месяц):
+    # переносим только те периоды, которых у действующей записи нет.
+    for slip in Payslip.query.filter_by(employee_id=stale_id).all():
+        clash = Payslip.query.filter_by(
+            employee_id=keep_id,
+            period_year=slip.period_year,
+            period_month=slip.period_month).first()
+        if clash:
+            db.session.delete(slip)
+        else:
+            slip.employee_id = keep_id
+            moved += 1
+
+    # Сначала фиксируем перенос и только потом удаляем дубль: если удалить
+    # его в том же flush, SQLAlchemy обнулит employee_id у «осиротевших»
+    # листков и перезапишет только что сделанное присваивание.
+    db.session.commit()
+
+    # ИИН — колонка самой записи, а не отдельная строка, и вместе с дублем он
+    # бы пропал: поиск сотрудника по ИИН перестал бы его находить. Переносим
+    # после удаления — на ИИН стоит требование неповторимости, и до удаления
+    # дубля такое присваивание не прошло бы.
+    orphan_iin = stale.iin
+    db.session.delete(stale)
+    db.session.commit()
+    if orphan_iin and not keep.iin:
+        keep.iin = orphan_iin
         db.session.commit()
 
-        db.session.delete(stale)
-        db.session.commit()
-        logging.info(
-            'Merged duplicate employee %s into %s (%d rows moved)',
-            stale_id, keep_id, moved)
+    logging.info('Merged duplicate employee %s into %s (%d rows moved)',
+                 stale_id, keep_id, moved)
+    return moved
 
 
 def _seed_user_accounts():
