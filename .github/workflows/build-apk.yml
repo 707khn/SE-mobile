@@ -55,18 +55,54 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # Ключ подписи из секретов. Без него Android подписал бы сборку
+      # отладочным ключом, а он на чистой машине создаётся заново — у каждой
+      # сборки своя подпись, и новая версия не встанет поверх установленной.
+      - name: Подготовить ключ подписи
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::Нет секрета KEYSTORE_BASE64 — подпись будет отладочной, поверх установленной такая сборка не встанет"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/se-mobile.jks
+          cat > android/key.properties <<PROPS
+          storeFile=se-mobile.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          PROPS
+          echo "Ключ подписи на месте"
+
       # android-arm и android-arm64 — все телефоны предприятия. Третья
       # платформа, x86_64, нужна только эмулятору, а машинный код под неё
       # собирается столько же, сколько под настоящую.
       - name: Build APK
-        run: flutter build apk --debug --target-platform android-arm,android-arm64
+        run: flutter build apk --release --target-platform android-arm,android-arm64
+
+      # Чтобы по файлу было видно, чем он подписан: с «своим» ключом сборка
+      # встанет поверх прежней, с отладочным — нет.
+      - name: Чем подписано
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | tail -1)
+          if [ -x "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --print-certs "$APK" | grep -i "certificate DN" || true
+          else
+            echo "apksigner не найден — пропускаю"
+          fi
+          ls -lh "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: se-mobile-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: se-mobile-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
           overwrite: true
 
