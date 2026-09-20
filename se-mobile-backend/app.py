@@ -603,6 +603,31 @@ def _deny():
     return jsonify({'message': 'Failure', 'error': 'forbidden'}), 403
 
 
+def _norm_title(job_title):
+    """Должность в сравнимом виде: без регистра, лишних пробелов и «ё».
+
+    Сравниваем должности целиком, а не по вхождению: «Генеральный директор»
+    входит подстрокой в «Заместитель Генерального директора по экономике и
+    финансам», и проверка на вхождение спутала бы одного с другим.
+    """
+    return re.sub(r'\s+', ' ', (job_title or '').lower().replace('ё', 'е')).strip()
+
+
+# Кто смотрит проходы по всему предприятию, а не только по своему
+# подразделению — и чьи проходы при этом всё равно не видит.
+#
+# Правило общего вида (начальник видит свой отдел) для заместителя
+# Генерального директора бессмысленно: его «отдел» — это Руководство, то
+# есть ровно те трое, кого ему как раз смотреть и не нужно. Поэтому доступ
+# задаётся явно: всё предприятие минус перечисленные должности.
+_PLANT_WIDE_VIEWERS = {
+    'заместитель генерального директора по экономике и финансам': (
+        'генеральный директор',
+        'заместитель генерального директора по производству',
+    ),
+}
+
+
 def _may_view(target_employee_id):
     """Свои данные — себе, чужие — начальнику того же отдела или админу."""
     viewer = getattr(g, 'employee', None)
@@ -613,11 +638,38 @@ def _may_view(target_employee_id):
         return True
     if _is_system_admin(viewer.job_title):
         return True
+
+    hidden = _PLANT_WIDE_VIEWERS.get(_norm_title(viewer.job_title))
+    if hidden is not None:
+        target = db.session.get(Employee, target_employee_id)
+        return bool(target) and _norm_title(target.job_title) not in hidden
+
     if _is_admin_role(viewer.job_title):
         target = db.session.get(Employee, target_employee_id)
         return bool(target and viewer.department
                     and target.department == viewer.department)
     return False
+
+
+def _hidden_employee_ids():
+    """Табельные тех, кого этому смотрящему показывать нельзя.
+
+    Пусто для всех, кого нет в _PLANT_WIDE_VIEWERS, — то есть для всех, кроме
+    заместителя Генерального директора. Нужно затем, чтобы запрет был один и
+    тот же везде: спрятать человека в «Отчёте сотрудников», но оставить его в
+    табеле значит не спрятать вовсе.
+    """
+    viewer = getattr(g, 'employee', None)
+    if viewer is None or _is_system_admin(viewer.job_title):
+        return set()
+    hidden = _PLANT_WIDE_VIEWERS.get(_norm_title(viewer.job_title))
+    if not hidden:
+        return set()
+    # Сотрудников пять сотен, перебор дешевле, чем сравнение должностей в SQL
+    # с его собственными правилами регистра и пробелов.
+    return {e.employee_id for e in Employee.query.all()
+            if _norm_title(e.job_title) in hidden
+            and e.employee_id != viewer.employee_id}
 
 
 def _is_manager():
@@ -1793,6 +1845,10 @@ def register_routes(app):
             TurnstileEvent.timestamp < day_end,
         ).order_by(TurnstileEvent.timestamp).all()
 
+        hidden = _hidden_employee_ids()
+        if hidden:
+            events = [e for e in events if e.employee_id not in hidden]
+
         names = _employee_names()
         result = [{
             'id': e.id,
@@ -1825,6 +1881,10 @@ def register_routes(app):
             TurnstileEvent.timestamp >= month_start,
             TurnstileEvent.timestamp < month_end,
         ).order_by(TurnstileEvent.timestamp).all()
+
+        hidden = _hidden_employee_ids()
+        if hidden:
+            events = [e for e in events if e.employee_id not in hidden]
 
         names = _employee_names()
         by_day: dict = {}
