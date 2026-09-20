@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/pin_screen.dart';
 import 'utils/api.dart';
 import 'utils/app_lock.dart';
+import 'utils/error_log.dart';
 import 'utils/secure_storage_helper.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
@@ -28,24 +29,40 @@ Future<void> _firebaseMessagingBackgroundHandler(dynamic message) async {
   await Firebase.initializeApp();
 }
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('ru');
-  await initializeSharedPreferences();
+void main() {
+  // Всё, включая поднятие привязки Flutter, происходит внутри одной зоны:
+  // иначе приложение встречает человека сообщением «Zone mismatch» — а
+  // ловить ошибки без зоны нельзя, и именно ради этого всё затевалось.
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Firebase.initializeApp();
-    FcmService.setupForegroundHandler();
-  } catch (_) {
-    // Firebase not configured yet — app works without push notifications
-  }
+    // Ошибку, из-за которой приложение упало у человека в цехе, иначе не
+    // узнать: телефон к отладчику не подключишь. Записываем на месте, читаем
+    // в «О программе». Нужны обе дороги: FlutterError ловит сбои при
+    // отрисовке, зона — всё остальное, включая асинхронное.
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      ErrorLog.record(details.exception, details.stack,
+          where: details.library ?? '');
+    };
 
-  // Следим, сколько приложение пролежало в фоне: вернулись позже пяти минут
-  // — спросим код. Наблюдателя снимать некому и незачем: он живёт столько же,
-  // сколько сам процесс.
-  AppLock.instance.start();
+    await initializeDateFormatting('ru');
+    await initializeSharedPreferences();
 
-  runApp(const MyApp());
+    try {
+      await Firebase.initializeApp();
+      FcmService.setupForegroundHandler();
+    } catch (_) {
+      // Firebase not configured yet — app works without push notifications
+    }
+
+    // Следим, сколько приложение пролежало в фоне: вернулись позже пяти
+    // минут — спросим код. Наблюдателя снимать некому и незачем: он живёт
+    // столько же, сколько сам процесс.
+    AppLock.instance.start();
+
+    runApp(const MyApp());
+  }, (error, stack) => ErrorLog.record(error, stack));
 }
 
 late SharedPreferences prefs;

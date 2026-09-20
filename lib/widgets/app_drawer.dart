@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../screens/about_screen.dart';
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
 import '../screens/change_password_screen.dart';
@@ -198,6 +199,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.translate,
                   label: _lang == "KZ" ? 'Русский' : 'Қазақша',
                   onTap: _changeLanguage,
+                ),
+                _item(
+                  icon: Icons.info_outline,
+                  label: 'about_title'.tr,
+                  onTap: () => Get.to(() => const AboutScreen()),
                 ),
                 _item(
                   icon: Icons.logout,
