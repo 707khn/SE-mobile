@@ -5928,6 +5928,19 @@ def _merge_duplicate_employees():
         _absorb_employee(stale_id, keep_id)
 
 
+def _employee_referrers():
+    """Столбцы, ссылающиеся на employees.employee_id, — по описанию моделей."""
+    found = []
+    for table in db.metadata.tables.values():
+        if table.name == 'employees':
+            continue
+        for column in table.columns:
+            if any(fk.column.table.name == 'employees'
+                   for fk in column.foreign_keys):
+                found.append((table, column))
+    return found
+
+
 def _absorb_employee(stale_id, keep_id):
     """Переносит всё с записи-дубля на действующую и удаляет дубль.
 
@@ -5938,11 +5951,19 @@ def _absorb_employee(stale_id, keep_id):
     if stale is None or keep is None:
         return None
 
+    # Таблицы берём из самих моделей, а не списком.
+    #
+    # Список был, и в нём не хватало пропусков (auth_tokens): на боевой базе
+    # у людей они есть, и удаление прежней записи упёрлось во внешний ключ —
+    # «update or delete on table employees violates foreign key constraint».
+    # Забыть строку теперь негде: кто ссылается на сотрудника, тот и едет.
     moved = 0
-    for model in (AccessRecord, LeaveBalance, LeaveHistory,
-                  FcmToken, TurnstileEvent, UserAccount):
-        moved += model.query.filter_by(employee_id=stale_id).update(
-            {'employee_id': keep_id})
+    for table, column in _employee_referrers():
+        if table.name == 'payslips':
+            continue                    # у них своё ограничение, ниже
+        moved += db.session.execute(
+            table.update().where(column == stale_id).values({column: keep_id})
+        ).rowcount
 
     # У расчётных листков есть ограничение на (сотрудник, год, месяц):
     # переносим только те периоды, которых у действующей записи нет.

@@ -164,3 +164,24 @@ def test_june_hands_over_to_july(app):
         for emp in both:
             assert abs((june[emp].debt_end or 0) -
                        (july[emp].debt_start or 0)) < 1, emp
+
+
+def test_merge_moves_a_live_token(app):
+    """Пропуск тоже ссылается на сотрудника.
+
+    На боевой базе у людей есть действующие пропуска, и удаление прежней
+    записи упиралось в них: «violates foreign key constraint auth_tokens».
+    В проверках этого не было видно — там никто не входил до склейки.
+    """
+    from models import AuthToken
+    with app.app_context():
+        stale = Employee(employee_id='D999', full_name='Временный Т.',
+                         job_title='Слесарь')
+        keep = db.session.get(Employee, '0000002114')
+        db.session.add(stale)
+        db.session.commit()
+        token = app_module._issue_token('D999')
+
+        assert app_module._absorb_employee('D999', keep.employee_id) is not None
+        assert db.session.get(Employee, 'D999') is None
+        assert db.session.get(AuthToken, token).employee_id == keep.employee_id
