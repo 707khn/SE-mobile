@@ -350,6 +350,49 @@ sudo systemctl restart se-mobile
 
 ---
 
+## Если приложение отвечает «ошибка сервера (503)»
+
+503 при входе означает одно: приложение не смогло обратиться к базе. Сначала
+смотрим, жива ли она:
+
+```
+systemctl status postgresql@16-main --no-pager -l | head -25
+```
+
+**Случай из жизни.** 12 сентября 2026 база не поднялась после перезапуска:
+
+```
+could not translate host name "localhost", service "5432" to address:
+    Temporary failure in name resolution
+WARNING: could not create listen socket for "localhost"
+FATAL:  could not create any TCP/IP sockets
+```
+
+PostgreSQL слушал `localhost` — то есть при запуске просил систему перевести
+имя в адрес, а в тот момент перевести его не удалось. Служба сдалась с первой
+попытки и молча пролежала **неделю**: узнали об этом от сотрудника, который
+не смог войти.
+
+Лечится тем, что имя больше не участвует:
+
+```
+sudo sed -i "s/^#\?listen_addresses\s*=.*/listen_addresses = '127.0.0.1'/" \
+    /etc/postgresql/16/main/postgresql.conf
+sudo systemctl restart postgresql@16-main
+```
+
+и в `/etc/se-mobile.env` в `DATABASE_URL` вместо `@localhost/` — `@127.0.0.1/`,
+после чего `sudo systemctl restart se-mobile`. В `deploy/setup.sh` то и другое
+уже так, эта правка нужна только серверам, поставленным раньше.
+
+Плюс служба базы теперь пробует запуститься снова, а не сдаётся с первого
+раза (`Restart=on-failure` в `/etc/systemd/system/postgresql@16-main.service.d/`).
+
+**Неделя простоя — это про отсутствие присмотра, а не про базу.** Пока никто
+не следит за сервером, любая такая поломка будет жить до первой жалобы.
+
+---
+
 ## Новости с сайта
 
 Раздел «Новости» в приложении показывает два потока: объявления, которые
