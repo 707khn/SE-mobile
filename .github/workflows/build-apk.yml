@@ -1,9 +1,29 @@
 name: Build Android APK
 
+# Сборка идёт сама, как только правка попала в main: пока вы читаете письмо
+# о слиянии, файл уже собирается. Раньше её запускали руками и стояли над
+# ней семь минут — а ждать имеет смысл только то, что нельзя начать заранее.
 on:
   push:
-    branches: [ "claude/serene-carson-TFdlK" ]
+    branches: [ "main" ]
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
+    inputs:
+      emulator:
+        description: 'Прогнать проверку на эмуляторе (добавит ~12 минут)'
+        type: boolean
+        default: false
+
+# Слили два раза подряд — собираем только последнее. Предыдущая сборка уже
+# не нужна, а очередь она занимает.
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -20,11 +40,26 @@ jobs:
           channel: 'stable'
           cache: true
 
+      # Gradle заново выкачивает плагин Android, компилятор Kotlin и
+      # зависимости при каждой сборке — это минуты. Ключ по файлам сборки:
+      # меняются они редко, значит кеш переживает обычную правку экрана.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties', 'pubspec.lock') }}
+          restore-keys: gradle-
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      # android-arm и android-arm64 — все телефоны предприятия. Третья
+      # платформа, x86_64, нужна только эмулятору, а машинный код под неё
+      # собирается столько же, сколько под настоящую.
+      - name: Build APK
+        run: flutter build apk --debug --target-platform android-arm,android-arm64
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -32,10 +67,13 @@ jobs:
         with:
           name: se-mobile-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 3
+          retention-days: 7
           overwrite: true
 
   emulator:
+    # Только по отдельной просьбе: проверка на эмуляторе идёт дольше самой
+    # сборки, а apk от неё не зависит.
+    if: inputs.emulator
     runs-on: ubuntu-latest
     needs: build
 
