@@ -19,6 +19,11 @@ enum PinMode {
 
   /// Код меняют: человек пришёл из бокового меню.
   change,
+
+  /// Код спрашивают заново: приложение пролежало в фоне дольше пяти минут.
+  /// От [unlock] отличается только тем, куда вернуться: человек не открывает
+  /// приложение заново, а возвращается на тот экран, где его свернул.
+  relock,
 }
 
 /// Сколько раз подряд можно ошибиться, прежде чем код перестанет помогать.
@@ -44,6 +49,14 @@ Future<void> enterApp({required String fullName, required String job}) async {
   }
 }
 
+/// Открыт ли сейчас экран кода.
+///
+/// Нужно замку на фон: если человек оставил телефон на «введите код» и
+/// вернулся через час, второй такой же экран поверх первого ни к чему.
+/// Смотрим на сам экран, а не на имя маршрута: при запуске экран кода стоит
+/// в `home`, и маршрут у него — обычный «/».
+bool get pinScreenIsOpen => _PinScreenState._open > 0;
+
 /// Код для входа: четыре цифры вместо логина и пароля при каждом открытии.
 class PinScreen extends StatefulWidget {
   const PinScreen({
@@ -65,6 +78,9 @@ class PinScreen extends StatefulWidget {
 }
 
 class _PinScreenState extends State<PinScreen> {
+  /// Сколько экранов кода сейчас на виду — см. [pinScreenIsOpen].
+  static int _open = 0;
+
   /// Что набрано сейчас.
   String _entered = '';
 
@@ -77,7 +93,23 @@ class _PinScreenState extends State<PinScreen> {
   String? _error;
   bool _busy = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _open++;
+  }
+
+  @override
+  void dispose() {
+    _open--;
+    super.dispose();
+  }
+
   bool get _askingOld => widget.mode == PinMode.change && !_oldConfirmed;
+
+  /// Код спрашивают, а не придумывают.
+  bool get _unlocking =>
+      widget.mode == PinMode.unlock || widget.mode == PinMode.relock;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +136,7 @@ class _PinScreenState extends State<PinScreen> {
               if (widget.mode == PinMode.create && _first == null) _why(),
               Expanded(child: _prompt()),
               _keypad(),
-              if (widget.mode == PinMode.unlock)
+              if (_unlocking)
                 TextButton(
                   onPressed: _busy ? null : _forgot,
                   child: Text('pin_forgot'.tr),
@@ -122,6 +154,7 @@ class _PinScreenState extends State<PinScreen> {
       case PinMode.create:
         return 'pin_create_title'.tr;
       case PinMode.unlock:
+      case PinMode.relock:
         return 'pin_unlock_title'.tr;
       case PinMode.change:
         return 'pin_change_title'.tr;
@@ -131,7 +164,7 @@ class _PinScreenState extends State<PinScreen> {
   String get _hint {
     if (_askingOld) return 'pin_current_hint'.tr;
     if (_first != null) return 'pin_repeat_hint'.tr;
-    if (widget.mode == PinMode.unlock) return 'pin_unlock_hint'.tr;
+    if (_unlocking) return 'pin_unlock_hint'.tr;
     return 'pin_create_hint'.tr;
   }
 
@@ -259,7 +292,7 @@ class _PinScreenState extends State<PinScreen> {
     try {
       if (_askingOld) {
         await _checkOld(entered);
-      } else if (widget.mode == PinMode.unlock) {
+      } else if (_unlocking) {
         await _unlock(entered);
       } else {
         await _choose(entered);
@@ -290,7 +323,11 @@ class _PinScreenState extends State<PinScreen> {
     if (entered == saved) {
       await secure.resetPinFails();
       if (!mounted) return;
-      await _openApp();
+      if (widget.mode == PinMode.relock) {
+        Get.back();
+      } else {
+        await _openApp();
+      }
       return;
     }
 

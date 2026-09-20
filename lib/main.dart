@@ -14,6 +14,7 @@ import 'package:se_mobile/utils/variables.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/pin_screen.dart';
+import 'utils/app_lock.dart';
 import 'utils/secure_storage_helper.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
@@ -37,6 +38,11 @@ void main() async {
   } catch (_) {
     // Firebase not configured yet — app works without push notifications
   }
+
+  // Следим, сколько приложение пролежало в фоне: вернулись позже пяти минут
+  // — спросим код. Наблюдателя снимать некому и незачем: он живёт столько же,
+  // сколько сам процесс.
+  AppLock.instance.start();
 
   runApp(const MyApp());
 }
