@@ -235,57 +235,68 @@ def _update_employee_iins():
         db.session.commit()
 
 
+def _column_sql(column, dialect):
+    """Описание колонки для ALTER TABLE ... ADD COLUMN — по самой модели.
+
+    Возвращает None, если колонку дописать нельзя (первичный ключ), — такую
+    таблицу правят руками, а не на старте службы.
+    """
+    if column.primary_key:
+        return None
+
+    parts = [f'"{column.name}"', column.type.compile(dialect)]
+
+    literal = None
+    if column.server_default is not None:
+        literal = getattr(column.server_default.arg, 'text', None) or \
+            str(column.server_default.arg)
+    elif column.default is not None and getattr(column.default, 'is_scalar', False):
+        value = column.default.arg
+        if isinstance(value, bool):
+            literal = 'TRUE' if value else 'FALSE'
+        elif isinstance(value, (int, float)):
+            literal = repr(value)
+        elif isinstance(value, str):
+            escaped = value.replace("'", "''")
+            literal = f"'{escaped}'"
+    if literal is not None:
+        parts.append(f'DEFAULT {literal}')
+
+    if not column.nullable:
+        if literal is None:
+            # NOT NULL без значения по умолчанию к непустой таблице не
+            # добавить. Лучше колонка без запрета пустоты, чем несостоявшаяся
+            # правка схемы и отказ на каждом запросе.
+            logging.warning('Migration: %s.%s added as nullable — no default',
+                            column.table.name, column.name)
+        else:
+            parts.append('NOT NULL')
+    return ' '.join(parts)
+
+
 def _migrate_schema():
     """Add columns missing from existing tables without dropping data.
 
     db.create_all() only creates whole tables — it never adds new columns to
     tables that already exist. Columns added to the models after the live
     database was first created must be back-filled here, otherwise every
-    INSERT that references them fails on strict backends like PostgreSQL
-    (silently rolling back the seeders and leaving payslips empty).
+    query that mentions them fails on strict backends like PostgreSQL.
+
+    Список недостающих колонок раньше вёлся здесь руками — и однажды в нём
+    не хватило строки: в модель добавили `user_accounts.failed_attempts`, а
+    сюда не вписали, и вход стал отвечать «ошибка сервера» на боевой базе,
+    оставаясь зелёным в проверках (SQLite создаёт таблицу заново и всегда со
+    всеми колонками). Поэтому теперь колонки берутся из самих моделей:
+    забыть строку больше негде.
     """
     from sqlalchemy import text, inspect
     inspector = inspect(db.engine)
     tables = inspector.get_table_names()
-
-    # table -> {column: SQL type}. Covers the parent payslips row plus every
-    # child table whose columns were introduced after initial deployment.
-    schema = {
-        'employees': {
-            'department': 'VARCHAR(200)',
-        },
-        'menu_items': {
-            'portion': 'VARCHAR(50)',
-        },
-        'user_accounts': {
-            'locked_until': 'TIMESTAMP',
-        },
-        'payslips': {
-            'position':    'VARCHAR(200)',
-            'department':  'VARCHAR(200)',
-            'salary_rate': 'FLOAT DEFAULT 0',
-            'debt_start':  'FLOAT DEFAULT 0',
-            'debt_end':    'FLOAT DEFAULT 0',
-            'total_paid':  'FLOAT DEFAULT 0',
-        },
-        'payslip_accruals': {
-            'period':        'VARCHAR(50)',
-            'working_days':  'INTEGER',
-            'working_hours': 'FLOAT',
-        },
-        'payslip_deductions': {
-            'period': 'VARCHAR(50)',
-        },
-        'payslip_paid': {
-            'payment_type': 'VARCHAR(200)',
-            'period':       'VARCHAR(50)',
-            'document':     'VARCHAR(200)',
-            'date':         'VARCHAR(20)',
-        },
-    }
+    dialect = db.engine.dialect
 
     # Расширение колонок, которым не хватило объявленной длины. Добавить
-    # колонку умеет блок выше, а вот растянуть существующую — только это:
+    # недостающую умеет проход по моделям, а растянуть существующую — только
+    # это:
     # PostgreSQL режет значение длиннее объявленного и валит весь запрос,
     # тогда как SQLite длину не проверяет вовсе, и на ней это не всплывает.
     widen = {
@@ -310,14 +321,28 @@ def _migrate_schema():
     }
 
     with db.engine.connect() as conn:
-        for table, columns in schema.items():
-            if table not in tables:
-                continue
-            existing = {c['name'] for c in inspector.get_columns(table)}
-            for col, typedef in columns.items():
-                if col not in existing:
-                    conn.execute(text(f'ALTER TABLE {table} ADD COLUMN "{col}" {typedef}'))
-                    logging.info(f'Migration: added {table}.{col}')
+        for name, table in db.metadata.tables.items():
+            if name not in tables:
+                continue                      # такую создаст create_all целиком
+            existing = {c['name'] for c in inspector.get_columns(name)}
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+                definition = _column_sql(column, dialect)
+                if definition is None:
+                    logging.error('Migration: %s.%s требует правки вручную',
+                                  name, column.name)
+                    continue
+                try:
+                    conn.execute(text(f'ALTER TABLE {name} ADD COLUMN {definition}'))
+                    conn.commit()
+                    logging.info('Migration: added %s.%s', name, column.name)
+                except Exception as e:
+                    # Поодиночке: одна неудачная колонка не должна уносить с
+                    # собой остальные правки схемы.
+                    conn.rollback()
+                    logging.error('Migration: %s.%s не добавилась: %s',
+                                  name, column.name, e)
 
         # ALTER COLUMN TYPE есть в PostgreSQL; в SQLite длина не проверяется,
         # поэтому там расширять нечего.
