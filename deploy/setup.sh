@@ -47,6 +47,37 @@ fi
 say "Пользователь приложения"
 id semobile &>/dev/null || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin semobile
 
+say "База данных: слушать по адресу, а не по имени"
+# PostgreSQL по умолчанию слушает "localhost" — то есть при запуске просит
+# систему перевести это имя в адрес. Однажды при перезагрузке имя перевести
+# не удалось ("Temporary failure in name resolution"), база не поднялась и
+# пролежала неделю. Числовой адрес переводить не нужно, поэтому здесь он.
+PG_CONF=$(ls /etc/postgresql/*/main/postgresql.conf 2>/dev/null | head -1)
+if [ -n "$PG_CONF" ]; then
+    sed -i "s/^#\?listen_addresses\s*=.*/listen_addresses = '127.0.0.1'/" "$PG_CONF"
+    echo "listen_addresses = '127.0.0.1' в $PG_CONF"
+fi
+
+# И пусть служба пробует снова: почти всякая неудача при запуске временная,
+# а systemd по умолчанию сдаётся с первого раза и молчит.
+PG_UNIT=$(systemctl list-units --all --plain --no-legend 'postgresql@*' \
+    | awk '{print $1}' | head -1)
+if [ -n "$PG_UNIT" ]; then
+    mkdir -p "/etc/systemd/system/$PG_UNIT.d"
+    cat > "/etc/systemd/system/$PG_UNIT.d/restart.conf" <<'UNIT'
+[Unit]
+StartLimitIntervalSec=900
+StartLimitBurst=12
+
+[Service]
+Restart=on-failure
+RestartSec=20
+UNIT
+    systemctl daemon-reload
+    echo "$PG_UNIT будет перезапускаться при сбое"
+fi
+systemctl restart postgresql || true
+
 say "База данных"
 DB_PASS_FILE=/etc/se-mobile-db-password
 if [ ! -f "$DB_PASS_FILE" ]; then
@@ -119,7 +150,8 @@ say "Окружение Python"
 say "Переменные окружения"
 if [ ! -f /etc/se-mobile.env ]; then
     cat > /etc/se-mobile.env <<ENV
-DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME
+# Адрес числом, не именем: см. выше — на переводе имени база уже вставала.
+DATABASE_URL=postgresql://$DB_USER:$DB_PASS@127.0.0.1/$DB_NAME
 
 # Пока выключено: установленные сборки приложения пропуск присылать не умеют
 # и получили бы отказ на всех экранах. Включить после того, как все
