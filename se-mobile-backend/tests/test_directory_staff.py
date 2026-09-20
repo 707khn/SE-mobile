@@ -78,19 +78,27 @@ def test_loading_twice_changes_nothing(app):
         assert before == after
 
 
-def test_july_payslips_are_loaded(app):
-    """Листки за июль есть у всех, кто есть и в базе, и в книге."""
+def test_every_book_is_loaded(app):
+    """Каждая книга из data/ доехала: листок есть у всех, кто есть в базе."""
+    import glob
     import json
-    with open(os.path.join(_DATA, 'payslips_2026_07.json'), encoding='utf-8') as f:
-        book = {s['tab']: s for s in json.load(f)}
+    import re as _re
+    books = sorted(glob.glob(os.path.join(_DATA, 'payslips_*.json')))
+    assert books, 'книг расчётных листков в data/ не нашлось'
 
     with app.app_context():
         from models import Payslip
-        have = {p.employee_id for p in Payslip.query.filter_by(
-            period_year=2026, period_month=7).all()}
-        expected = {r['tab'] for r in _rows('employees_2026_07.csv')
-                    if r['tab'] in book}
-        assert expected - have == set(), f'без листка остались: {expected - have}'
+        for path in books:
+            year, month = (int(x) for x in
+                           _re.search(r'(\d{4})_(\d{2})', path).groups())
+            with open(path, encoding='utf-8') as f:
+                book = {s['tab']: s for s in json.load(f)}
+            have = {p.employee_id for p in Payslip.query.filter_by(
+                period_year=year, period_month=month).all()}
+            expected = {r['tab'] for r in _rows('employees_2026_07.csv')
+                        if r['tab'] in book}
+            assert expected - have == set(), \
+                f'{year}-{month:02d}: без листка остались {expected - have}'
 
 
 def test_payslip_adds_up(app):
@@ -102,7 +110,8 @@ def test_payslip_adds_up(app):
     """
     with app.app_context():
         from models import Payslip
-        for ps in Payslip.query.filter_by(period_year=2026, period_month=7).all():
+        for ps in Payslip.query.filter(Payslip.period_year == 2026,
+                                       Payslip.period_month.in_((6, 7))).all():
             accrued = round(sum(a.amount for a in ps.accruals), 2)
             deducted = round(sum(d.amount for d in ps.deductions), 2)
             paid = round(sum(p.amount for p in ps.paid), 2)
@@ -124,9 +133,9 @@ def test_payslips_load_once(app):
     """
     with app.app_context():
         from models import Payslip, PayslipAccrual
-        app_module._seed_payslips_july_2026()
+        app_module._seed_payslips_from_data()
         before = (Payslip.query.count(), PayslipAccrual.query.count())
-        app_module._seed_payslips_july_2026()
+        app_module._seed_payslips_from_data()
         assert (Payslip.query.count(), PayslipAccrual.query.count()) == before
 
 
@@ -135,3 +144,23 @@ def test_merged_employee_keeps_the_iin(app):
     with app.app_context():
         keep = db.session.get(Employee, '0000002114')   # Сарсекенов
         assert keep is not None and keep.iin, 'ИИН пропал при склейке записей'
+
+
+def test_june_hands_over_to_july(app):
+    """Долг на конец июня равен долгу на начало июля.
+
+    Две книги разбирались одним разборщиком, но независимо друг от друга,
+    и сходятся они только если обе разобраны верно: ошибка в знаке долга
+    или в столбце сразу разводит месяцы.
+    """
+    with app.app_context():
+        from models import Payslip
+        june = {p.employee_id: p for p in Payslip.query.filter_by(
+            period_year=2026, period_month=6).all()}
+        july = {p.employee_id: p for p in Payslip.query.filter_by(
+            period_year=2026, period_month=7).all()}
+        both = set(june) & set(july)
+        assert len(both) > 100, len(both)
+        for emp in both:
+            assert abs((june[emp].debt_end or 0) -
+                       (july[emp].debt_start or 0)) < 1, emp

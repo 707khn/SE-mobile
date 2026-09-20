@@ -1102,7 +1102,7 @@ def _seed_all():
         # ему важно видеть, у кого учётная запись уже есть.
         _seed_directory_staff_2026,
         _seed_access_august_2026,
-        _seed_payslips_july_2026,
+        _seed_payslips_from_data,
         # Последним: подчищает следы прежних одновременных запусков.
         _dedupe_access_records,
     ]:
@@ -5520,27 +5520,45 @@ def _seed_access_august_2026():
                  added_rec, added_ev, skipped)
 
 
-def _seed_payslips_july_2026():
-    """Грузит расчётные листки за июль из книги 1С.
+# Расчётные листки лежат по месяцам: data/payslips_ГОД_МЕСЯЦ.json. Чтобы
+# добавить новый месяц, достаточно положить рядом такой же файл — и поднять
+# версию сидера в _SEED_VERSIONS, иначе на боевой базе он второй раз не
+# запустится: журнал посчитает, что своё уже отработал.
+_PAYSLIP_FILE = re.compile(r'^payslips_(\d{4})_(\d{2})\.json$')
 
-    Листков в книге 374 — всё предприятие; кладём те, чей табельный номер
-    есть в базе. Остальные не пропадают: появится сотрудник — повторный
-    запуск сидера подберёт и его листок.
+_MONTHS_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль',
+              'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 
-    Повторный запуск ничего не задваивает: на (сотрудник, год, месяц) в
-    базе стоит требование неповторимости, и уже загруженные пропускаются.
+
+def _seed_payslips_from_data():
+    """Грузит все книги расчётных листков, какие лежат в data/."""
+    if not os.path.isdir(_DATA_DIR):
+        return
+    for name in sorted(os.listdir(_DATA_DIR)):
+        found = _PAYSLIP_FILE.match(name)
+        if found:
+            _load_payslip_book(name, int(found.group(1)), int(found.group(2)))
+
+
+def _load_payslip_book(name, year, month):
+    """Кладёт в базу книгу листков за один месяц.
+
+    В книге всё предприятие — 374 листка; кладём те, чей табельный номер
+    есть в базе. Остальные не пропадают: появится сотрудник — следующий
+    запуск подберёт и его листок.
+
+    Повторный запуск ничего не задваивает: на (сотрудник, год, месяц) в базе
+    стоит требование неповторимости, и уже загруженные пропускаются.
     """
     import json
-    path = os.path.join(_DATA_DIR, 'payslips_2026_07.json')
-    if not os.path.exists(path):
-        logging.warning('Файла %s нет — пропускаю', path)
-        return
+    path = os.path.join(_DATA_DIR, name)
     with open(path, encoding='utf-8') as f:
         slips = json.load(f)
 
     known = {e.employee_id for e in Employee.query.all()}
     have = {p.employee_id for p in Payslip.query.filter_by(
-        period_year=2026, period_month=7).all()}
+        period_year=year, period_month=month).all()}
+    period_display = f'{_MONTHS_RU[month - 1]} {year}'
 
     added = skipped = 0
     for slip in slips:
@@ -5555,9 +5573,9 @@ def _seed_payslips_july_2026():
         deductions = slip.get('total_deductions') or 0.0
         payslip = Payslip(
             employee_id=tab,
-            period_month=7,
-            period_year=2026,
-            period_display='Июль 2026',
+            period_month=month,
+            period_year=year,
+            period_display=period_display,
             total_accruals=accruals,
             total_deductions=deductions,
             # «К выплате» — начисленное минус удержанное. Выплаченное и долги
@@ -5599,8 +5617,8 @@ def _seed_payslips_july_2026():
         added += 1
 
     db.session.commit()
-    logging.info('Июль: листков добавлено %d, пропущено (нет такого '
-                 'сотрудника) %d', added, skipped)
+    logging.info('%s: листков добавлено %d, пропущено (нет такого '
+                 'сотрудника) %d', period_display, added, skipped)
 
 
 def _dedupe_access_records():
