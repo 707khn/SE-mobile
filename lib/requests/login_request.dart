@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import '../screens/change_password_screen.dart';
-import '../screens/home_shell.dart';
+import '../screens/pin_screen.dart';
 import '../utils/dimensions.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
@@ -84,8 +84,9 @@ Future<void> loginToAccount(
             ));
       } else {
         // Everyone gets the bottom-nav shell; admin-only screens are surfaced
-        // as extra quick-access cards inside it.
-        Get.to(() => HomeShell(fullName: body['full_name'], job: body['job']));
+        // as extra quick-access cards inside it. Сначала код для входа, если
+        // его ещё нет: дальше приложение открывается им.
+        await enterApp(fullName: body['full_name'], job: body['job']);
       }
       break;
     case _Result.wrongCredentials:

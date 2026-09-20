@@ -6,7 +6,7 @@ import '../requests/account_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
-import 'home_shell.dart';
+import 'pin_screen.dart';
 import '../utils/app_theme.dart';
 
 /// Экран «придумайте пароль».
@@ -88,7 +88,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           margin: const EdgeInsets.all(12),
         );
         if (widget.mandatory) {
-          Get.offAll(() => HomeShell(fullName: widget.fullName, job: widget.job));
+          await enterApp(fullName: widget.fullName, job: widget.job);
         } else {
           Get.back();
         }

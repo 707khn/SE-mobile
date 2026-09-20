@@ -9,6 +9,7 @@ import '../screens/attendance_screen.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/news_screen.dart';
+import '../screens/pin_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -182,6 +183,11 @@ class _AppDrawerState extends State<AppDrawer> {
                         currentPassword: '',
                         mandatory: false,
                       )),
+                ),
+                _item(
+                  icon: Icons.pin_outlined,
+                  label: 'pin_change_title'.tr,
+                  onTap: () => Get.to(() => const PinScreen(mode: PinMode.change)),
                 ),
                 _item(
                   icon: ThemePref.icon(_themeMode),

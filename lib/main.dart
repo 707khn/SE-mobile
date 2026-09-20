@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -12,7 +13,7 @@ import 'package:se_mobile/utils/theme_pref.dart';
 import 'package:se_mobile/utils/variables.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'screens/home_shell.dart';
+import 'screens/pin_screen.dart';
 import 'utils/secure_storage_helper.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
@@ -109,7 +110,14 @@ class MyApp extends StatelessWidget {
             if (data != null && data['loggedIn'] == 'true'){
               String fullName = data['fullName'] ?? '';
               String job = data['job'] ?? '';
-              return HomeShell(fullName: fullName, job: job);
+              // Вход по коду: логин с паролем спрашивают только в первый раз
+              // и после выхода. Кода ещё нет — значит, приложение обновили,
+              // и придумать его нужно сейчас.
+              return PinScreen(
+                mode: data['hasPin'] == 'true' ? PinMode.unlock : PinMode.create,
+                fullName: fullName,
+                job: job,
+              );
             } else {
               return const StartPage();
             }
@@ -127,11 +135,16 @@ class MyApp extends StatelessWidget {
       // Always re-read the profile: job title and department drive which
       // screens a user sees, and HR edits them server-side. Offline, the
       // cached values below are used unchanged.
-      await _refreshProfile(secure);
+      //
+      // Без await: пока человек набирает код, запрос успевает пройти, и
+      // экран кода не ждёт сервер. Без связи ожидание было бы десятисекундным
+      // — перед тем, как спросить четыре цифры, которые сервера не требуют.
+      unawaited(_refreshProfile(secure));
       return {
         'loggedIn': 'true',
         'fullName': await secure.getFullName(),
         'job': await secure.getJob(),
+        'hasPin': (await secure.hasPin()).toString(),
       };
     } else {
       return {'loggedIn': 'false'};
