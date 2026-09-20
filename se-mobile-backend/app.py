@@ -505,6 +505,10 @@ def _authenticate(login, password):
         logging.warning(
             'Login %r served from the in-code fallback: no row in '
             'user_accounts. Seed it before removing _CREDENTIALS.', login)
+        try:
+            _count_today('fallback_logins')
+        except Exception:
+            db.session.rollback()
         return cred[1]
     return None
 
@@ -603,15 +607,25 @@ def _note_app_version(employee_id):
     db.session.commit()
 
 
-def _note_auth_miss():
-    """Считает запрос, пришедший без пропуска."""
+def _count_today(field):
+    """Прибавляет единицу к дневному счётчику.
+
+    Счётчики нужны, чтобы отвечать на вопросы «можно ли уже включать
+    обязательную проверку пропуска» и «можно ли уже удалить словарь паролей
+    из кода». На оба отвечает одно: несколько дней подряд ноль.
+    """
     today = date.today()
     row = db.session.get(AuthMiss, today)
     if row is None:
-        db.session.add(AuthMiss(day=today, count=1))
-    else:
-        row.count += 1
+        row = AuthMiss(day=today, count=0, fallback_logins=0)
+        db.session.add(row)
+    setattr(row, field, (getattr(row, field) or 0) + 1)
     db.session.commit()
+
+
+def _note_auth_miss():
+    """Считает запрос, пришедший без пропуска."""
+    _count_today('count')
 
 
 def require_auth(view):
@@ -2221,6 +2235,10 @@ def register_routes(app):
             'not_seen_logins': sorted(asleep)[:50],
             'without_pass': [{'day': m.day.isoformat(), 'count': m.count}
                              for m in misses],
+            # Пока не ноль — словарь паролей в коде ещё кому-то нужен.
+            'in_code_passwords': [{'day': m.day.isoformat(),
+                                   'count': m.fallback_logins or 0}
+                                  for m in misses],
         })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])

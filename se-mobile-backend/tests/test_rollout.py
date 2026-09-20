@@ -75,3 +75,27 @@ def test_api_me_refuses_without_a_pass(app, client):
     """
     r = client.get('/api/me')
     assert r.status_code == 401
+
+
+def test_in_code_passwords_are_counted(app, client):
+    """Словарь паролей в коде — последнее место, где они лежат открыто.
+
+    Удалить его можно, когда счётчик несколько дней подряд ноль, поэтому
+    счётчик должен считать и попадать в отчёт. Сам запасной путь здесь не
+    пройти, и это хорошо: сидер переносит все логины из словаря в таблицу,
+    так что в базе они уже есть и до словаря дело не доходит.
+    """
+    with app.app_context():
+        for login in app_module._CREDENTIALS:
+            assert UserAccount.query.filter_by(login=login).first() is not None, \
+                f'{login} не перенесён в user_accounts — словарь ещё нужен'
+
+        before = sum(m.fallback_logins or 0 for m in AuthMiss.query.all())
+        app_module._count_today('fallback_logins')
+        after = sum(m.fallback_logins or 0 for m in AuthMiss.query.all())
+        assert after == before + 1
+
+        admin = app_module._issue_token(app_module._authenticate('admin', 'admin'))
+    report = client.get('/api/admin/rollout',
+                        headers={'Authorization': f'Bearer {admin}'}).get_json()
+    assert sum(d['count'] for d in report['in_code_passwords']) >= 1

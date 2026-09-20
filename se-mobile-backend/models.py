@@ -323,3 +323,8 @@ class AuthMiss(db.Model):
     __tablename__ = 'auth_misses'
     day = db.Column(db.Date, primary_key=True)
     count = db.Column(db.Integer, nullable=False, default=0)
+
+    # Сколько раз за день вход прошёл по словарю паролей, зашитому в код.
+    # Этот словарь — последнее место, где пароли лежат открытым текстом, и
+    # удалить его можно ровно тогда, когда здесь несколько дней подряд ноль.
+    fallback_logins = db.Column(db.Integer, nullable=False, default=0)
