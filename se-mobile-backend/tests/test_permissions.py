@@ -97,3 +97,41 @@ def test_admin_still_sees_everyone(app, client):
                           headers={'Authorization': f'Bearer {token}'})
     seen = {e['employee_id'] for e in response.get_json()['events']}
     assert {_CEO, _PRODUCTION, _ORDINARY} <= seen
+
+
+_HEAD_OF_IT = '0000001465'   # Даурембекова, начальник ОИТиС
+_SECRETARY = '0000000083'    # Бейсекина, корпоративный отдел
+
+
+def test_head_of_department_sees_only_her_department(app, client):
+    """В табеле — свой отдел, как и в отчёте. Раньше там было всё предприятие."""
+    day = datetime(2031, 5, 6, 8, 0)
+    with app.app_context():
+        for employee_id in (_ORDINARY, _CEO, _SECRETARY):
+            db.session.add(TurnstileEvent(employee_id=employee_id,
+                                          direction='in', timestamp=day))
+        db.session.commit()
+        token = app_module._issue_token(_HEAD_OF_IT)
+        own = db.session.get(Employee, _HEAD_OF_IT).department
+
+    response = client.get('/api/attendance?date=2031-05-06',
+                          headers={'Authorization': f'Bearer {token}'})
+    assert response.status_code == 200
+    seen = {e['employee_id'] for e in response.get_json()['events']}
+    assert seen == {_ORDINARY}, f'{own}: видно лишнее'
+
+    summary = client.get('/api/attendance/summary?month=2031-05',
+                         headers={'Authorization': f'Bearer {token}'})
+    listed = {emp['full_name']
+              for day_row in summary.get_json()['days']
+              for emp in day_row['employees']}
+    with app.app_context():
+        assert db.session.get(Employee, _SECRETARY).full_name not in listed
+
+
+def test_rank_and_file_sees_nobody_elses_records(app):
+    """Не начальник — только свои. До табеля его и так не пускает _is_manager."""
+    with app.test_request_context():
+        g.employee = db.session.get(Employee, _ORDINARY)
+        assert app_module._may_view(_ORDINARY)
+        assert not app_module._may_view(_HEAD_OF_IT)

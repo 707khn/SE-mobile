@@ -628,52 +628,52 @@ _PLANT_WIDE_VIEWERS = {
 }
 
 
+def _visible_employee_ids():
+    """Чьи проходы этот смотрящий видит. None — значит всех без ограничений.
+
+    Одно место на все экраны: и на «Отчёт сотрудников», и на табель. Пока
+    правил было два — по одному на экран, — начальник отдела видел в отчёте
+    свой отдел, а в табеле всё предприятие.
+    """
+    viewer = getattr(g, 'employee', None)
+    if viewer is None:
+        # Пропуска нет, а проверки ещё не включены: старая сборка.
+        return None
+    if _is_system_admin(viewer.job_title):
+        return None
+
+    hidden = _PLANT_WIDE_VIEWERS.get(_norm_title(viewer.job_title))
+    if hidden is not None:
+        return {e.employee_id for e in Employee.query.all()
+                if e.employee_id == viewer.employee_id
+                or _norm_title(e.job_title) not in hidden}
+
+    if _is_admin_role(viewer.job_title) and viewer.department:
+        ids = {e.employee_id for e in
+               Employee.query.filter_by(department=viewer.department).all()}
+        ids.add(viewer.employee_id)
+        return ids
+
+    return {viewer.employee_id}
+
+
 def _may_view(target_employee_id):
     """Свои данные — себе, чужие — начальнику того же отдела или админу."""
     viewer = getattr(g, 'employee', None)
     if viewer is None:
-        # Пропуска нет, а проверки ещё не включены: старая сборка.
         return not _AUTH_REQUIRED
     if viewer.employee_id == target_employee_id:
         return True
-    if _is_system_admin(viewer.job_title):
-        return True
-
-    hidden = _PLANT_WIDE_VIEWERS.get(_norm_title(viewer.job_title))
-    if hidden is not None:
-        target = db.session.get(Employee, target_employee_id)
-        return bool(target) and _norm_title(target.job_title) not in hidden
-
-    if _is_admin_role(viewer.job_title):
-        target = db.session.get(Employee, target_employee_id)
-        return bool(target and viewer.department
-                    and target.department == viewer.department)
-    return False
-
-
-def _hidden_employee_ids():
-    """Табельные тех, кого этому смотрящему показывать нельзя.
-
-    Пусто для всех, кого нет в _PLANT_WIDE_VIEWERS, — то есть для всех, кроме
-    заместителя Генерального директора. Нужно затем, чтобы запрет был один и
-    тот же везде: спрятать человека в «Отчёте сотрудников», но оставить его в
-    табеле значит не спрятать вовсе.
-    """
-    viewer = getattr(g, 'employee', None)
-    if viewer is None or _is_system_admin(viewer.job_title):
-        return set()
-    hidden = _PLANT_WIDE_VIEWERS.get(_norm_title(viewer.job_title))
-    if not hidden:
-        return set()
-    # Сотрудников пять сотен, перебор дешевле, чем сравнение должностей в SQL
-    # с его собственными правилами регистра и пробелов.
-    return {e.employee_id for e in Employee.query.all()
-            if _norm_title(e.job_title) in hidden
-            and e.employee_id != viewer.employee_id}
+    allowed = _visible_employee_ids()
+    return allowed is None or target_employee_id in allowed
 
 
 def _is_manager():
-    """Табель по всему предприятию — начальникам и админу."""
+    """Кому вообще открыт табель: начальникам и админу.
+
+    Кого они там увидят — решает _visible_employee_ids: начальник отдела
+    видит свой отдел, администратор системы — всех.
+    """
     viewer = getattr(g, 'employee', None)
     if viewer is None:
         return not _AUTH_REQUIRED
@@ -1845,9 +1845,9 @@ def register_routes(app):
             TurnstileEvent.timestamp < day_end,
         ).order_by(TurnstileEvent.timestamp).all()
 
-        hidden = _hidden_employee_ids()
-        if hidden:
-            events = [e for e in events if e.employee_id not in hidden]
+        allowed = _visible_employee_ids()
+        if allowed is not None:
+            events = [e for e in events if e.employee_id in allowed]
 
         names = _employee_names()
         result = [{
@@ -1882,9 +1882,9 @@ def register_routes(app):
             TurnstileEvent.timestamp < month_end,
         ).order_by(TurnstileEvent.timestamp).all()
 
-        hidden = _hidden_employee_ids()
-        if hidden:
-            events = [e for e in events if e.employee_id not in hidden]
+        allowed = _visible_employee_ids()
+        if allowed is not None:
+            events = [e for e in events if e.employee_id in allowed]
 
         names = _employee_names()
         by_day: dict = {}
