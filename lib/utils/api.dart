@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../screens/start_screen.dart';
+import 'app_version.dart';
 import 'offline_cache.dart';
 import 'secure_storage_helper.dart';
 import 'variables.dart';
@@ -13,10 +14,15 @@ import 'variables.dart';
 /// Пока пропуска нет — например, приложение только обновили, а человек ещё
 /// не перезаходил — заголовок просто не добавляется. Сервер в переходном
 /// режиме такой запрос пропустит и запишет в лог.
+///
+/// Версию сборки приложение называет само. Без этого нельзя ответить на
+/// единственный вопрос, который держит обязательную проверку пропуска
+/// выключенной: дошла ли новая сборка до всех.
 Future<Map<String, String>> authHeaders() async {
   final token = await SecureStorageHelper.instance.getToken();
   return {
     'Content-Type': 'application/json',
+    'X-App-Version': appVersionLabel(),
     if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
   };
 }

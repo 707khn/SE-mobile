@@ -12,7 +12,8 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
-                    UserAccount, AuthToken, DirectoryEntry, NewsItem)
+                    UserAccount, AuthToken, DirectoryEntry, NewsItem,
+                    AuthMiss)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import parse_directory_excel
@@ -581,11 +582,44 @@ def _resolve_token(raw):
     return employee
 
 
+# Как часто записываем, что человек заходил. Чаще незачем: запись нужна,
+# чтобы понять, обновился ли он, а не чтобы следить за ним поминутно.
+_SEEN_EVERY = timedelta(hours=6)
+
+
+def _note_app_version(employee_id):
+    """Запоминает версию приложения у того, кто пришёл с пропуском."""
+    version = (request.headers.get('X-App-Version') or '').strip()[:20]
+    account = UserAccount.query.filter_by(employee_id=employee_id).first()
+    if account is None:
+        return
+    now = datetime.utcnow()
+    fresh = account.last_seen_at and now - account.last_seen_at < _SEEN_EVERY
+    if fresh and account.app_version == (version or account.app_version):
+        return
+    account.last_seen_at = now
+    if version:
+        account.app_version = version
+    db.session.commit()
+
+
+def _note_auth_miss():
+    """Считает запрос, пришедший без пропуска."""
+    today = date.today()
+    row = db.session.get(AuthMiss, today)
+    if row is None:
+        db.session.add(AuthMiss(day=today, count=1))
+    else:
+        row.count += 1
+    db.session.commit()
+
+
 def require_auth(view):
     """Пускает только с действующим пропуском.
 
-    Пока REQUIRE_AUTH выключен, запрос без пропуска проходит, но пишется
-    в лог: так видно, кто ещё не обновил приложение.
+    Пока REQUIRE_AUTH выключен, запрос без пропуска проходит, но считается:
+    по тому, как это число падает, видно, дошла ли новая сборка до всех и
+    можно ли включать проверку (см. /api/admin/rollout).
     """
     @wraps(view)
     def wrapper(*args, **kwargs):
@@ -595,6 +629,17 @@ def require_auth(view):
                 return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
             logging.warning('Unauthenticated request to %s — old app build?',
                             request.path)
+            try:
+                _note_auth_miss()
+            except Exception as e:      # счётчик не повод ронять запрос
+                db.session.rollback()
+                logging.warning('Не удалось учесть запрос без пропуска: %s', e)
+        else:
+            try:
+                _note_app_version(g.employee.employee_id)
+            except Exception as e:
+                db.session.rollback()
+                logging.warning('Не удалось записать версию приложения: %s', e)
         return view(*args, **kwargs)
     return wrapper
 
@@ -2114,6 +2159,42 @@ def register_routes(app):
         pending = sum(1 for r in rows if not r.is_published)
         return jsonify({'message': 'Success', 'pending': pending,
                         'items': [_news_json(r) for r in rows]})
+
+    @app.route('/api/admin/rollout', methods=['GET'])
+    @require_auth
+    def rollout_readiness():
+        """Готовность к включению обязательной проверки пропуска.
+
+        Один вопрос, один ответ: дошла ли новая сборка до всех. Пока в
+        `without_pass` за сегодня и вчера не появятся нули, включать
+        REQUIRE_AUTH=1 нельзя — у кого-то приложение перестанет работать.
+        """
+        if not _is_admin_account():
+            return _deny()
+
+        accounts = UserAccount.query.filter_by(is_active=True).all()
+        by_version = {}
+        for account in accounts:
+            by_version[account.app_version or 'неизвестно'] = \
+                by_version.get(account.app_version or 'неизвестно', 0) + 1
+
+        # Кто не заходил дольше недели: их сборку мы не знаем и знать не
+        # можем, пока они не откроют приложение.
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        asleep = [a.login for a in accounts
+                  if a.last_seen_at is None or a.last_seen_at < week_ago]
+
+        misses = (AuthMiss.query.order_by(AuthMiss.day.desc()).limit(14).all())
+        return jsonify({
+            'message': 'Success',
+            'require_auth': _AUTH_REQUIRED,
+            'accounts': len(accounts),
+            'by_version': by_version,
+            'not_seen_for_a_week': len(asleep),
+            'not_seen_logins': sorted(asleep)[:50],
+            'without_pass': [{'day': m.day.isoformat(), 'count': m.count}
+                             for m in misses],
+        })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])
     @require_auth

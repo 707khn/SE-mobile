@@ -347,11 +347,48 @@ sudo systemctl restart se-mobile
 | Состояние служб | `systemctl status se-mobile nginx postgresql` |
 | Снять копию сейчас | `sudo systemctl start se-mobile-backup` |
 | Список копий | `ls -lh /var/backups/se-mobile` |
-| Восстановить из копии | `sudo systemctl stop se-mobile && zcat /var/backups/se-mobile/ФАЙЛ.sql.gz \| sudo -u postgres psql se_mobile && sudo systemctl start se-mobile` |
+| Восстановить из копии | см. ниже — копии зашифрованы |
 
 **Восстановление стоит отрепетировать заранее**, а не в тот день, когда оно
 понадобится: копия, которую ни разу не разворачивали, — это надежда, а не
 резерв.
+
+### Копии зашифрованы
+
+В копии зарплаты, ИИН и телефоны всего предприятия. Лежит она файлом на том
+же диске, где и база, поэтому шифруется ключом `/etc/se-mobile-backup-key`.
+
+Восстановление:
+
+```bash
+sudo systemctl stop se-mobile
+sudo openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+     -pass file:/etc/se-mobile-backup-key \
+     -in /var/backups/se-mobile/ФАЙЛ.sql.gz.enc \
+  | zcat | sudo -u postgres psql se_mobile
+sudo systemctl start se-mobile
+```
+
+**Ключ заберите с сервера и храните отдельно** — там же, где ключ подписи
+приложения:
+
+```powershell
+scp -o User=ubuntu 87.199.130.179:/tmp/backup-key .
+```
+
+(сначала на сервере: `sudo cp /etc/se-mobile-backup-key /tmp/backup-key &&
+sudo chmod 644 /tmp/backup-key`, а после копирования — `rm /tmp/backup-key`.)
+
+Скажем честно, чего это шифрование **не** даёт: оно защищает унесённый файл
+копии, но не спасает от того, кто получил сервер целиком — ключ лежит рядом.
+Настоящая защита — забирать копии с сервера. Раз в неделю с домашнего
+ноутбука:
+
+```powershell
+scp -o User=ubuntu "87.199.130.179:/var/backups/se-mobile/se_mobile_*.sql.gz.enc" .
+```
+
+Копия, которая лежит только на сервере, не переживёт потерю сервера.
 
 ---
 
