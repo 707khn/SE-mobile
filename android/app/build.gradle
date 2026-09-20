@@ -22,6 +22,23 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Ключ подписи. Лежит вне репозитория — в android/key.properties, который
+// на сборочной машине создаётся из секретов GitHub.
+//
+// Почему это важно: без своего ключа Android подписывает сборку отладочным,
+// а он создаётся заново на каждой чистой машине. Значит у каждой сборки своя
+// подпись, и новая версия не встанет поверх установленной — телефон ответит
+// «приложение не установлено», и обновление превращается в «удалите и
+// поставьте заново» для пятисот человек. Со своим ключом подпись одна и та
+// же всегда.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace "com.example.se_mobile.se_mobile"
     compileSdk flutter.compileSdkVersion
@@ -49,9 +66,24 @@ android {
         versionName flutterVersionName
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            // Ключа нет — подписываем отладочным, как раньше: пусть сборка
+            // у того, кто просто скачал репозиторий, всё равно получится.
+            signingConfig keystorePropertiesFile.exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
         }
     }
 }
