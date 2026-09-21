@@ -9,6 +9,10 @@ os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 # пропускает всех. На боевом сервере его ставит setup.sh; здесь — тоже, иначе
 # тесты проверяли бы поведение, которого в работе не бывает.
 os.environ.setdefault('ADMIN_TOKEN', 'test-admin-token')
+# Пароль «admin» у учётной записи «admin» сервер меняет сам при запуске — на
+# заданный здесь или на случайный. Тестам нужен известный, иначе войти
+# администратором не получится ни разу.
+os.environ.setdefault('ADMIN_PASSWORD', 'test-admin-password')
 
 import pytest
 from app import create_app  # noqa: E402

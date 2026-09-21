@@ -10,6 +10,9 @@ import os
 import app as app_module
 from models import db, UserAccount, AuthMiss
 
+# Тот же пароль, что conftest кладёт в окружение до создания приложения.
+ADMIN_PASSWORD = os.environ['ADMIN_PASSWORD']
+
 _ADMIN = {'X-Admin-Token': os.environ['ADMIN_TOKEN']}
 
 
@@ -44,7 +47,7 @@ def test_rollout_report_is_for_admins_only(app, client):
     assert denied.status_code == 403
 
     with app.app_context():
-        admin = app_module._authenticate('admin', 'admin')
+        admin = app_module._authenticate('admin', ADMIN_PASSWORD)
         admin_token = app_module._issue_token(admin)
     allowed = client.get('/api/admin/rollout',
                          headers={'Authorization': f'Bearer {admin_token}'})
@@ -78,24 +81,25 @@ def test_api_me_refuses_without_a_pass(app, client):
 
 
 def test_in_code_passwords_are_counted(app, client):
-    """Словарь паролей в коде — последнее место, где они лежат открыто.
+    """Счётчик пропавших учётных записей.
 
-    Удалить его можно, когда счётчик несколько дней подряд ноль, поэтому
-    счётчик должен считать и попадать в отчёт. Сам запасной путь здесь не
-    пройти, и это хорошо: сидер переносит все логины из словаря в таблицу,
-    так что в базе они уже есть и до словаря дело не доходит.
+    Раньше логин, которого нет в user_accounts, проверялся по словарю
+    паролей в коде, и счётчик показывал, сколько раз этим воспользовались.
+    Паролей в словаре больше нет, и такой вход просто не проходит — а
+    считать всё равно надо: не ноль значит, что у кого-то пропала строка в
+    базе и человек не войдёт, пока сидер её не восстановит.
     """
     with app.app_context():
         for login in app_module._CREDENTIALS:
             assert UserAccount.query.filter_by(login=login).first() is not None, \
-                f'{login} не перенесён в user_accounts — словарь ещё нужен'
+                f'{login} не заведён в user_accounts — под ним не войти'
 
         before = sum(m.fallback_logins or 0 for m in AuthMiss.query.all())
         app_module._count_today('fallback_logins')
         after = sum(m.fallback_logins or 0 for m in AuthMiss.query.all())
         assert after == before + 1
 
-        admin = app_module._issue_token(app_module._authenticate('admin', 'admin'))
+        admin = app_module._issue_token(app_module._authenticate('admin', ADMIN_PASSWORD))
     report = client.get('/api/admin/rollout',
                         headers={'Authorization': f'Bearer {admin}'}).get_json()
     assert sum(d['count'] for d in report['in_code_passwords']) >= 1

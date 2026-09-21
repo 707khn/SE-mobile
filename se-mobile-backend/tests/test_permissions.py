@@ -6,6 +6,7 @@
 подразделение — «Руководство», то есть ровно те, кого смотреть не нужно.
 """
 
+import os
 from datetime import datetime
 
 import pytest
@@ -13,6 +14,9 @@ from flask import g
 
 import app as app_module
 from models import db, Employee, TurnstileEvent
+
+# Тот же пароль, что conftest кладёт в окружение до создания приложения.
+ADMIN_PASSWORD = os.environ['ADMIN_PASSWORD']
 
 # Табельные номера, а не временные D-номера: с загрузкой июльских листков
 # справочник переехал на настоящие номера, а временные записи удалены.
@@ -94,7 +98,7 @@ def test_attendance_hides_the_two_directors(app, client):
 
 def test_admin_still_sees_everyone(app, client):
     with app.app_context():
-        token = _token_for('admin', 'admin')
+        token = _token_for('admin', ADMIN_PASSWORD)
     response = client.get('/api/attendance?date=2031-03-04',
                           headers={'Authorization': f'Bearer {token}'})
     seen = {e['employee_id'] for e in response.get_json()['events']}

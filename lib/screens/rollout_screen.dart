@@ -92,6 +92,12 @@ class _RolloutScreenState extends State<RolloutScreen> {
       _line('rollout_not_seen'.tr, '${r.notSeenForAWeek}',
           muted: true),
       SizedBox(height: Dimensions.height30 / 1.5),
+      _section('rollout_passwords'.tr),
+      _line('rollout_passwords_temporary'.tr, '${r.temporaryPasswords}'),
+      SizedBox(height: Dimensions.height30 / 2),
+      Text('rollout_passwords_why'.tr,
+          style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
+      SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_backups'.tr),
       if (r.backupProblem.isNotEmpty)
         _line('rollout_backups_none'.tr, '', muted: true)
@@ -107,13 +113,13 @@ class _RolloutScreenState extends State<RolloutScreen> {
       else
         ...r.withoutPass.map((e) => _line(e.key, '${e.value}')),
       SizedBox(height: Dimensions.height30 / 1.5),
-      _section('rollout_in_code'.tr),
+      _section('rollout_lost_accounts'.tr),
       if (r.inCodePasswords.isEmpty)
         _line('rollout_no_data'.tr, '', muted: true)
       else
         ...r.inCodePasswords.map((e) => _line(e.key, '${e.value}')),
       SizedBox(height: Dimensions.height30 / 2),
-      Text('rollout_in_code_why'.tr,
+      Text('rollout_lost_accounts_why'.tr,
           style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
     ];
   }

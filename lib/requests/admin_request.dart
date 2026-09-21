@@ -100,8 +100,12 @@ class RolloutReport {
   /// По дням, свежие сверху: сколько запросов пришло без пропуска.
   final List<MapEntry<String, int>> withoutPass;
 
-  /// По дням: сколько входов прошло по словарю паролей, зашитому в код.
+  /// По дням: сколько раз вход не нашёл своей строки в user_accounts.
+  /// Пока это ноль, всё в порядке; не ноль — учётка пропала из базы.
   final List<MapEntry<String, int>> inCodePasswords;
+
+  /// Сколько учётных записей всё ещё с выданным паролем — табельным номером.
+  int temporaryPasswords = 0;
 
   /// Копии базы: сколько дней назад делалась последняя и сколько их всего.
   /// null в [backupDaysAgo] — копий нет или папка недоступна.
@@ -139,6 +143,8 @@ Future<RolloutReport> fetchRollout() async {
     withoutPass: _days(body['without_pass']),
     inCodePasswords: _days(body['in_code_passwords']),
   );
+  report.temporaryPasswords =
+      (body['temporary_passwords'] as num?)?.toInt() ?? 0;
   report.backupCount = (backups['count'] as num?)?.toInt() ?? 0;
   report.backupDaysAgo = (backups['days_ago'] as num?)?.toInt();
   report.backupProblem =
