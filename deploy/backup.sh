@@ -17,7 +17,13 @@ KEEP_DAYS=30
 STAMP=$(date +%Y-%m-%d)
 FILE="$DIR/se_mobile_$STAMP.sql.gz.enc"
 
-mkdir -p "$DIR"
+if [ ! -d "$DIR" ] || [ ! -w "$DIR" ]; then
+    echo "папка $DIR недоступна для записи от пользователя $(id -un)." >&2
+    echo "создайте её от root:" >&2
+    echo "  sudo mkdir -p $DIR" >&2
+    echo "  sudo chown postgres:semobile $DIR && sudo chmod 750 $DIR" >&2
+    exit 1
+fi
 
 if [ ! -r "$KEY" ]; then
     echo "нет ключа $KEY — без него копию не зашифровать" >&2

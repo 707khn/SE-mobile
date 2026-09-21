@@ -1221,6 +1221,32 @@ def _seed_all():
     logging.info('Seeders: %d executed, %d skipped', _ran, _skipped)
 
 
+def _backup_state():
+    """Когда была последняя копия базы и сколько их всего.
+
+    Копирование идёт отдельной службой, и три недели подряд оно падало на
+    том, что папку нельзя создать, — узнали об этом случайно. Раз уж
+    администратор открывает эту страницу, пусть видит и это.
+    """
+    directory = os.environ.get('BACKUP_DIR', '/var/backups/se-mobile')
+    try:
+        files = [f for f in os.listdir(directory) if f.startswith('se_mobile_')]
+    except OSError as e:
+        return {'available': False, 'reason': str(e), 'count': 0}
+    if not files:
+        return {'available': True, 'count': 0, 'last': None, 'days_ago': None}
+    newest = max(files, key=lambda f: os.path.getmtime(os.path.join(directory, f)))
+    when = datetime.utcfromtimestamp(
+        os.path.getmtime(os.path.join(directory, newest)))
+    return {
+        'available': True,
+        'count': len(files),
+        'last': when.date().isoformat(),
+        'days_ago': (datetime.utcnow() - when).days,
+        'encrypted': newest.endswith('.enc'),
+    }
+
+
 def register_routes(app):
 
     @app.route('/')
@@ -2273,6 +2299,7 @@ def register_routes(app):
             'by_version': by_version,
             'not_seen_for_a_week': len(asleep),
             'not_seen_logins': sorted(asleep)[:50],
+            'backups': _backup_state(),
             'without_pass': [{'day': m.day.isoformat(), 'count': m.count}
                              for m in misses],
             # Пока не ноль — словарь паролей в коде ещё кому-то нужен.

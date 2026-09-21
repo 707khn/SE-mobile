@@ -102,6 +102,12 @@ class RolloutReport {
 
   /// По дням: сколько входов прошло по словарю паролей, зашитому в код.
   final List<MapEntry<String, int>> inCodePasswords;
+
+  /// Копии базы: сколько дней назад делалась последняя и сколько их всего.
+  /// null в [backupDaysAgo] — копий нет или папка недоступна.
+  int? backupDaysAgo;
+  int backupCount = 0;
+  String backupProblem = '';
 }
 
 List<MapEntry<String, int>> _days(dynamic raw) {
@@ -123,7 +129,8 @@ Future<RolloutReport> fetchRollout() async {
   }
   final body = jsonDecode(response.body) as Map<String, dynamic>;
   final versions = (body['by_version'] as Map?) ?? {};
-  return RolloutReport(
+  final backups = (body['backups'] as Map?) ?? {};
+  final report = RolloutReport(
     requireAuth: body['require_auth'] == true,
     accounts: (body['accounts'] as num?)?.toInt() ?? 0,
     byVersion: versions.map((key, value) =>
@@ -132,4 +139,9 @@ Future<RolloutReport> fetchRollout() async {
     withoutPass: _days(body['without_pass']),
     inCodePasswords: _days(body['in_code_passwords']),
   );
+  report.backupCount = (backups['count'] as num?)?.toInt() ?? 0;
+  report.backupDaysAgo = (backups['days_ago'] as num?)?.toInt();
+  report.backupProblem =
+      backups['available'] == false ? ((backups['reason'] as String?) ?? '') : '';
+  return report;
 }

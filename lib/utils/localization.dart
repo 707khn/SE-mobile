@@ -97,6 +97,9 @@ class LocaleString extends Translations {
           'rollout_in_code_why': 'Кодта 28 құпиясөз ашық жатыр. Бұл санақ '
               'бірнеше күн қатарынан нөл болса, оларды жоюға болады.',
           'rollout_no_data': 'Мәлімет жоқ',
+          'rollout_backups': 'Дерекқор көшірмелері',
+          'rollout_backups_last': 'Соңғысы: @days күн бұрын',
+          'rollout_backups_none': 'Көшірме жоқ — тексеріңіз',
           'about_server': 'Сервер',
           'about_errors': 'Соңғы қателер',
           'about_no_errors': 'Қате жазылмаған.',
@@ -339,6 +342,9 @@ class LocaleString extends Translations {
           'rollout_in_code_why': 'В коде открытым текстом лежат 28 паролей. '
               'Когда этот счёт несколько дней подряд ноль, их можно удалить.',
           'rollout_no_data': 'Нет данных',
+          'rollout_backups': 'Копии базы',
+          'rollout_backups_last': 'Последняя: @days дн. назад',
+          'rollout_backups_none': 'Копий нет — проверьте службу',
           'about_server': 'Сервер',
           'about_errors': 'Последние ошибки',
           'about_no_errors': 'Ошибок не записано.',
