@@ -75,49 +75,16 @@ class PayslipData {
   });
 }
 
-// Returns the stored employee_id, signing in only when there is none.
+// Табельный номер: сохранённый, а если его нет — с сервера по пропуску.
 //
-// This used to re-authenticate before every payslip request, which meant two
-// round-trips per month switch — and against a sleeping server that is a
-// 15-second wait on top of the payslip's own. It is unnecessary: app start-up
-// already refreshes the profile (see _refreshProfile in main.dart), so the
-// stored id is current.
+// Сохранённого номера может не быть после обновления с очень старой
+// сборки. Раньше здесь входили заново сохранённым паролем — теперь хватает
+// пропуска, и пароль на телефоне больше не нужен.
 Future<String?> _resolveEmployeeId() async {
   final storage = SecureStorageHelper.instance;
   final cached = await storage.getEmployeeId();
   if (cached != null && cached.isNotEmpty) return cached;
-
-  final login = await storage.getLogin();
-  final password = await storage.getPassword();
-  if (login != null && login.isNotEmpty && password != null && password.isNotEmpty) {
-    try {
-      final r = await http
-          .post(
-            Uri.parse('${AppValues.baseUrl}/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'login': login, 'password': password}),
-          )
-          .timeout(const Duration(seconds: 15));
-      if (r.statusCode == 200) {
-        final b = jsonDecode(r.body) as Map<String, dynamic>;
-        if (b['message'] == 'Success') {
-          final id = (b['employee_id'] as String?) ?? '';
-          if (id.isNotEmpty) {
-            await storage.saveEmployeeId(id);
-            // Раз уж вошли заново — забираем и свежий пропуск.
-            await storage.saveToken((b['token'] as String?) ?? '');
-            return id;
-          }
-        } else {
-          // Backend explicitly rejected these credentials.
-          return null;
-        }
-      }
-    } catch (_) {
-      // Network error — fall back to cached id for offline / cold-start scenarios.
-    }
-  }
-  return storage.getEmployeeId();
+  return employeeIdFromServer();
 }
 
 PayslipItem _toItem(dynamic e) {

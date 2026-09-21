@@ -8,16 +8,21 @@ class SecureStorageHelper {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
+  /// Сохраняет всё, что нужно после входа.
+  ///
+  /// Пароля здесь нет намеренно. Раньше он лежал на телефоне, потому что
+  /// приложение при каждом запуске входило заново; теперь для этого есть
+  /// пропуск, и хранить пароль пятисот человек на пятистах телефонах больше
+  /// не за чем. Оставшийся от прежних сборок — стираем.
   Future<void> saveCredentials({
     required String login,
-    required String password,
     required String fullName,
     required String job,
     required String employeeId,
     String? token,
   }) async {
     await _storage.write(key: 'login', value: login);
-    await _storage.write(key: 'password', value: password);
+    await _storage.delete(key: 'password');
     await _storage.write(key: 'employeeId', value: employeeId);
     await _storage.write(key: 'fullName', value: fullName);
     await _storage.write(key: 'job', value: job);
@@ -73,9 +78,22 @@ class SecureStorageHelper {
     return await _storage.read(key: 'login');
   }
 
-  Future<String?> getPassword() async {
-    return await _storage.read(key: 'password');
-  }
+  /// Сервер сказал, что пароль пора сменить.
+  ///
+  /// Флаг нужен, потому что узнаём мы об этом при запуске, а спрашивать
+  /// новый пароль надо после кода — до него человек ещё не доказал, что
+  /// телефон его.
+  Future<void> markPasswordExpired() async =>
+      _storage.write(key: 'passwordExpired', value: 'true');
+
+  Future<bool> passwordExpired() async =>
+      await _storage.read(key: 'passwordExpired') == 'true';
+
+  Future<void> clearPasswordExpired() async =>
+      _storage.delete(key: 'passwordExpired');
+
+  /// Пароль, оставшийся в хранилище от прежних сборок. Стираем при запуске.
+  Future<void> forgetStoredPassword() async => _storage.delete(key: 'password');
 
   Future<String?> getEmployeeId() async {
     return await _storage.read(key: 'employeeId');

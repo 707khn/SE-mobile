@@ -49,35 +49,9 @@ class LeaveData {
 }
 
 Future<String?> _resolveEmployeeId() async {
-  var id = await SecureStorageHelper.instance.getEmployeeId();
+  final id = await SecureStorageHelper.instance.getEmployeeId();
   if (id != null && id.isNotEmpty) return id;
-  // /login expects login+password; the old {'iin': ...} payload could never
-  // succeed, so this fallback silently returned null whenever it was reached.
-  final login = await SecureStorageHelper.instance.getLogin();
-  final password = await SecureStorageHelper.instance.getPassword();
-  if (login == null || login.isEmpty || password == null || password.isEmpty) {
-    return null;
-  }
-  try {
-    final r = await http.post(
-      Uri.parse('${AppValues.baseUrl}/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'login': login, 'password': password}),
-    ).timeout(const Duration(seconds: 10));
-    if (r.statusCode == 200) {
-      final b = jsonDecode(r.body) as Map<String, dynamic>;
-      if (b['message'] == 'Success') {
-        final fresh = (b['employee_id'] as String?) ?? '';
-        if (fresh.isNotEmpty) {
-          await SecureStorageHelper.instance.saveEmployeeId(fresh);
-          // Раз уж вошли заново — забираем и свежий пропуск.
-          await SecureStorageHelper.instance.saveToken((b['token'] as String?) ?? '');
-          return fresh;
-        }
-      }
-    }
-  } catch (_) {}
-  return null;
+  return employeeIdFromServer();
 }
 
 /// [employeeId] overrides the signed-in user — used by the admin panel.

@@ -66,7 +66,6 @@ Future<void> loginToAccount(
       final body = attempt.body!;
       await SecureStorageHelper.instance.saveCredentials(
         login: login,
-        password: password,
         fullName: body['full_name'],
         job: body['job'],
         employeeId: body['employee_id'] ?? '',

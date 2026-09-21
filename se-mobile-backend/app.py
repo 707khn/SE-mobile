@@ -12,7 +12,8 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
-                    UserAccount, AuthToken, DirectoryEntry, NewsItem)
+                    UserAccount, AuthToken, DirectoryEntry, NewsItem,
+                    AuthMiss)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import parse_directory_excel
@@ -504,6 +505,10 @@ def _authenticate(login, password):
         logging.warning(
             'Login %r served from the in-code fallback: no row in '
             'user_accounts. Seed it before removing _CREDENTIALS.', login)
+        try:
+            _count_today('fallback_logins')
+        except Exception:
+            db.session.rollback()
         return cred[1]
     return None
 
@@ -581,11 +586,54 @@ def _resolve_token(raw):
     return employee
 
 
+# Как часто записываем, что человек заходил. Чаще незачем: запись нужна,
+# чтобы понять, обновился ли он, а не чтобы следить за ним поминутно.
+_SEEN_EVERY = timedelta(hours=6)
+
+
+def _note_app_version(employee_id):
+    """Запоминает версию приложения у того, кто пришёл с пропуском."""
+    version = (request.headers.get('X-App-Version') or '').strip()[:20]
+    account = UserAccount.query.filter_by(employee_id=employee_id).first()
+    if account is None:
+        return
+    now = datetime.utcnow()
+    fresh = account.last_seen_at and now - account.last_seen_at < _SEEN_EVERY
+    if fresh and account.app_version == (version or account.app_version):
+        return
+    account.last_seen_at = now
+    if version:
+        account.app_version = version
+    db.session.commit()
+
+
+def _count_today(field):
+    """Прибавляет единицу к дневному счётчику.
+
+    Счётчики нужны, чтобы отвечать на вопросы «можно ли уже включать
+    обязательную проверку пропуска» и «можно ли уже удалить словарь паролей
+    из кода». На оба отвечает одно: несколько дней подряд ноль.
+    """
+    today = date.today()
+    row = db.session.get(AuthMiss, today)
+    if row is None:
+        row = AuthMiss(day=today, count=0, fallback_logins=0)
+        db.session.add(row)
+    setattr(row, field, (getattr(row, field) or 0) + 1)
+    db.session.commit()
+
+
+def _note_auth_miss():
+    """Считает запрос, пришедший без пропуска."""
+    _count_today('count')
+
+
 def require_auth(view):
     """Пускает только с действующим пропуском.
 
-    Пока REQUIRE_AUTH выключен, запрос без пропуска проходит, но пишется
-    в лог: так видно, кто ещё не обновил приложение.
+    Пока REQUIRE_AUTH выключен, запрос без пропуска проходит, но считается:
+    по тому, как это число падает, видно, дошла ли новая сборка до всех и
+    можно ли включать проверку (см. /api/admin/rollout).
     """
     @wraps(view)
     def wrapper(*args, **kwargs):
@@ -595,6 +643,17 @@ def require_auth(view):
                 return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
             logging.warning('Unauthenticated request to %s — old app build?',
                             request.path)
+            try:
+                _note_auth_miss()
+            except Exception as e:      # счётчик не повод ронять запрос
+                db.session.rollback()
+                logging.warning('Не удалось учесть запрос без пропуска: %s', e)
+        else:
+            try:
+                _note_app_version(g.employee.employee_id)
+            except Exception as e:
+                db.session.rollback()
+                logging.warning('Не удалось записать версию приложения: %s', e)
         return view(*args, **kwargs)
     return wrapper
 
@@ -1186,6 +1245,33 @@ def register_routes(app):
             return jsonify({'message': 'Failure', 'error': 'locked',
                             'retry_after': seconds}), 429
         return jsonify({'message': 'Failure'})
+
+    @app.route('/api/me', methods=['GET'])
+    @require_auth
+    def whoami():
+        """Кто я, по пропуску.
+
+        Приложение спрашивает это при каждом запуске. Раньше оно для этого
+        входило заново — хранило на телефоне пароль и отправляло его. Пароль
+        там больше не нужен: пропуск и сам продлевается этим запросом.
+
+        Заодно отсюда приложение узнаёт, что пароль сброшен и его пора
+        сменить: до этого о сбросе знал только экран входа, и человек,
+        который уже вошёл, не узнавал о нём никогда.
+        """
+        viewer = getattr(g, 'employee', None)
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        account = UserAccount.query.filter_by(
+            employee_id=viewer.employee_id).first()
+        return jsonify({
+            'message': 'Success',
+            'employee_id': viewer.employee_id,
+            'full_name': viewer.full_name,
+            'job': viewer.job_title,
+            'department': viewer.department or '',
+            'must_change_password': bool(account and account.must_change_password),
+        })
 
     @app.route('/change-password', methods=['POST'])
     @require_auth
@@ -2114,6 +2200,46 @@ def register_routes(app):
         pending = sum(1 for r in rows if not r.is_published)
         return jsonify({'message': 'Success', 'pending': pending,
                         'items': [_news_json(r) for r in rows]})
+
+    @app.route('/api/admin/rollout', methods=['GET'])
+    @require_auth
+    def rollout_readiness():
+        """Готовность к включению обязательной проверки пропуска.
+
+        Один вопрос, один ответ: дошла ли новая сборка до всех. Пока в
+        `without_pass` за сегодня и вчера не появятся нули, включать
+        REQUIRE_AUTH=1 нельзя — у кого-то приложение перестанет работать.
+        """
+        if not _is_admin_account():
+            return _deny()
+
+        accounts = UserAccount.query.filter_by(is_active=True).all()
+        by_version = {}
+        for account in accounts:
+            by_version[account.app_version or 'неизвестно'] = \
+                by_version.get(account.app_version or 'неизвестно', 0) + 1
+
+        # Кто не заходил дольше недели: их сборку мы не знаем и знать не
+        # можем, пока они не откроют приложение.
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        asleep = [a.login for a in accounts
+                  if a.last_seen_at is None or a.last_seen_at < week_ago]
+
+        misses = (AuthMiss.query.order_by(AuthMiss.day.desc()).limit(14).all())
+        return jsonify({
+            'message': 'Success',
+            'require_auth': _AUTH_REQUIRED,
+            'accounts': len(accounts),
+            'by_version': by_version,
+            'not_seen_for_a_week': len(asleep),
+            'not_seen_logins': sorted(asleep)[:50],
+            'without_pass': [{'day': m.day.isoformat(), 'count': m.count}
+                             for m in misses],
+            # Пока не ноль — словарь паролей в коде ещё кому-то нужен.
+            'in_code_passwords': [{'day': m.day.isoformat(),
+                                   'count': m.fallback_logins or 0}
+                                  for m in misses],
+        })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])
     @require_auth
@@ -5928,6 +6054,19 @@ def _merge_duplicate_employees():
         _absorb_employee(stale_id, keep_id)
 
 
+def _employee_referrers():
+    """Столбцы, ссылающиеся на employees.employee_id, — по описанию моделей."""
+    found = []
+    for table in db.metadata.tables.values():
+        if table.name == 'employees':
+            continue
+        for column in table.columns:
+            if any(fk.column.table.name == 'employees'
+                   for fk in column.foreign_keys):
+                found.append((table, column))
+    return found
+
+
 def _absorb_employee(stale_id, keep_id):
     """Переносит всё с записи-дубля на действующую и удаляет дубль.
 
@@ -5938,11 +6077,19 @@ def _absorb_employee(stale_id, keep_id):
     if stale is None or keep is None:
         return None
 
+    # Таблицы берём из самих моделей, а не списком.
+    #
+    # Список был, и в нём не хватало пропусков (auth_tokens): на боевой базе
+    # у людей они есть, и удаление прежней записи упёрлось во внешний ключ —
+    # «update or delete on table employees violates foreign key constraint».
+    # Забыть строку теперь негде: кто ссылается на сотрудника, тот и едет.
     moved = 0
-    for model in (AccessRecord, LeaveBalance, LeaveHistory,
-                  FcmToken, TurnstileEvent, UserAccount):
-        moved += model.query.filter_by(employee_id=stale_id).update(
-            {'employee_id': keep_id})
+    for table, column in _employee_referrers():
+        if table.name == 'payslips':
+            continue                    # у них своё ограничение, ниже
+        moved += db.session.execute(
+            table.update().where(column == stale_id).values({column: keep_id})
+        ).rowcount
 
     # У расчётных листков есть ограничение на (сотрудник, год, месяц):
     # переносим только те периоды, которых у действующей записи нет.

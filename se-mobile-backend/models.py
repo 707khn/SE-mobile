@@ -285,6 +285,13 @@ class UserAccount(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login_at = db.Column(db.DateTime)
 
+    # Какая сборка приложения стоит у человека и когда он последний раз
+    # заходил. Нужно ровно для одного решения: можно ли уже включить
+    # обязательную проверку пропуска, или кто-то ещё сидит на старой сборке
+    # и назавтра останется без приложения.
+    app_version = db.Column(db.String(20))
+    last_seen_at = db.Column(db.DateTime)
+
 
 class AuthToken(db.Model):
     """Пропуск, который приложение получает при входе и предъявляет дальше.
@@ -303,3 +310,21 @@ class AuthToken(db.Model):
     # Срок сдвигается при каждом обращении: пока человек пользуется
     # приложением, его не выбрасывает.
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
+
+
+class AuthMiss(db.Model):
+    """Сколько за день пришло запросов без пропуска.
+
+    Считаем по дням, а не по устройствам: устройство без пропуска ничем себя
+    не называет, а вот скорость, с которой их число падает, показывает, как
+    идёт раздача новой сборки. Ноль несколько дней подряд — можно включать
+    REQUIRE_AUTH=1.
+    """
+    __tablename__ = 'auth_misses'
+    day = db.Column(db.Date, primary_key=True)
+    count = db.Column(db.Integer, nullable=False, default=0)
+
+    # Сколько раз за день вход прошёл по словарю паролей, зашитому в код.
+    # Этот словарь — последнее место, где пароли лежат открытым текстом, и
+    # удалить его можно ровно тогда, когда здесь несколько дней подряд ноль.
+    fallback_logins = db.Column(db.Integer, nullable=False, default=0)

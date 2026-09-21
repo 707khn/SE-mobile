@@ -75,3 +75,61 @@ class HttpException implements Exception {
   @override
   String toString() => 'HttpException: $message';
 }
+
+
+/// Готовность к включению обязательной проверки пропуска.
+///
+/// Один вопрос: дошла ли новая сборка до всех. Пока приходят запросы без
+/// пропуска, включать нельзя — у необновившихся приложение перестанет
+/// работать в ту же минуту.
+class RolloutReport {
+  RolloutReport({
+    required this.requireAuth,
+    required this.accounts,
+    required this.byVersion,
+    required this.notSeenForAWeek,
+    required this.withoutPass,
+    required this.inCodePasswords,
+  });
+
+  final bool requireAuth;
+  final int accounts;
+  final Map<String, int> byVersion;
+  final int notSeenForAWeek;
+
+  /// По дням, свежие сверху: сколько запросов пришло без пропуска.
+  final List<MapEntry<String, int>> withoutPass;
+
+  /// По дням: сколько входов прошло по словарю паролей, зашитому в код.
+  final List<MapEntry<String, int>> inCodePasswords;
+}
+
+List<MapEntry<String, int>> _days(dynamic raw) {
+  if (raw is! List) return <MapEntry<String, int>>[];
+  return raw
+      .whereType<Map>()
+      .map((d) => MapEntry((d['day'] as String?) ?? '',
+          (d['count'] as num?)?.toInt() ?? 0))
+      .toList();
+}
+
+Future<RolloutReport> fetchRollout() async {
+  final response = await http
+      .get(Uri.parse('${AppValues.baseUrl}/api/admin/rollout'),
+          headers: await authHeaders())
+      .timeout(const Duration(seconds: 20));
+  if (response.statusCode != 200) {
+    throw HttpException('HTTP ${response.statusCode}');
+  }
+  final body = jsonDecode(response.body) as Map<String, dynamic>;
+  final versions = (body['by_version'] as Map?) ?? {};
+  return RolloutReport(
+    requireAuth: body['require_auth'] == true,
+    accounts: (body['accounts'] as num?)?.toInt() ?? 0,
+    byVersion: versions.map((key, value) =>
+        MapEntry(key.toString(), (value as num?)?.toInt() ?? 0)),
+    notSeenForAWeek: (body['not_seen_for_a_week'] as num?)?.toInt() ?? 0,
+    withoutPass: _days(body['without_pass']),
+    inCodePasswords: _days(body['in_code_passwords']),
+  );
+}

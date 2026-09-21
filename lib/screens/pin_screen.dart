@@ -7,6 +7,7 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
 import '../utils/secure_storage_helper.dart';
+import 'change_password_screen.dart';
 import 'home_shell.dart';
 
 /// Зачем экран нужен в каждом из трёх случаев.
@@ -386,6 +387,17 @@ class _PinScreenState extends State<PinScreen> {
     final secure = SecureStorageHelper.instance;
     final fullName = await secure.getFullName() ?? widget.fullName;
     final job = await secure.getJob() ?? widget.job;
+
+    // Пароль сбросили, пока человек пользовался кодом: спрашиваем новый
+    // здесь, а не на входе — на вход он теперь попадает редко.
+    if (await secure.passwordExpired()) {
+      Get.offAll(() => ChangePasswordScreen(
+            fullName: fullName,
+            job: job,
+            currentPassword: '',
+          ));
+      return;
+    }
     Get.offAll(() => HomeShell(fullName: fullName, job: job));
   }
 

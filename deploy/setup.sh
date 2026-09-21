@@ -191,6 +191,16 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
 say "Резервные копии"
+# Ключ шифрования копий. Создаётся один раз и больше нигде не появляется:
+# потеряете — старые копии не раскрыть. Читает его пользователь postgres,
+# от которого идёт копирование.
+BACKUP_KEY=/etc/se-mobile-backup-key
+if [ ! -f "$BACKUP_KEY" ]; then
+    openssl rand -base64 48 > "$BACKUP_KEY"
+    chown postgres:postgres "$BACKUP_KEY"
+    chmod 600 "$BACKUP_KEY"
+    echo "создан $BACKUP_KEY — ЗАБЕРИТЕ ЕГО С СЕРВЕРА И СОХРАНИТЕ ОТДЕЛЬНО"
+fi
 cp "$APP_DIR/deploy/backup.sh" /usr/local/bin/se-mobile-backup
 chmod +x /usr/local/bin/se-mobile-backup
 cat > /etc/systemd/system/se-mobile-backup.service <<'UNIT'
