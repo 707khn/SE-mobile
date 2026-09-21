@@ -446,12 +446,41 @@ def _lock_delay(failed_attempts):
 
 
 def locked_for(login):
-    """Сколько секунд ещё закрыт вход под этим логином, или 0."""
-    account = UserAccount.query.filter_by(login=(login or '').strip()).first()
+    """Сколько секунд ещё закрыт вход под этим логином, или 0.
+
+    Логин ищем так же, как при входе: человек, набравший «450», должен
+    увидеть «слишком много попыток», а не «неверный пароль».
+    """
+    account = _find_account((login or '').strip())
     if account is None or account.locked_until is None:
         return 0
     left = (account.locked_until - datetime.utcnow()).total_seconds()
     return int(left) if left > 0 else 0
+
+
+def _number_forms(value):
+    """Как человек называет табельный номер и как он записан в базе.
+
+    В базе номер полный — «0000000450», а вслух и на пропуске он «450».
+    Заставлять пятьсот человек набирать восемь нулей — значит получить
+    пятьсот звонков «не пускает». Принимаем обе формы.
+    """
+    forms = [value]
+    if value.isdigit():
+        short = value.lstrip('0') or '0'
+        for form in (short.zfill(10), short):
+            if form not in forms:
+                forms.append(form)
+    return forms
+
+
+def _find_account(login):
+    """Учётная запись по логину в любой из привычных форм номера."""
+    for form in _number_forms(login):
+        account = UserAccount.query.filter_by(login=form, is_active=True).first()
+        if account is not None:
+            return account
+    return None
 
 
 def _authenticate(login, password):
@@ -466,7 +495,7 @@ def _authenticate(login, password):
     if not login or not password:
         return None
 
-    account = UserAccount.query.filter_by(login=login, is_active=True).first()
+    account = _find_account(login)
     if account is not None:
         now = datetime.utcnow()
         # Пока замок держит, пароль даже не проверяем: иначе перебор просто
@@ -476,8 +505,17 @@ def _authenticate(login, password):
                             (account.locked_until - now).total_seconds())
             return None
 
+        # Пароль у заведённых нами учёток равен табельному номеру, поэтому
+        # его тоже принимаем в обеих формах — но только пока пароль
+        # временный. У придуманного человеком пароля никаких «похожих»
+        # вариантов не перебираем.
+        candidates = [password]
+        if account.must_change_password:
+            candidates += [form for form in _number_forms(password)
+                           if form not in candidates]
         try:
-            ok = check_password_hash(account.password_hash, password)
+            ok = any(check_password_hash(account.password_hash, candidate)
+                     for candidate in candidates)
         except Exception as e:
             # Испорченный или незнакомый формат хеша — это не «верный пароль».
             logging.error('Cannot verify password hash for %r: %s', login, e)
@@ -785,7 +823,9 @@ def _resolve_employee_id(tab_number):
 
 
 def _must_change_password(login):
-    account = db.session.get(UserAccount, login)
+    # Через _find_account: иначе вошедший как «450» не увидит требования
+    # сменить пароль — учётная запись-то записана как «0000000450».
+    account = _find_account((login or '').strip())
     return bool(account and account.must_change_password)
 
 
