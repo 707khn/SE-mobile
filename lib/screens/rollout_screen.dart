@@ -92,6 +92,15 @@ class _RolloutScreenState extends State<RolloutScreen> {
       _line('rollout_not_seen'.tr, '${r.notSeenForAWeek}',
           muted: true),
       SizedBox(height: Dimensions.height30 / 1.5),
+      _section('rollout_backups'.tr),
+      if (r.backupProblem.isNotEmpty)
+        _line('rollout_backups_none'.tr, '', muted: true)
+      else if (r.backupDaysAgo == null)
+        _line('rollout_backups_none'.tr, '${r.backupCount}', muted: true)
+      else
+        _line('rollout_backups_last'.trParams({'days': '${r.backupDaysAgo}'}),
+            '${r.backupCount}'),
+      SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_without_pass'.tr),
       if (r.withoutPass.isEmpty)
         _line('rollout_no_data'.tr, '', muted: true)

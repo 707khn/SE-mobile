@@ -99,3 +99,23 @@ def test_in_code_passwords_are_counted(app, client):
     report = client.get('/api/admin/rollout',
                         headers={'Authorization': f'Bearer {admin}'}).get_json()
     assert sum(d['count'] for d in report['in_code_passwords']) >= 1
+
+
+def test_backup_state_is_reported(app, client, tmp_path, monkeypatch):
+    """Три недели подряд копии не делались, и узнали об этом случайно.
+
+    Поэтому дата последней копии теперь стоит рядом с остальным, что
+    администратор и так открывает.
+    """
+    monkeypatch.setenv('BACKUP_DIR', str(tmp_path))
+    (tmp_path / 'se_mobile_2026-09-21.sql.gz.enc').write_bytes(b'x')
+    with app.app_context():
+        state = app_module._backup_state()
+    assert state['available'] and state['count'] == 1
+    assert state['days_ago'] == 0 and state['encrypted']
+
+    # Нет папки — не молчим, а говорим, почему.
+    monkeypatch.setenv('BACKUP_DIR', str(tmp_path / 'нет-такой'))
+    with app.app_context():
+        missing = app_module._backup_state()
+    assert not missing['available'] and missing['reason']

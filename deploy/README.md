@@ -353,6 +353,29 @@ sudo systemctl restart se-mobile
 понадобится: копия, которую ни разу не разворачивали, — это надежда, а не
 резерв.
 
+### Копии не делались три недели
+
+При установке папку `/var/backups/se-mobile` никто не создавал, а копирование
+идёт от пользователя `postgres`, которому в `/var/backups` писать нельзя.
+Служба падала на первой же строке — `mkdir: Permission denied` — каждую ночь,
+и обнаружилось это случайно, три недели спустя. В `setup.sh` папка теперь
+создаётся; на сервере, поставленном раньше, один раз вручную:
+
+```bash
+sudo mkdir -p /var/backups/se-mobile
+sudo chown postgres:semobile /var/backups/se-mobile
+sudo chmod 750 /var/backups/se-mobile
+sudo systemctl start se-mobile-backup
+```
+
+Проверять, что копии идут, теперь можно не заходя на сервер: дата последней
+видна в админ-панели, на экране «Обновление». А на сервере — так:
+
+```bash
+systemctl list-timers se-mobile-backup     # когда сработает в следующий раз
+systemctl status se-mobile-backup          # чем кончился прошлый запуск
+```
+
 ### Копии зашифрованы
 
 В копии зарплаты, ИИН и телефоны всего предприятия. Лежит она файлом на том
