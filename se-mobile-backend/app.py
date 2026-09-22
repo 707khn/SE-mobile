@@ -392,37 +392,39 @@ def _seed_sarseken():
         logging.info('Removed legacy employee 2114 (IIN merged into employee 001)')
 
 
-# login → (password, employee_id)
+# login → employee_id
 #
-# ВРЕМЕННО. Учётные записи переехали в таблицу user_accounts, а этот словарь
-# остался запасным путём на время перехода: он срабатывает только для логина,
-# которого в базе ещё нет, и каждое такое срабатывание пишется в лог
-# предупреждением. Когда предупреждения перестанут появляться — удалить
-# словарь вместе с запасной веткой в _authenticate.
+# Кто заводился до того, как учётные записи переехали в базу. Паролей здесь
+# больше нет: они были равны табельному номеру, лежали открытым текстом в
+# этом файле и оставались действующими паролями двадцати трёх живых учёток —
+# всякий, кто видел исходники, мог войти под начальником отдела. Теперь
+# список нужен только затем, чтобы восстановить пропавшую строку в
+# user_accounts (пароль при этом ставится временный, как у всех) и чтобы
+# админ-панель знала логин сотрудника, заведённого до таблицы.
 _CREDENTIALS = {
-    'admin': ('admin', 'ADMIN'),
-    '2114': ('2114', '001'),
-    '1874': ('1874', '0000001874'),
-    '44': ('44', '0000000044'),
-    '644': ('644', '0000000644'),
-    '674': ('674', '0000000674'),
-    '726': ('726', '0000000726'),
-    '910': ('910', '0000000910'),
-    '1093': ('1093', '0000001093'),
-    '1236': ('1236', '0000001236'),
-    '1295': ('1295', '0000001295'),
-    '1296': ('1296', '0000001296'),
-    '1445': ('1445', '0000001445'),
-    '1579': ('1579', '0000001579'),
-    '1668': ('1668', '0000001668'),
-    '1681': ('1681', '0000001681'),
-    '1864': ('1864', '0000001864'),
-    '1965': ('1965', '0000001965'),
-    '1978': ('1978', '0000001978'),
-    '2005': ('2005', '0000002005'),
-    '2063': ('2063', '0000002063'),
-    '2148': ('2148', '0000002148'),
-    '2162': ('2162', '0000002162'),
+    'admin': 'ADMIN',
+    '2114': '001',
+    '1874': '0000001874',
+    '44':   '0000000044',
+    '644':  '0000000644',
+    '674':  '0000000674',
+    '726':  '0000000726',
+    '910':  '0000000910',
+    '1093': '0000001093',
+    '1236': '0000001236',
+    '1295': '0000001295',
+    '1296': '0000001296',
+    '1445': '0000001445',
+    '1579': '0000001579',
+    '1668': '0000001668',
+    '1681': '0000001681',
+    '1864': '0000001864',
+    '1965': '0000001965',
+    '1978': '0000001978',
+    '2005': '0000002005',
+    '2063': '0000002063',
+    '2148': '0000002148',
+    '2162': '0000002162',
 }
 
 
@@ -474,6 +476,31 @@ def _number_forms(value):
     return forms
 
 
+def _random_password(length=14):
+    """Пароль, который придётся переписать глазами.
+
+    Буквы и цифры без похожих друг на друга: ноль и «O», единица и «l». Его
+    диктуют по телефону и переписывают с экрана журнала, и «l» вместо «1»
+    стоит второго захода.
+    """
+    alphabet = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _is_default_password(password, login):
+    """Это выданный при заведении пароль, а не придуманный человеком?
+
+    Заводим мы всех одинаково: пароль равен табельному номеру. Поэтому
+    «пароль совпадает с логином в любой его форме» и значит «временный».
+    Обратное невозможно: _password_problem не даёт выбрать себе пароль,
+    совпадающий с логином, — так что ошибиться тут не на чем.
+    """
+    password = (password or '').strip()
+    if not password:
+        return False
+    return password in _number_forms((login or '').strip())
+
+
 def _find_account(login):
     """Учётная запись по логину в любой из привычных форм номера."""
     for form in _number_forms(login):
@@ -486,9 +513,14 @@ def _find_account(login):
 def _authenticate(login, password):
     """Проверяет пару логин/пароль. Возвращает employee_id или None.
 
-    Источник истины — таблица user_accounts. Словарь _CREDENTIALS остаётся
-    запасным путём на время переноса и используется только для логинов,
-    которых в таблице ещё нет.
+    Источник истины — таблица user_accounts, и только она. Раньше рядом был
+    запасной путь: логин, которого нет в таблице, проверялся по словарю
+    _CREDENTIALS с паролями в коде. Он пропускал и выключенную учётку —
+    _find_account ищет только среди is_active, выключенный вход до таблицы не
+    доходил и попадал прямо в словарь, где про is_active никто не знает. То
+    есть уволенный входил тем же паролем, что и раньше. Запасного пути
+    больше нет: пропавшую строку восстанавливает _seed_user_accounts при
+    запуске, с временным паролем и обязательной сменой.
     """
     login = (login or '').strip()
     password = (password or '').strip()
@@ -513,18 +545,34 @@ def _authenticate(login, password):
         if account.must_change_password:
             candidates += [form for form in _number_forms(password)
                            if form not in candidates]
+        matched = None
         try:
-            ok = any(check_password_hash(account.password_hash, candidate)
-                     for candidate in candidates)
+            for candidate in candidates:
+                if check_password_hash(account.password_hash, candidate):
+                    matched = candidate
+                    break
         except Exception as e:
             # Испорченный или незнакомый формат хеша — это не «верный пароль».
             logging.error('Cannot verify password hash for %r: %s', login, e)
-            ok = False
+            matched = None
+        ok = matched is not None
         try:
             if ok:
                 account.last_login_at = now
                 account.failed_attempts = 0
                 account.locked_until = None
+                # Пароль, равный табельному номеру, — это выданный при
+                # заведении, а не придуманный: придумать такой нельзя,
+                # _password_problem запрещает пароль, совпадающий с логином.
+                # Значит, его пора менять, и узнаём мы об этом здесь бесплатно
+                # — хеш только что проверен. Прежде такие учётки приходилось
+                # перечислять руками, и в списке стояла ровно одна из
+                # двадцати трёх.
+                if not account.must_change_password and _is_default_password(
+                        matched, account.login):
+                    account.must_change_password = True
+                    logging.info('Пароль у %r всё ещё временный — просим сменить',
+                                 account.login)
             else:
                 account.failed_attempts = (account.failed_attempts or 0) + 1
                 delay = _lock_delay(account.failed_attempts)
@@ -538,16 +586,16 @@ def _authenticate(login, password):
             db.session.rollback()
         return account.employee_id if ok else None
 
-    cred = _CREDENTIALS.get(login)
-    if cred and password == cred[0]:
-        logging.warning(
-            'Login %r served from the in-code fallback: no row in '
-            'user_accounts. Seed it before removing _CREDENTIALS.', login)
+    # Строки нет — значит, входить не под чем. Если логин при этом знаком
+    # коду, это не «неверный пароль», а пропавшая учётка: пишем об этом, её
+    # восстановит сидер при следующем запуске.
+    if login in _CREDENTIALS:
+        logging.error('Учётной записи %r нет в user_accounts, хотя она должна '
+                      'быть: восстановит _seed_user_accounts при запуске', login)
         try:
             _count_today('fallback_logins')
         except Exception:
             db.session.rollback()
-        return cred[1]
     return None
 
 
@@ -834,7 +882,7 @@ def _login_by_employee():
 
     Словарь в коде даёт основу, база поверх него — она главнее.
     """
-    mapping = {emp_id: login for login, (_, emp_id) in _CREDENTIALS.items()}
+    mapping = {emp_id: login for login, emp_id in _CREDENTIALS.items()}
     for account in UserAccount.query.filter_by(is_active=True).all():
         mapping[account.employee_id] = account.login
     return mapping
@@ -1034,6 +1082,14 @@ _SEED_VERSIONS = {
     '_merge_duplicate_employees': '3',
     # Должность и подразделение на листках переписаны с печатных на настоящие.
     '_seed_daurembekova': '3',
+    # Пароли больше не переносятся из кода: новая строка заводится с
+    # временным паролем. Версия поднята ещё и затем, чтобы сидер прошёл
+    # заново и восстановил строку, если какая-то пропала, — запасного пути
+    # через _CREDENTIALS больше нет.
+    '_seed_user_accounts': '2',
+    # Вместо списка из одной учётки — проверка всех: пароль, равный логину,
+    # временный у кого угодно.
+    '_force_password_change': '2',
 }
 
 
@@ -1195,11 +1251,13 @@ def _seed_all():
         # создают, склеивают и удаляют.
         _seed_user_accounts,
         _seed_extra_accounts,
-        # После него: до этого момента учётки может ещё не существовать.
-        _force_password_change,
         # После учёток из кода: справочник заводит людей и логины пачкой, и
         # ему важно видеть, у кого учётная запись уже есть.
         _seed_directory_staff_2026,
+        # После всех, кто заводит учётные записи: проверяет пароли у тех,
+        # кого они успели создать.
+        _force_password_change,
+        _secure_admin_account,
         _seed_access_august_2026,
         _seed_payslips_from_data,
         # Последним: подчищает следы прежних одновременных запусков.
@@ -1409,7 +1467,11 @@ def register_routes(app):
         if account is None:
             return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
 
-        temporary = account.login
+        # Табельный номер годится во временные: он у человека на пропуске и
+        # меняется при первом же входе. Для именованной учётки — «admin» —
+        # это означало бы пароль «admin», то есть ровно то, от чего мы
+        # уходили; такой придумываем случайно и показываем тому, кто сбросил.
+        temporary = account.login if account.login.isdigit() else _random_password()
         account.password_hash = generate_password_hash(temporary)
         account.must_change_password = True
         account.failed_attempts = 0
@@ -2302,10 +2364,16 @@ def register_routes(app):
             'backups': _backup_state(),
             'without_pass': [{'day': m.day.isoformat(), 'count': m.count}
                              for m in misses],
-            # Пока не ноль — словарь паролей в коде ещё кому-то нужен.
+            # Пока не ноль — где-то пропала строка в user_accounts: вход под
+            # таким логином теперь не проходит вовсе.
             'in_code_passwords': [{'day': m.day.isoformat(),
                                    'count': m.fallback_logins or 0}
                                   for m in misses],
+            # Сколько учётных записей всё ещё с выданным паролем — табельным
+            # номером. Пока не ноль, столько людей можно открыть, зная одно
+            # лишь число с пропуска.
+            'temporary_passwords': sum(
+                1 for a in accounts if a.must_change_password),
         })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])
@@ -6193,19 +6261,22 @@ def _absorb_employee(stale_id, keep_id):
 
 
 def _seed_user_accounts():
-    """Переносит учётные записи из кода в таблицу user_accounts.
+    """Восстанавливает строку в user_accounts для логинов, заведённых в коде.
 
-    Пароли кладутся хешем: из хеша исходный пароль не восстанавливается,
-    поэтому забытый пароль можно только сбросить, а не посмотреть. Сами
-    пароли при этом не меняются — люди входят ровно как раньше, пересобирать
-    приложение не нужно. Обязательную смену пароля включаем отдельным шагом,
-    когда в приложении появится экран для неё.
+    Раньше этот сидер переносил сюда и пароли из _CREDENTIALS — они там
+    лежали открытым текстом, — и ставил must_change_password=False: пароль
+    оставался прежним, чтобы никого не тревожить. Из-за этого двадцать три
+    живых учётки годами ходили с паролем, напечатанным в исходниках.
+
+    Теперь правило одно на всех, как при заведении любой новой учётки:
+    временный пароль — табельный номер, сменить при первом входе. Строки,
+    которые уже есть, сидер не трогает: чей пароль уже сменён, тот сменён.
 
     Запускается последним: сидеры выше ещё создают, склеивают и удаляют
     сотрудников, а учётная запись ссылается на существующего.
     """
     created = 0
-    for login, (password, employee_id) in _CREDENTIALS.items():
+    for login, employee_id in _CREDENTIALS.items():
         if db.session.get(UserAccount, login) is not None:
             continue
         if db.session.get(Employee, employee_id) is None:
@@ -6215,8 +6286,8 @@ def _seed_user_accounts():
         db.session.add(UserAccount(
             login=login,
             employee_id=employee_id,
-            password_hash=generate_password_hash(password),
-            must_change_password=False,
+            password_hash=generate_password_hash(login),
+            must_change_password=True,
         ))
         created += 1
     if created:
@@ -6400,9 +6471,7 @@ def _seed_beisekina():
 
 # Учётки, которым пора сменить временный пароль. Пока он равен табельному
 # номеру, войти может любой, кто видел табель.
-_FORCE_PASSWORD_CHANGE = [
-    '2114',  # Сарсекенов Батырхан Арманұлы
-]
+
 
 
 # Входы, заведённые поимённо для людей из справочника, у которых учётной
@@ -6445,32 +6514,102 @@ def _seed_extra_accounts():
 
 
 def _force_password_change():
-    """Просит сменить пароль тех, у кого он остался временным.
+    """Просит сменить пароль всех, у кого он остался временным.
 
-    Флаг ставится, только если пароль всё ещё равен логину. Человек мог
-    сменить его сам, пока сидер ехал до боевой базы, — тогда просить не за
-    что, и новый пароль остаётся при нём. Журнал applied_seeds и так не даст
-    сидеру отработать дважды, но проверка страхует на случай, если ему
-    когда-нибудь поднимут версию.
+    Кого просить, сидер выясняет сам: пароль, совпадающий с логином, придумать
+    нельзя — _password_problem такой отклоняет, — значит, он выданный при
+    заведении. Раньше здесь стоял список, и в нём была ровно одна учётка из
+    двадцати трёх: остальные двадцать два ходили с паролем-табельным номером,
+    напечатанным в app.py, и никто этого не замечал, потому что список никто
+    не пополнял. Списки, которые нужно помнить, всегда отстают от данных.
 
-    Запускается после _seed_user_accounts: до него учётки может ещё не быть.
+    Сам вход теперь ставит тот же флаг (см. _authenticate), так что впредь
+    такое ловится без сидера. Этот проход нужен для тех, кто уже вошёл и
+    сидит на пропуске с кодом-паролем: на экран входа они не попадают
+    неделями, а приложение спрашивает про смену и при запуске, через /api/me.
+
+    Проверяем только тех, у кого флаг ещё не стоит: сверка хеша стоит около
+    ста миллисекунд, и гонять её по всем пяти сотням учёток при каждом
+    обновлении сидера незачем.
+
+    Запускается после всех сидеров, заводящих учётные записи.
     """
     changed = 0
-    for login in _FORCE_PASSWORD_CHANGE:
-        account = db.session.get(UserAccount, login)
-        if account is None:
-            logging.warning('Смена пароля не включена: учётки %r нет', login)
+    checked = 0
+    for account in UserAccount.query.filter_by(must_change_password=False).all():
+        forms = _number_forms(account.login)
+        checked += 1
+        try:
+            temporary = any(check_password_hash(account.password_hash, form)
+                            for form in forms)
+        except Exception as e:
+            logging.error('Не читается хеш пароля у %r: %s', account.login, e)
             continue
-        if account.must_change_password:
-            continue
-        if not check_password_hash(account.password_hash, login):
-            logging.info('Смена пароля не нужна: %r уже сменил', login)
+        if not temporary:
             continue
         account.must_change_password = True
         changed += 1
     if changed:
         db.session.commit()
-        logging.info('Обязательная смена пароля включена для %d учётки(-ок)', changed)
+    logging.info('Временный пароль у %d из %d проверенных учётных записей',
+                 changed, checked)
+
+
+# Пароль администратора, если его нужно задать самим. Пусто — придумаем
+# случайный и напечатаем в журнал один раз.
+_ADMIN_PASSWORD_ENV = 'ADMIN_PASSWORD'
+
+
+def _secure_admin_account():
+    """Убирает пароль «admin» у учётной записи «admin».
+
+    Логин администратора назывался admin, и паролем у него было слово admin.
+    Сервер смотрит в интернет; такую пару подбирают не люди, а сканеры, и
+    первым же запросом. Обязательная смена пароля тут не спасает: она
+    показывается в приложении, а вошедший уже вошёл — пропуск у него на
+    руках, и сменить пароль он может на свой.
+
+    Поэтому пароль заменяется здесь. Если в окружении задан ADMIN_PASSWORD —
+    берём его, иначе придумываем случайный и печатаем один раз в журнал
+    службы: прочитать его можно `journalctl -u se-mobile | grep -i пароль`.
+    Выданные ранее пропуска администратора при этом гасятся — если паролем
+    «admin» кто-то уже воспользовался, его пропуск перестанет работать.
+
+    Трогаем, только если пароль всё ещё «admin»: сменённый — не наше дело.
+    """
+    account = db.session.get(UserAccount, 'admin')
+    if account is None:
+        logging.info('Учётной записи admin нет — менять нечего')
+        return
+    try:
+        if not check_password_hash(account.password_hash, 'admin'):
+            logging.info('Пароль администратора уже не «admin» — не трогаем')
+            return
+    except Exception as e:
+        logging.error('Не читается хеш пароля администратора: %s', e)
+        return
+
+    chosen = (os.environ.get(_ADMIN_PASSWORD_ENV) or '').strip()
+    generated = not chosen
+    if generated:
+        chosen = _random_password()
+
+    account.password_hash = generate_password_hash(chosen)
+    account.must_change_password = True
+    account.failed_attempts = 0
+    account.locked_until = None
+    AuthToken.query.filter_by(employee_id=account.employee_id).delete()
+    db.session.commit()
+
+    if generated:
+        logging.warning(
+            'Пароль администратора был «admin» и заменён на случайный. '
+            'Новый пароль администратора: %s — запишите его и смените в '
+            'приложении. Задать свой заранее можно переменной %s.',
+            chosen, _ADMIN_PASSWORD_ENV)
+    else:
+        logging.warning('Пароль администратора был «admin» и взят из %s',
+                        _ADMIN_PASSWORD_ENV)
 
 
 app = create_app()

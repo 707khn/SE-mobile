@@ -93,9 +93,16 @@ class LocaleString extends Translations {
           'rollout_versions': 'Қолданба нұсқалары',
           'rollout_not_seen': 'Аптадан бері кірмегендер',
           'rollout_without_pass': 'Пропускісіз сұраныстар (күн бойынша)',
-          'rollout_in_code': 'Кодтағы құпиясөзбен кіру',
-          'rollout_in_code_why': 'Кодта 28 құпиясөз ашық жатыр. Бұл санақ '
-              'бірнеше күн қатарынан нөл болса, оларды жоюға болады.',
+          'rollout_lost_accounts': 'Жоғалған тіркелгілер',
+          'rollout_lost_accounts_why': 'Логин бар, ал user_accounts кестесінде '
+              'жолы жоқ. Нөл болса — бәрі орнында; нөл болмаса, жолды қайта '
+              'жасайды: сервер қайта іске қосылсын.',
+          'rollout_passwords': 'Құпиясөздер',
+          'rollout_passwords_temporary': 'Уақытша құпиясөзбен',
+          'rollout_passwords_why': 'Уақытша құпиясөз — табельдік нөмір. Ол '
+              'пропускідегі санды білген кез келген адамға жарайды, сондықтан '
+              'бұл сан нөлге ұмтылуы керек: адам кірген бойда қолданба жаңасын '
+              'сұрайды.',
           'rollout_no_data': 'Мәлімет жоқ',
           'rollout_backups': 'Дерекқор көшірмелері',
           'rollout_backups_last': 'Соңғысы: @days күн бұрын',
@@ -157,8 +164,6 @@ class LocaleString extends Translations {
           'theme_light': 'Ашық',
           'theme_dark': 'Қараңғы',
           'timeout': 'Сервер жауап бермеді',
-          'admin_data': 'Деректер',
-          'admin_no_login': 'Кіру мүмкіндігі жоқ',
           'accounts': 'Тіркелгілер',
           'never_signed_in': 'Ешқашан кірмеген',
           'save': 'Сақтау',
@@ -338,9 +343,16 @@ class LocaleString extends Translations {
           'rollout_versions': 'Версии приложения',
           'rollout_not_seen': 'Не заходили неделю',
           'rollout_without_pass': 'Запросы без пропуска (по дням)',
-          'rollout_in_code': 'Входы по паролям из кода',
-          'rollout_in_code_why': 'В коде открытым текстом лежат 28 паролей. '
-              'Когда этот счёт несколько дней подряд ноль, их можно удалить.',
+          'rollout_lost_accounts': 'Пропавшие учётные записи',
+          'rollout_lost_accounts_why': 'Логин известен, а строки в '
+              'user_accounts нет — войти под ним нельзя. Ноль — всё на месте; '
+              'не ноль — строку восстановит перезапуск сервера.',
+          'rollout_passwords': 'Пароли',
+          'rollout_passwords_temporary': 'С временным паролем',
+          'rollout_passwords_why': 'Временный пароль — это табельный номер: он '
+              'подходит любому, кто видел число на пропуске. Число должно '
+              'стремиться к нулю — приложение просит придумать свой пароль при '
+              'первом же входе.',
           'rollout_no_data': 'Нет данных',
           'rollout_backups': 'Копии базы',
           'rollout_backups_last': 'Последняя: @days дн. назад',
