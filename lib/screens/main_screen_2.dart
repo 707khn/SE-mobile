@@ -453,8 +453,8 @@ class _MainPage2State extends State<MainPage2> {
                                             DateFormat('yyyy-MM-dd').format(startDate),
                                             DateFormat('yyyy-MM-dd').format(endDate),
                                           );
-                                          reportsEntries = data;
-                                          reportsEntriesForMsg.add(data);
+                                          reportsEntries = data.entries;
+                                          reportsEntriesForMsg.add(data.entries);
                                           if (mounted) {
                                             setState(() {
                                               _loadingReport = false;

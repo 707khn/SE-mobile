@@ -1600,11 +1600,13 @@ def register_routes(app):
 
         records = AccessRecord.query.filter_by(employee_id=key_suffix)\
             .order_by(AccessRecord.access_date, AccessRecord.access_time).all()
-        if not records:
-            return jsonify({'message': 'Failure'})
+        # Пусто — это не отказ. Отвечать «Failure» на «проходов нет» значило
+        # сваливать в одну кучу сбой связи и человека, которого нет в выгрузке
+        # СКУД; экран показывал одно и то же и в том, и в другом случае.
         return jsonify({
             'message': 'Success',
-            'report': [_access_to_dict(r) for r in records]
+            'report': [_access_to_dict(r) for r in records],
+            'coverage': _access_coverage(key_suffix),
         })
 
     @app.route('/reportdate', methods=['POST'])
@@ -1623,11 +1625,10 @@ def register_routes(app):
             AccessRecord.access_date <= end_date
         ).order_by(AccessRecord.access_date, AccessRecord.access_time).all()
 
-        if not records:
-            return jsonify({'message': 'Failure'})
         return jsonify({
             'message': 'Success',
-            'report': [_access_to_dict(r) for r in records]
+            'report': [_access_to_dict(r) for r in records],
+            'coverage': _access_coverage(key_suffix),
         })
 
     @app.route('/director_report', methods=['POST'])
@@ -1640,7 +1641,9 @@ def register_routes(app):
 
         emp = Employee.query.filter(Employee.full_name.contains(emp_sname)).first()
         if not emp:
-            return jsonify({'message': 'Failure'})
+            # Отдельно от «проходов нет»: это разные ответы на разные вопросы,
+            # а выглядели они одинаково.
+            return jsonify({'message': 'Failure', 'error': 'not_found'})
         # Сотрудника здесь ищут по фамилии, поэтому право проверяем после того,
         # как узнали, кто это.
         if not _may_view(emp.employee_id):
@@ -1652,11 +1655,10 @@ def register_routes(app):
             AccessRecord.access_date <= end_date
         ).order_by(AccessRecord.access_date, AccessRecord.access_time).all()
 
-        if not records:
-            return jsonify({'message': 'Failure'})
         return jsonify({
             'message': 'Success',
-            'director_report': [_access_to_dict(r) for r in records]
+            'director_report': [_access_to_dict(r) for r in records],
+            'coverage': _access_coverage(emp.employee_id),
         })
 
     @app.route('/api/admin/employees', methods=['GET'])
@@ -2628,6 +2630,82 @@ def _access_to_dict(record):
         'time': record.access_time,
         'event': record.event_type,
         'door': record.door_location
+    }
+
+
+# Самая поздняя дата, по которую вообще загружены проходы. Считается редко:
+# таблица самая большая в базе, а пополняется она выгрузками из СКУД, то есть
+# раз в месяц, а не ежеминутно.
+_ACCESS_COVERAGE_TTL = timedelta(minutes=10)
+_access_loaded_until = {'checked_at': None, 'date': None}
+
+
+def _loaded_until():
+    """До какого числа в базе есть проходы — по всему предприятию."""
+    now = datetime.utcnow()
+    checked = _access_loaded_until['checked_at']
+    if checked is not None and now - checked < _ACCESS_COVERAGE_TTL:
+        return _access_loaded_until['date']
+    try:
+        latest = db.session.query(db.func.max(AccessRecord.access_date)).scalar()
+    except Exception as e:
+        db.session.rollback()
+        logging.warning('Не смог узнать, по какое число загружены проходы: %s', e)
+        return _access_loaded_until['date']
+    _access_loaded_until['checked_at'] = now
+    _access_loaded_until['date'] = latest
+    return latest
+
+
+@db.event.listens_for(AccessRecord, 'after_insert')
+def _forget_loaded_until(mapper, connection, target):
+    """Новая запись о проходе — старый ответ про «загружено по» неверен.
+
+    Вешаем на саму модель, а не на тринадцать мест, где проходы добавляются:
+    список таких мест пришлось бы помнить, а он бы отстал. Дороже всего это
+    обходится при загрузке выгрузки — три тысячи строк, три тысячи раз
+    присвоить None, — и всё равно не стоит ничего.
+
+    Без этого администратор, загрузив сентябрьскую выгрузку, ещё десять минут
+    видел бы «проходы загружены по 20 августа» и решил бы, что загрузка не
+    прошла.
+
+    На удаление не вешаем: последняя дата от него сдвигается, только если
+    удалить саму последнюю выгрузку, а на это никто не ходит. Да и срок
+    жизни ответа всё равно десять минут — через них пересчитается само.
+    """
+    _access_loaded_until['checked_at'] = None
+
+
+def _access_coverage(employee_id):
+    """Чем объяснить пустой список проходов.
+
+    Пустота бывает трёх разных видов, и раньше все три выглядели одинаково —
+    экран говорил «нет данных» и предлагал выбрать период:
+
+    * человека нет в выгрузке СКУД вовсе. Из 130 человек справочника проходы
+      заведены у 110: остальным выбирать период бессмысленно, там не
+      появится ничего;
+    * период позже последней выгрузки. Это главный случай: выгрузку приносят
+      раз в месяц, и 22 сентября проходы в базе были по 20 августа — то есть
+      «Сегодня», «Последние 7 дней» и «Этот месяц» пусты у всех подряд, и
+      выглядит это как поломка;
+    * в эти дни человек действительно не проходил.
+
+    Отсюда приложение и узнаёт, какой именно случай перед ним.
+    """
+    until = _loaded_until()
+    try:
+        mine = (db.session.query(db.func.max(AccessRecord.access_date))
+                .filter(AccessRecord.employee_id == employee_id).scalar())
+    except Exception as e:
+        db.session.rollback()
+        logging.warning('Не смог узнать проходы сотрудника %s: %s', employee_id, e)
+        mine = None
+    return {
+        'loaded_until': until.isoformat() if until else None,
+        'employee_until': mine.isoformat() if mine else None,
+        'employee_has_any': mine is not None,
     }
 
 

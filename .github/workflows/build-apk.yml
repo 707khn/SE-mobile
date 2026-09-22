@@ -52,6 +52,22 @@ jobs:
           key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties', 'pubspec.lock') }}
           restore-keys: gradle-
 
+      # Номер версии записан в двух местах: pubspec.yaml и app_version.dart.
+      # Второй показывается в «О программе» и уходит на сервер заголовком
+      # X-App-Version — по нему в поддержке понимают, какая сборка у человека.
+      # Разойдутся — и смотреть будут не на ту версию, а заметить это по
+      # экрану нельзя. Пусть замечает сборка, за секунду.
+      - name: Версия в двух местах совпадает
+        run: |
+          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
+          DART_V=$(sed -n "s/.*kAppVersion = '\([^']*\)'.*/\1/p" lib/utils/app_version.dart)
+          DART_B=$(sed -n "s/.*kAppBuild = '\([^']*\)'.*/\1/p" lib/utils/app_version.dart)
+          if [ "$PUB" != "$DART_V+$DART_B" ]; then
+            echo "::error::pubspec.yaml: $PUB, app_version.dart: $DART_V+$DART_B. Приведите к одному виду."
+            exit 1
+          fi
+          echo "Версия $PUB"
+
       - name: Install dependencies
         run: flutter pub get
 

@@ -20,6 +20,8 @@ _SARSEKEN = '0000002114'
 
 import pytest
 
+import app as app_module
+
 _TEST_XML = os.path.join(os.path.dirname(__file__), '..', 'test_payslip.xml')
 
 
@@ -88,9 +90,17 @@ def test_report_success(client):
     assert len(body['report']) > 0
 
 
-def test_report_failure(client):
-    r = _post(client, '/report', {'key_suffix': 'UNKNOWN'})
-    assert r.get_json()['message'] == 'Failure'
+def test_report_empty_is_not_a_failure(client):
+    """Пустой список — это ответ, а не отказ.
+
+    «Failure» на «проходов нет» приложение показывало так же, как сбой связи:
+    «нет данных, выберите период». Предлагать выбрать период тому, у кого
+    проходов нет вовсе, — значит отправить его искать то, чего нет.
+    """
+    body = _post(client, '/report', {'key_suffix': 'UNKNOWN'}).get_json()
+    assert body['message'] == 'Success'
+    assert body['report'] == []
+    assert body['coverage']['employee_has_any'] is False
 
 
 # ---------------------------------------------------------------------------
@@ -109,12 +119,73 @@ def test_reportdate_success(client):
 
 
 def test_reportdate_no_records(client):
-    r = _post(client, '/reportdate', {
+    """Период без проходов у того, у кого проходы есть.
+
+    Здесь экран и должен сказать «за эти дни проходов нет» — в отличие от
+    случая, когда человека нет в выгрузке вовсе или период позже последней
+    загрузки. Различить их можно только по coverage.
+    """
+    body = _post(client, '/reportdate', {
         'key_suffix': _SARSEKEN,
         'start_date': '2000-01-01',
         'end_date': '2000-01-31',
-    })
-    assert r.get_json()['message'] == 'Failure'
+    }).get_json()
+    assert body['message'] == 'Success'
+    assert body['report'] == []
+    assert body['coverage']['employee_has_any'] is True
+    assert body['coverage']['loaded_until'] >= body['coverage']['employee_until']
+
+
+def test_uploading_passes_refreshes_the_coverage(app, client):
+    """Загрузили выгрузку — «загружено по» меняется сразу, а не через десять минут.
+
+    Ответ про последнюю загруженную дату держится в памяти процесса: считать
+    максимум по самой большой таблице на каждый запрос незачем. Но сбрасывать
+    его надо в момент вставки, иначе администратор, загрузив сентябрьскую
+    выгрузку, увидит «загружено по 20 августа» и решит, что не прошло.
+    """
+    from datetime import date as _date
+    from models import db, AccessRecord
+
+    before = _post(client, '/report', {'key_suffix': _SARSEKEN}
+                   ).get_json()['coverage']['loaded_until']
+
+    with app.app_context():
+        db.session.add(AccessRecord(
+            employee_id=_SARSEKEN, access_date=_date(2099, 6, 1),
+            access_time='08:00', event_type='Вход', door_location='Проходная'))
+        db.session.commit()
+
+    after = _post(client, '/report', {'key_suffix': _SARSEKEN}
+                  ).get_json()['coverage']['loaded_until']
+    assert after == '2099-06-01' and after != before
+
+    with app.app_context():
+        AccessRecord.query.filter_by(access_date=_date(2099, 6, 1)).delete()
+        db.session.commit()
+        # Массовое удаление событий модели не поднимает — сбрасываем сами,
+        # иначе следующая проверка увидит дату несуществующей записи.
+        app_module._access_loaded_until['checked_at'] = None
+
+
+def test_reportdate_after_the_last_upload(client):
+    """Период позже последней выгрузки — главный случай.
+
+    Выгрузку из СКУД приносят раз в месяц: 22 сентября проходы в базе были
+    по 20 августа. Значит, «Сегодня», «Последние 7 дней» и «Этот месяц»
+    пусты у всех подряд, и без объяснения это выглядит как поломка.
+    """
+    body = _post(client, '/reportdate', {
+        'key_suffix': _SARSEKEN,
+        'start_date': '2099-01-01',
+        'end_date': '2099-01-31',
+    }).get_json()
+    assert body['message'] == 'Success'
+    assert body['report'] == []
+    coverage = body['coverage']
+    # По этим двум приложение и отличает «данных ещё нет» от «не проходил».
+    assert coverage['employee_has_any'] is True
+    assert coverage['loaded_until'] < '2099-01-01'
 
 
 # ---------------------------------------------------------------------------
