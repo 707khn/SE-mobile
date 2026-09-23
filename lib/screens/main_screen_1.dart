@@ -10,6 +10,7 @@ import 'package:se_mobile/requests/reportdate_request.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../functions/generate_csv.dart';
+import '../utils/access_report.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
@@ -154,6 +155,14 @@ class _MainMenu1State extends State<MainMenu1> {
   bool _loadingReport = false;
   bool _dateError = false;
   bool _initError = false;
+
+  /// По какое число вообще загружены проходы и есть ли они у этого человека.
+  /// Пока сервер не ответил — null, и экран ведёт себя как раньше.
+  AccessCoverage? _coverage;
+
+  /// Начало показанного периода, чтобы отличить «период позже выгрузки» от
+  /// «в эти дни не проходил». null — показан весь отчёт целиком.
+  DateTime? _shownPeriodStart;
   String _filterText = '';
   final _filterController = TextEditingController();
 
@@ -166,11 +175,14 @@ class _MainMenu1State extends State<MainMenu1> {
 
   Future<void> _initData() async {
     setState(() { _loadingReport = true; _initError = false; });
-    reportsEntries = await getReportEntries(context);
+    final report = await getReportEntries(context);
+    reportsEntries = report.entries;
     if (mounted) {
       setState(() {
         _loadingReport = false;
-        _initError = reportsEntries.length == 1 && reportsEntries[0][0] == 'no';
+        _initError = report.isFailure;
+        _coverage = report.coverage ?? _coverage;
+        _shownPeriodStart = null;
       });
       if (_hasData) {
         widget.recordCount.value = reportsEntries.length;
@@ -185,6 +197,60 @@ class _MainMenu1State extends State<MainMenu1> {
       !(reportsEntries.length == 1 &&
           (reportsEntries[0][0].isEmpty || reportsEntries[0][0] == 'no'));
 
+  /// Пусто бывает по трём разным причинам, и человеку важно знать, по какой.
+  ///
+  /// Раньше на все три экран отвечал «нет данных, выберите период»: и тому,
+  /// у кого проходов нет вовсе — выбирать период ему незачем, — и тому, кто
+  /// открыл «Сегодня», а выгрузку из СКУД в последний раз приносили месяц
+  /// назад. Второй случай выглядит как поломка, и объяснять его приходилось
+  /// живым людям в ОИТиС.
+  bool get _noRecordsAtAll =>
+      _coverage != null && !_coverage!.employeeHasAny;
+
+  bool get _periodBeyondData {
+    final coverage = _coverage;
+    final from = _shownPeriodStart;
+    if (coverage == null || from == null) return false;
+    return coverage.isBeyondData(from);
+  }
+
+  IconData get _emptyIcon {
+    if (_noRecordsAtAll) return Icons.badge_outlined;
+    if (_periodBeyondData) return Icons.update_outlined;
+    return Icons.date_range_outlined;
+  }
+
+  String get _emptyTitle {
+    if (_noRecordsAtAll) return 'no_passes_at_all'.tr;
+    if (_periodBeyondData) return 'no_passes_yet'.tr;
+    return 'no_data'.tr;
+  }
+
+  String get _emptyHint {
+    if (_noRecordsAtAll) return 'no_passes_at_all_hint'.tr;
+    if (_periodBeyondData) return _loadedUntilLine;
+    if (_shownPeriodStart != null) return 'no_passes_in_period_hint'.tr;
+    return 'select_period_hint'.tr;
+  }
+
+  /// «Проходы загружены по 20 августа» — одной строкой и той же формулировкой
+  /// и в пустом списке, и над заполненным.
+  String get _loadedUntilLine {
+    final until = _coverage?.loadedUntil;
+    if (until == null) return 'select_period_hint'.tr;
+    return 'loaded_until'
+        .trParams({'date': DateFormat('dd.MM.yyyy').format(until)});
+  }
+
+  /// Стоит ли предупредить, что отчёт отстаёт от сегодняшнего дня.
+  ///
+  /// Выгрузку приносят раз в месяц, поэтому «сегодня» в отчёте не бывает
+  /// почти никогда. Молчать об этом — значит каждый раз объяснять заново.
+  bool get _dataIsBehind {
+    final behind = _coverage?.daysBehind;
+    return behind != null && behind > 1;
+  }
+
   Future<void> _loadDateReport() async {
     if (_loadingReport) return;
     if (startDate.isAfter(endDate)) {
@@ -192,14 +258,19 @@ class _MainMenu1State extends State<MainMenu1> {
     }
     setState(() { _loadingReport = true; _dateError = false; _filterText = ''; });
     _filterController.clear();
-    reportsEntries = await getReportDateEntries(
+    final report = await getReportDateEntries(
       context,
       DateFormat('yyyy-MM-dd').format(startDate),
       DateFormat('yyyy-MM-dd').format(endDate),
       employeeId: widget.employeeId,
     );
+    reportsEntries = report.entries;
     if (!mounted) return;
-    setState(() => _loadingReport = false);
+    setState(() {
+      _loadingReport = false;
+      _coverage = report.coverage ?? _coverage;
+      _shownPeriodStart = startDate;
+    });
     if (_hasData) {
       widget.recordCount.value = reportsEntries.length;
       final fmt = DateFormat('dd.MM.yyyy');
@@ -436,6 +507,28 @@ class _MainMenu1State extends State<MainMenu1> {
               ),
             ),
             SizedBox(height: Dimensions.height30 / 3),
+            // Отчёт всегда отстаёт: выгрузку из СКУД приносят раз в месяц.
+            // Строка снимает вопрос «почему сегодняшнего прохода не видно»
+            // до того, как он задан.
+            if (!_loadingReport && _dataIsBehind)
+              Padding(
+                padding: EdgeInsets.only(bottom: Dimensions.height30 / 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 15, color: context.mutedColor.withOpacity(0.7)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(_loadedUntilLine,
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              height: 1.35,
+                              color: context.mutedColor.withOpacity(0.85))),
+                    ),
+                  ],
+                ),
+              ),
             if (!_loadingReport && _hasData) ...[
               TextField(
                 controller: _filterController,
@@ -506,15 +599,16 @@ class _MainMenu1State extends State<MainMenu1> {
               ),
             ] else if (!_loadingReport && !_hasData) ...[
               const SizedBox(height: 32),
-              Icon(Icons.date_range_outlined, size: 56, color: context.mutedColor.withOpacity(0.55)),
+              Icon(_emptyIcon, size: 56, color: context.mutedColor.withOpacity(0.55)),
               const SizedBox(height: 8),
               Text(
-                'no_data'.tr,
+                _emptyTitle,
+                textAlign: TextAlign.center,
                 style: TextStyle(color: context.mutedColor, fontSize: 15),
               ),
               const SizedBox(height: 4),
               Text(
-                'select_period_hint'.tr,
+                _emptyHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.mutedColor.withOpacity(0.55), fontSize: 13),
               ),
