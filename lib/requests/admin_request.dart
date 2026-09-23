@@ -110,6 +110,12 @@ class RolloutReport {
   /// По какое число заполнен каждый источник данных.
   List<DataSource> data = <DataSource>[];
 
+  /// Сборка, лежащая на сервере для скачивания: «1.8.2 (12)» или пусто.
+  String appOnServer = '';
+
+  /// Почему её нет.
+  String appProblem = '';
+
   /// Копии базы: сколько дней назад делалась последняя и сколько их всего.
   /// null в [backupDaysAgo] — копий нет или папка недоступна.
   int? backupDaysAgo;
@@ -149,6 +155,12 @@ Future<RolloutReport> fetchRollout() async {
   report.temporaryPasswords =
       (body['temporary_passwords'] as num?)?.toInt() ?? 0;
   report.data = _dataSources(body['data']);
+  final app = (body['app'] as Map?) ?? {};
+  if (app['available'] == true) {
+    report.appOnServer = '${app['version']} (${app['build']})';
+  } else {
+    report.appProblem = (app['reason'] as String?) ?? '';
+  }
   report.backupCount = (backups['count'] as num?)?.toInt() ?? 0;
   report.backupDaysAgo = (backups['days_ago'] as num?)?.toInt();
   report.backupProblem =
