@@ -460,6 +460,38 @@ def locked_for(login):
     return int(left) if left > 0 else 0
 
 
+# Часовой пояс предприятия. Казахстан с 1 марта 2024 года живёт в одном
+# поясе, UTC+5, — Семей в том числе.
+#
+# В базе лежат часы двух родов, и это важно не перепутать:
+#
+# * то, что принесли системы предприятия, — проходы из СКУД, периоды
+#   расчётных листков, — записано **местным** временем: в выгрузке стоит
+#   07:40, и это 07:40 у проходной;
+# * то, что сервер записал сам, — сроки пропусков, время новостей, отметки
+#   сидеров, — записано в **UTC**, как datetime.utcnow() и отдаёт.
+#
+# Пока эти два рода не встречаются, всё сходится. Встречаются они там, где
+# сервер спрашивает «а какое сегодня число» про местные данные: сервер стоит
+# в Астане и живёт по UTC, поэтому с полуночи до пяти утра его «сегодня» —
+# это вчера у проходной. Меню столовой на сегодня в эти часы показывалось
+# вчерашнее, табель за «сегодня» — за вчера.
+#
+# Отсюда правило: там, где «сегодня» значит «сегодня на предприятии», берём
+# _plant_today(), а не date.today().
+_PLANT_TZ = timezone(timedelta(hours=5))
+
+
+def _plant_now():
+    """Время на предприятии, без пояса — как всё в базе."""
+    return datetime.now(_PLANT_TZ).replace(tzinfo=None)
+
+
+def _plant_today():
+    """Какое сегодня число у проходной."""
+    return _plant_now().date()
+
+
 def _number_forms(value):
     """Как человек называет табельный номер и как он записан в базе.
 
@@ -700,7 +732,7 @@ def _count_today(field):
     обязательную проверку пропуска» и «можно ли уже удалить словарь паролей
     из кода». На оба отвечает одно: несколько дней подряд ноль.
     """
-    today = date.today()
+    today = _plant_today()
     row = db.session.get(AuthMiss, today)
     if row is None:
         row = AuthMiss(day=today, count=0, fallback_logins=0)
@@ -1067,7 +1099,12 @@ def _news_json(item):
         'url': item.url or '',
         'image_url': item.image_url or '',
         'author': item.author or '',
-        'published_at': item.published_at.isoformat() if item.published_at else None,
+        # Со смещением: время новости сервер хранит в UTC, а телефон стоит
+        # в местном поясе и переводит сам — но только если знает, что перед
+        # ним UTC. Без смещения он считал время местным, и новость, вышедшая
+        # ночью, показывалась вчерашней.
+        'published_at': (item.published_at.replace(tzinfo=timezone.utc).isoformat()
+                         if item.published_at else None),
         'is_published': item.is_published,
     }
 
@@ -1291,7 +1328,7 @@ def _data_freshness():
 
     Здесь то же самое видит тот, кто может это исправить.
     """
-    today = date.today()
+    today = _plant_today()
 
     def behind(value):
         if value is None:
@@ -2150,13 +2187,20 @@ def register_routes(app):
         if not emp:
             return jsonify({'message': 'Failure', 'error': 'Employee not found'}), 404
 
+        # Своего времени СКУД может и не прислать. Тогда берём местное, а не
+        # utcnow: в этой же таблице лежат проходы из выгрузки, записанные
+        # местным временем, и приход в 08:00 оказался бы рядом с приходом в
+        # 03:00 — по одному и тому же турникету.
         if ts_raw:
             try:
                 ts = datetime.fromisoformat(ts_raw)
+                # Прислали со смещением — приводим к местному и снимаем пояс.
+                if ts.tzinfo is not None:
+                    ts = ts.astimezone(_PLANT_TZ).replace(tzinfo=None)
             except ValueError:
-                ts = datetime.utcnow()
+                ts = _plant_now()
         else:
-            ts = datetime.utcnow()
+            ts = _plant_now()
 
         event = TurnstileEvent(employee_id=employee_id, direction=direction, timestamp=ts)
         db.session.add(event)
@@ -2174,7 +2218,7 @@ def register_routes(app):
     def attendance():
         if not _is_manager():
             return _deny()
-        date_str = request.args.get('date', date.today().isoformat())
+        date_str = request.args.get('date', _plant_today().isoformat())
         try:
             query_date = date.fromisoformat(date_str)
         except ValueError:
@@ -2208,7 +2252,7 @@ def register_routes(app):
     def attendance_summary():
         if not _is_manager():
             return _deny()
-        month_str = request.args.get('month', date.today().strftime('%Y-%m'))
+        month_str = request.args.get('month', _plant_now().strftime('%Y-%m'))
         try:
             year, month = (int(x) for x in month_str.split('-'))
             # Границы месяца считаем сразу: они же и проверяют, что месяц
@@ -2259,7 +2303,7 @@ def register_routes(app):
     @app.route('/api/menu', methods=['GET'])
     @require_auth
     def get_menu():
-        date_str = request.args.get('date', date.today().isoformat())
+        date_str = request.args.get('date', _plant_today().isoformat())
         try:
             query_date = date.fromisoformat(date_str)
         except ValueError:
