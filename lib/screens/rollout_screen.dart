@@ -86,6 +86,16 @@ class _RolloutScreenState extends State<RolloutScreen> {
     return [
       _verdict(r, ready, today),
       SizedBox(height: Dimensions.height30 / 1.5),
+      _section('rollout_apk'.tr),
+      if (r.appOnServer.isNotEmpty)
+        _line('rollout_apk_on_server'.tr, r.appOnServer)
+      else
+        _line(r.appProblem.isEmpty ? 'rollout_apk_none'.tr : r.appProblem, '',
+            muted: true),
+      SizedBox(height: Dimensions.height30 / 2),
+      Text('rollout_apk_why'.tr,
+          style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
+      SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_versions'.tr),
       ...(r.byVersion.entries.toList()
             ..sort((a, b) => b.value.compareTo(a.value)))

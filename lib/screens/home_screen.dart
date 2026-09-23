@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../utils/app_update.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
@@ -33,10 +35,25 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _lang = "RU";
 
+  /// Сборка новее установленной, если она лежит на сервере и человек её ещё
+  /// не отложил.
+  AppUpdate? _update;
+
   @override
   void initState() {
     super.initState();
     _initPrefs();
+    _checkForUpdate();
+  }
+
+  /// Раздача приложения руками — причина, по которой обязательную проверку
+  /// пропуска до сих пор нельзя включить: у необновившихся всё перестанет
+  /// работать, а обновиться им было неоткуда. Спрашиваем сервер сами.
+  Future<void> _checkForUpdate() async {
+    final update = await AppUpdate.check();
+    if (update == null || !mounted) return;
+    if (await update.isDismissed()) return;
+    if (mounted) setState(() => _update = update);
   }
 
   Future<void> _initPrefs() async {
@@ -90,6 +107,10 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildGreetingCard(),
+            if (_update != null) ...[
+              SizedBox(height: Dimensions.height30 / 1.5),
+              _buildUpdateCard(_update!),
+            ],
             SizedBox(height: Dimensions.height30 / 1.2),
             GridView(
               shrinkWrap: true,
@@ -202,6 +223,77 @@ class _HomeScreenState extends State<HomeScreen> {
     const textLines = (13 * 2 + 11 * 2) * 1.4;
     final scale = MediaQuery.textScalerOf(context).scale(1.0);
     return padding + iconCircle + gaps + textLines * scale;
+  }
+
+  /// Полоса про новую сборку.
+  ///
+  /// Не диалог: закрывать его пришлось бы каждому при каждом запуске, а
+  /// откладывать человек имеет право. «Позже» откладывает именно эту сборку —
+  /// следующая спросит снова.
+  Widget _buildUpdateCard(AppUpdate update) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.mainColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.mainColor.withOpacity(0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.system_update_outlined,
+              color: context.accentColor, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('update_available'.trParams({'version': update.label}),
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(
+                  update.sizeLabel.isEmpty
+                      ? 'update_hint'.tr
+                      : '${'update_hint'.tr} · ${update.sizeLabel}',
+                  style: TextStyle(fontSize: 12, color: context.mutedColor),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    ElevatedButton(
+                      onPressed: () => launchUrl(Uri.parse(update.url),
+                          mode: LaunchMode.externalApplication),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text('update_download'.tr,
+                          style: const TextStyle(fontSize: 13)),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await update.dismiss();
+                        if (mounted) setState(() => _update = null);
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text('later'.tr,
+                          style: const TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildGreetingCard() {

@@ -1410,6 +1410,74 @@ def _data_freshness():
     return out
 
 
+# Где лежит собранное приложение. nginx отдаёт эту же папку по /app/,
+# поэтому телефону хватает ссылки, а серверу — прочитать имя файла.
+_APK_DIR = os.environ.get('APK_DIR', '/var/www/se-mobile')
+
+# Имя файла и есть версия: se-mobile-1.8.2+12.apk. Так её неоткуда потерять —
+# сборка записывает её в имя, сервер оттуда же и читает. Отдельного файла с
+# номером версии нет намеренно: любой номер, который надо где-то повторить,
+# рано или поздно отстаёт.
+_APK_NAME = re.compile(r'^se-mobile-(\d+)\.(\d+)\.(\d+)\+(\d+)\.apk$')
+
+
+def _public_origin():
+    """Адрес, по которому к нам пришли снаружи, — со схемой и именем."""
+    proto = (request.headers.get('X-Forwarded-Proto') or '').split(',')[0].strip()
+    if proto not in ('http', 'https'):
+        proto = request.scheme
+    host = (request.headers.get('X-Forwarded-Host')
+            or request.host or '').split(',')[0].strip()
+    return f'{proto}://{host}'
+
+
+def _latest_apk():
+    """Самая свежая сборка, лежащая на сервере, или None.
+
+    Приложение раздаётся руками: пятистам людям нужно сказать, что вышла
+    новая сборка, и дать её скачать. Пока этого не было, обязательную
+    проверку пропуска нельзя включить — необновившиеся перестали бы
+    работать, — а узнать, кто обновился, можно было только по их запросам.
+    """
+    try:
+        names = os.listdir(_APK_DIR)
+    except OSError as e:
+        return {'available': False, 'reason': str(e)}
+
+    builds = []
+    for name in names:
+        found = _APK_NAME.match(name)
+        if not found:
+            continue
+        major, minor, patch, build = (int(x) for x in found.groups())
+        builds.append((build, (major, minor, patch), name))
+    if not builds:
+        return {'available': False,
+                'reason': f'в {_APK_DIR} нет файлов вида se-mobile-1.8.2+12.apk'}
+
+    # По номеру сборки: Android ставит поверх только его, а не «1.8.2».
+    build, version, name = max(builds)
+    path = os.path.join(_APK_DIR, name)
+    try:
+        size = os.path.getsize(path)
+        built_at = datetime.utcfromtimestamp(os.path.getmtime(path))
+    except OSError as e:
+        return {'available': False, 'reason': str(e)}
+
+    return {
+        'available': True,
+        'version': '.'.join(str(x) for x in version),
+        'build': build,
+        'file': name,
+        # Схему берём из заголовка nginx: до gunicorn запрос доходит по http,
+        # и request.host_url всегда сказал бы http — даже тому, кто пришёл по
+        # https. Телефон получил бы ссылку на скачивание без шифрования.
+        'url': f'{_public_origin()}/app/{name}',
+        'size': size,
+        'built_at': built_at.replace(tzinfo=timezone.utc).isoformat(),
+    }
+
+
 def _backup_state():
     """Когда была последняя копия базы и сколько их всего.
 
@@ -1500,6 +1568,19 @@ def register_routes(app):
             return jsonify({'message': 'Failure', 'error': 'locked',
                             'retry_after': seconds}), 429
         return jsonify({'message': 'Failure'})
+
+    @app.route('/api/app/latest', methods=['GET'])
+    def app_latest():
+        """Какая сборка лежит на сервере — чтобы телефон сам предложил её.
+
+        Без пропуска: приложение спрашивает это и на экране входа, и когда
+        пропуск уже просрочен, — а узнать про обновление ему в этот момент
+        нужнее всего.
+
+        Отвечаем и когда файла нет: приложение тогда просто молчит, а
+        администратор видит причину на экране «Обновление».
+        """
+        return jsonify({'message': 'Success', 'app': _latest_apk()})
 
     @app.route('/api/me', methods=['GET'])
     @require_auth
@@ -2546,6 +2627,10 @@ def register_routes(app):
             # По какое число заполнен каждый источник. Пока этого не было
             # видно, об отставших данных узнавали от сотрудников.
             'data': _data_freshness(),
+            # Какая сборка лежит на сервере для скачивания. Пока её нет,
+            # «сколько людей на старой версии» не на что и смотреть: обновиться
+            # им неоткуда.
+            'app': _latest_apk(),
         })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])

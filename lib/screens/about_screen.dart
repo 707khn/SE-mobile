@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/app_theme.dart';
+import '../utils/app_update.dart';
 import '../utils/app_version.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
@@ -26,10 +28,17 @@ class _AboutScreenState extends State<AboutScreen> {
   List<ErrorEntry> _errors = [];
   bool _loading = true;
 
+  /// Здесь про обновление говорим всегда, даже отложенное: человек пришёл
+  /// сюда посмотреть, что у него за версия, — значит, спрашивает именно это.
+  AppUpdate? _update;
+
   @override
   void initState() {
     super.initState();
     _load();
+    AppUpdate.check().then((update) {
+      if (mounted) setState(() => _update = update);
+    });
   }
 
   Future<void> _load() async {
@@ -69,6 +78,31 @@ class _AboutScreenState extends State<AboutScreen> {
               children: [
                 _row('app_version'.tr, appVersionLabel()),
                 _row('about_server'.tr, AppValues.baseUrl),
+                if (_update != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 110, child: Text('')),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: ElevatedButton.icon(
+                              onPressed: () => launchUrl(
+                                  Uri.parse(_update!.url),
+                                  mode: LaunchMode.externalApplication),
+                              icon: const Icon(Icons.system_update_outlined,
+                                  size: 18),
+                              label: Text(
+                                  'update_available'
+                                      .trParams({'version': _update!.label}),
+                                  style: const TextStyle(fontSize: 13)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 SizedBox(height: Dimensions.height30 / 1.5),
                 Row(
                   children: [

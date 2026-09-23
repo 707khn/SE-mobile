@@ -190,6 +190,17 @@ ln -sf /etc/nginx/sites-available/se-mobile /etc/nginx/sites-enabled/se-mobile
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
+say "Папка для собранного приложения"
+# Сюда кладётся apk, отсюда его скачивают телефоны. Пустая папка — не беда:
+# сервер отвечает «сборки нет», приложение молчит, а причину видно в
+# админ-панели.
+#
+# Имя файла — se-mobile-1.8.2+12.apk: версия переезжает вместе с файлом, и
+# повторять её где-то ещё не нужно. Так её неоткуда потерять.
+mkdir -p /var/www/se-mobile
+chown root:semobile /var/www/se-mobile
+chmod 755 /var/www/se-mobile
+
 say "Резервные копии"
 # Папку создаём здесь, от root. Копирование идёт от пользователя postgres, а
 # создать каталог в /var/backups он не может — и молча не может: служба

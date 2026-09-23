@@ -139,12 +139,22 @@ jobs:
           fi
           ls -lh "$APK"
 
+      # Имя с версией — это то, по чему сервер потом узнаёт, какая сборка у
+      # него лежит. Отдельного файла с номером версии нет намеренно: номер,
+      # который надо где-то повторить, рано или поздно отстаёт. Здесь он
+      # переезжает вместе с файлом.
+      - name: Назвать файл версией
+        run: |
+          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
+          cp build/app/outputs/flutter-apk/app-release.apk "se-mobile-$PUB.apk"
+          ls -lh "se-mobile-$PUB.apk"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
           name: se-mobile-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: se-mobile-*.apk
           retention-days: 7
           overwrite: true
 
