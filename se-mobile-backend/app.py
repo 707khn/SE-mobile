@@ -5966,25 +5966,77 @@ _ADMIN_EMPLOYEE_ID = 'ADMIN'
 _ADMIN_DISPLAY_NAME = 'Админ'
 
 
-# ── Учётные записи по справочнику и проходы за август ────────────────────
+# ── Откуда сидеры берут выгрузки ─────────────────────────────────────────
 #
-# Данные лежат в файлах рядом, а не в коде: людей 123, проходов почти три
-# тысячи, и в исходнике это была бы тысяча строк, которую никто не прочтёт.
+# Из папки на сервере, а не из репозитория. Раньше файлы лежали рядом с
+# кодом, и это были не «данные для примера»: зарплата 124 человек по
+# статьям, их табельные номера, должности и время каждого прохода через
+# турникет. Всё это разъезжалось с каждой копией репозитория, с каждой
+# сборкой и оставалось в истории git навсегда.
 #
-#   data/employees_2026_07.csv — табельный номер, временный id, ФИО,
-#       должность, подразделение. Номера взяты из июльских расчётных
-#       листков: в самом справочнике их нет.
-#   data/access_2026_08.csv — проходы с 1 по 20 августа. Направление
-#       проставлено только для дверей на улицу; считыватели у кабинетов
-#       стоят внутри, и «выход» по дороге к своему столу — не выход.
-_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+# Держать такое в исходниках незачем: сидеры своё отработали, данные живут в
+# базе и в зашифрованных копиях, а поднимать сервер с нуля правильнее из
+# копии, а не повторной загрузкой.
+#
+# Что здесь ищется, если папка всё-таки заполнена:
+#
+#   employees_2026_07.csv — табельный номер, временный id, ФИО, должность,
+#       подразделение. Номера взяты из июльских расчётных листков: в самом
+#       справочнике их нет.
+#   access_2026_08.csv — проходы с 1 по 20 августа. Направление проставлено
+#       только для дверей на улицу; считыватели у кабинетов стоят внутри, и
+#       «выход» по дороге к своему столу — не выход.
+#   payslips_ГОД_МЕСЯЦ.json — книга расчётных листков за месяц.
+#
+# Пусто или папки нет — сидеры молча ничего не делают. Так и должно быть:
+# на боевом сервере они давно отработали и второй раз не запускаются.
+_SEED_DATA_DIR = os.environ.get('SEED_DATA_DIR', '/var/lib/se-mobile/seed-data')
+
+# Запасной путь — папка рядом с кодом. Пустая в репозитории; нужна тому, у
+# кого выгрузки лежат под рукой при разработке.
+_REPO_SEED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+
+
+def _seed_dirs():
+    """Где искать выгрузки — по очереди, папка сервера первой."""
+    return [_SEED_DATA_DIR, _REPO_SEED_DIR]
+
+
+def _seed_path(name):
+    """Путь к выгрузке или None.
+
+    Ищем по файлам, а не по папке целиком: у того, кто положил на сервер одни
+    расчётные листки, список сотрудников остаётся там, где лежал, — иначе
+    одна новая папка молча отменяла бы всё остальное.
+    """
+    for directory in _seed_dirs():
+        path = os.path.join(directory, name)
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _seed_files(pattern):
+    """Все выгрузки, подходящие под образец, без повторов по имени."""
+    import fnmatch
+    found = {}
+    for directory in _seed_dirs():
+        try:
+            names = os.listdir(directory)
+        except OSError:
+            continue
+        for name in sorted(names):
+            if fnmatch.fnmatch(name, pattern) and name not in found:
+                found[name] = os.path.join(directory, name)
+    return [found[name] for name in sorted(found)]
 
 
 def _read_data_csv(name):
     import csv
-    path = os.path.join(_DATA_DIR, name)
-    if not os.path.exists(path):
-        logging.warning('Файла %s нет — пропускаю', path)
+    path = _seed_path(name)
+    if path is None:
+        logging.warning('Выгрузки %s нет ни в %s — пропускаю',
+                        name, ', ни в '.join(_seed_dirs()))
         return []
     with open(path, newline='', encoding='utf-8') as f:
         return list(csv.DictReader(f, delimiter=';'))
@@ -6114,10 +6166,10 @@ def _seed_access_august_2026():
                  added_rec, added_ev, skipped)
 
 
-# Расчётные листки лежат по месяцам: data/payslips_ГОД_МЕСЯЦ.json. Чтобы
-# добавить новый месяц, достаточно положить рядом такой же файл — и поднять
-# версию сидера в _SEED_VERSIONS, иначе на боевой базе он второй раз не
-# запустится: журнал посчитает, что своё уже отработал.
+# Расчётные листки лежат по месяцам: payslips_ГОД_МЕСЯЦ.json в папке выгрузок
+# (см. _SEED_DATA_DIR). Чтобы добавить новый месяц, достаточно положить туда
+# такой же файл — и поднять версию сидера в _SEED_VERSIONS, иначе на боевой
+# базе он второй раз не запустится: журнал посчитает, что своё уже отработал.
 _PAYSLIP_FILE = re.compile(r'^payslips_(\d{4})_(\d{2})\.json$')
 
 _MONTHS_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль',
@@ -6125,16 +6177,14 @@ _MONTHS_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'М�
 
 
 def _seed_payslips_from_data():
-    """Грузит все книги расчётных листков, какие лежат в data/."""
-    if not os.path.isdir(_DATA_DIR):
-        return
-    for name in sorted(os.listdir(_DATA_DIR)):
-        found = _PAYSLIP_FILE.match(name)
+    """Грузит все книги расчётных листков, какие найдутся."""
+    for path in _seed_files('payslips_*.json'):
+        found = _PAYSLIP_FILE.match(os.path.basename(path))
         if found:
-            _load_payslip_book(name, int(found.group(1)), int(found.group(2)))
+            _load_payslip_book(path, int(found.group(1)), int(found.group(2)))
 
 
-def _load_payslip_book(name, year, month):
+def _load_payslip_book(path, year, month):
     """Кладёт в базу книгу листков за один месяц.
 
     В книге всё предприятие — 374 листка; кладём те, чей табельный номер
@@ -6145,7 +6195,6 @@ def _load_payslip_book(name, year, month):
     стоит требование неповторимости, и уже загруженные пропускаются.
     """
     import json
-    path = os.path.join(_DATA_DIR, name)
     with open(path, encoding='utf-8') as f:
         slips = json.load(f)
 

@@ -190,6 +190,14 @@ ln -sf /etc/nginx/sites-available/se-mobile /etc/nginx/sites-enabled/se-mobile
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
+say "Папка для выгрузок"
+# Сюда кладут выгрузки с предприятия — расчётные листки, проходы, справочник.
+# В репозитории их нет намеренно: это зарплата и передвижения живых людей, и
+# в исходниках им не место. Пусто — сидеры молча ничего не делают.
+mkdir -p /var/lib/se-mobile/seed-data
+chown root:semobile /var/lib/se-mobile/seed-data
+chmod 750 /var/lib/se-mobile/seed-data
+
 say "Папка для собранного приложения"
 # Сюда кладётся apk, отсюда его скачивают телефоны. Пустая папка — не беда:
 # сервер отвечает «сборки нет», приложение молчит, а причину видно в
