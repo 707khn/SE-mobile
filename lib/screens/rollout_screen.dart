@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../requests/admin_request.dart';
 import '../utils/app_theme.dart';
@@ -92,6 +93,15 @@ class _RolloutScreenState extends State<RolloutScreen> {
       _line('rollout_not_seen'.tr, '${r.notSeenForAWeek}',
           muted: true),
       SizedBox(height: Dimensions.height30 / 1.5),
+      _section('rollout_data'.tr),
+      if (r.data.isEmpty)
+        _line('rollout_no_data'.tr, '', muted: true)
+      else
+        ...r.data.map(_dataLine),
+      SizedBox(height: Dimensions.height30 / 2),
+      Text('rollout_data_why'.tr,
+          style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
+      SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_passwords'.tr),
       _line('rollout_passwords_temporary'.tr, '${r.temporaryPasswords}'),
       SizedBox(height: Dimensions.height30 / 2),
@@ -159,6 +169,62 @@ class _RolloutScreenState extends State<RolloutScreen> {
                     style:
                         TextStyle(fontSize: 12.5, color: context.mutedColor)),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Строка про один источник: когда заполнен и насколько отстал.
+  ///
+  /// Отставание красим только там, где оно осмысленно — у листков и проходов
+  /// есть дата, у справочника её нет. Больше сорока дней — оранжевым: это уже
+  /// не «на днях привезут», а «забыли».
+  Widget _dataLine(DataSource s) {
+    final behind = s.daysBehind;
+    // Сервер может прислать источник, для которого перевода ещё нет:
+    // GetX в таком случае вернёт сам ключ. Показывать «data_menu» человеку
+    // незачем — лучше голое имя источника.
+    final translated = 'data_${s.key}'.tr;
+    final title = translated == 'data_${s.key}' ? s.key : translated;
+    final parts = <String>[
+      if (s.last != null) DateFormat('dd.MM.yyyy').format(s.last!),
+      if (behind != null) 'days_ago'.trParams({'days': '$behind'}),
+      if (s.last == null && s.note.isEmpty) 'rollout_data_no_date'.tr,
+      if (s.note.isNotEmpty) s.note,
+    ];
+    final counts = <String>[
+      'rollout_data_rows'.trParams({'count': '${s.rows}'}),
+      if (s.people != null)
+        'rollout_data_people'.trParams({'count': '${s.people}'}),
+    ];
+    final late = behind != null && behind > 40;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(fontSize: 13.5, color: context.inkColor)),
+                const SizedBox(height: 2),
+                Text(counts.join(' · '),
+                    style: TextStyle(fontSize: 11.5, color: context.mutedColor)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            parts.isEmpty ? '—' : parts.join(', '),
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: late ? Colors.orange.shade800 : context.mutedColor,
             ),
           ),
         ],

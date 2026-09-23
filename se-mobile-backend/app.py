@@ -1279,6 +1279,100 @@ def _seed_all():
     logging.info('Seeders: %d executed, %d skipped', _ran, _skipped)
 
 
+def _data_freshness():
+    """По какое число заполнен каждый источник данных и скольких он покрывает.
+
+    Собрано в одном месте потому, что все, кого я находил, — одного рода:
+    данные в приложении отстают, а видно это только сотруднику, который
+    открыл экран и увидел пустоту. Расчётные листки кончались июлем, и
+    экран открывался пустым у всех ста тридцати; проходы — 20 августа, и
+    «Сегодня» был пуст у всех; меню перенесли один раз и больше не трогали.
+    Каждый раз об этом узнавали от людей, а не от приложения.
+
+    Здесь то же самое видит тот, кто может это исправить.
+    """
+    today = date.today()
+
+    def behind(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            value = value.date()
+        return (today - value).days
+
+    def source(key, last, rows, people=None, note=''):
+        return {'key': key, 'last': last.isoformat() if last else None,
+                'days_behind': behind(last), 'rows': rows,
+                'people': people, 'note': note}
+
+    out = []
+    try:
+        latest = (db.session.query(Payslip.period_year, Payslip.period_month)
+                  .order_by(Payslip.period_year.desc(),
+                            Payslip.period_month.desc()).first())
+        # Последний день месяца, а не первый: листок за июль закрывает июль,
+        # и отставание считается от его конца, иначе оно на месяц больше
+        # правды.
+        last = (date(latest[0] + 1, 1, 1) - _ONE_DAY if latest[1] == 12
+                else date(latest[0], latest[1] + 1, 1) - _ONE_DAY) if latest else None
+        # Считаем по последнему месяцу, а не по всей таблице: «сколько человек
+        # получили листок» — это про свежую выгрузку, а не про историю.
+        covered = (db.session.query(Payslip.employee_id)
+                   .filter(Payslip.period_year == latest[0],
+                           Payslip.period_month == latest[1])
+                   .distinct().count()) if latest else 0
+        out.append(source('payslips', last, Payslip.query.count(), covered))
+    except Exception as e:
+        db.session.rollback()
+        out.append(source('payslips', None, 0, None, str(e)))
+
+    try:
+        last = db.session.query(db.func.max(AccessRecord.access_date)).scalar()
+        covered = (db.session.query(AccessRecord.employee_id)
+                   .filter(AccessRecord.access_date == last)
+                   .distinct().count()) if last else 0
+        out.append(source('access', last, AccessRecord.query.count(), covered))
+    except Exception as e:
+        db.session.rollback()
+        out.append(source('access', None, 0, None, str(e)))
+
+    try:
+        last = db.session.query(db.func.max(MenuDate.date)).scalar()
+        out.append(source('menu', last, MenuItem.query.count()))
+    except Exception as e:
+        db.session.rollback()
+        out.append(source('menu', None, 0, None, str(e)))
+
+    try:
+        last = db.session.query(db.func.max(NewsItem.published_at)).scalar()
+        out.append(source('news', last, NewsItem.query.count()))
+    except Exception as e:
+        db.session.rollback()
+        out.append(source('news', None, 0, None, str(e)))
+
+    try:
+        covered = db.session.query(LeaveBalance.employee_id).distinct().count()
+        out.append(source('leaves', None, LeaveBalance.query.count(), covered))
+    except Exception as e:
+        db.session.rollback()
+        out.append(source('leaves', None, 0, None, str(e)))
+
+    try:
+        out.append(source('directory', None, DirectoryEntry.query.count()))
+    except Exception as e:
+        db.session.rollback()
+        out.append(source('directory', None, 0, None, str(e)))
+
+    try:
+        out.append(source('employees', None, Employee.query.count(),
+                          UserAccount.query.filter_by(is_active=True).count()))
+    except Exception as e:
+        db.session.rollback()
+        out.append(source('employees', None, 0, None, str(e)))
+
+    return out
+
+
 def _backup_state():
     """Когда была последняя копия базы и сколько их всего.
 
@@ -2405,6 +2499,9 @@ def register_routes(app):
             # лишь число с пропуска.
             'temporary_passwords': sum(
                 1 for a in accounts if a.must_change_password),
+            # По какое число заполнен каждый источник. Пока этого не было
+            # видно, об отставших данных узнавали от сотрудников.
+            'data': _data_freshness(),
         })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])

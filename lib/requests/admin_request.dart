@@ -107,6 +107,9 @@ class RolloutReport {
   /// Сколько учётных записей всё ещё с выданным паролем — табельным номером.
   int temporaryPasswords = 0;
 
+  /// По какое число заполнен каждый источник данных.
+  List<DataSource> data = <DataSource>[];
+
   /// Копии базы: сколько дней назад делалась последняя и сколько их всего.
   /// null в [backupDaysAgo] — копий нет или папка недоступна.
   int? backupDaysAgo;
@@ -145,9 +148,60 @@ Future<RolloutReport> fetchRollout() async {
   );
   report.temporaryPasswords =
       (body['temporary_passwords'] as num?)?.toInt() ?? 0;
+  report.data = _dataSources(body['data']);
   report.backupCount = (backups['count'] as num?)?.toInt() ?? 0;
   report.backupDaysAgo = (backups['days_ago'] as num?)?.toInt();
   report.backupProblem =
       backups['available'] == false ? ((backups['reason'] as String?) ?? '') : '';
   return report;
+}
+
+
+/// Свежесть одного источника данных: листки, проходы, меню, новости.
+///
+/// Всё, что ломалось в приложении на глазах у сотрудников, ломалось
+/// одинаково: данные отставали, а видел это только тот, кто открыл экран и
+/// увидел пустоту. Здесь то же самое видит тот, кто может загрузить новые.
+class DataSource {
+  const DataSource({
+    required this.key,
+    required this.last,
+    required this.daysBehind,
+    required this.rows,
+    required this.people,
+    required this.note,
+  });
+
+  /// payslips, access, menu, news, leaves, directory, employees.
+  final String key;
+
+  /// По какое число заполнено. null — у источника нет даты (справочник) или
+  /// он пуст.
+  final DateTime? last;
+
+  /// Сколько дней назад это было.
+  final int? daysBehind;
+
+  final int rows;
+
+  /// Скольких людей покрывает последняя выгрузка. null — не считается.
+  final int? people;
+
+  /// Почему не удалось посчитать.
+  final String note;
+}
+
+List<DataSource> _dataSources(dynamic raw) {
+  if (raw is! List) return <DataSource>[];
+  return raw.whereType<Map>().map((d) {
+    final last = d['last'];
+    return DataSource(
+      key: (d['key'] as String?) ?? '',
+      last: last is String && last.isNotEmpty ? DateTime.tryParse(last) : null,
+      daysBehind: (d['days_behind'] as num?)?.toInt(),
+      rows: (d['rows'] as num?)?.toInt() ?? 0,
+      people: (d['people'] as num?)?.toInt(),
+      note: (d['note'] as String?) ?? '',
+    );
+  }).toList();
 }

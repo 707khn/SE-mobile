@@ -97,6 +97,21 @@ class LocaleString extends Translations {
           'rollout_lost_accounts_why': 'Логин бар, ал user_accounts кестесінде '
               'жолы жоқ. Нөл болса — бәрі орнында; нөл болмаса, жолды қайта '
               'жасайды: сервер қайта іске қосылсын.',
+          'rollout_data': 'Деректердің жаңалығы',
+          'rollout_data_why': 'Қолданбада пайда болған бос экрандардың бәрі '
+              'бір себептен: деректер кешігеді, ал мұны тек экранды ашқан '
+              'қызметкер көреді. Мұнда оны жүктей алатын адам көреді.',
+          'rollout_data_no_date': 'күні жоқ',
+          'rollout_data_rows': '@count жазба',
+          'rollout_data_people': '@count адам',
+          'days_ago': '@days күн бұрын',
+          'data_payslips': 'Есеп айырысу парақтары',
+          'data_access': 'Турникет өтулері',
+          'data_menu': 'Асхана мәзірі',
+          'data_news': 'Жаңалықтар',
+          'data_leaves': 'Демалыстар',
+          'data_directory': 'Ішкі телефондар',
+          'data_employees': 'Қызметкерлер (тіркелгісі барлар)',
           'rollout_passwords': 'Құпиясөздер',
           'rollout_passwords_temporary': 'Уақытша құпиясөзбен',
           'rollout_passwords_why': 'Уақытша құпиясөз — табельдік нөмір. Ол '
@@ -358,6 +373,22 @@ class LocaleString extends Translations {
           'rollout_lost_accounts_why': 'Логин известен, а строки в '
               'user_accounts нет — войти под ним нельзя. Ноль — всё на месте; '
               'не ноль — строку восстановит перезапуск сервера.',
+          'rollout_data': 'Свежесть данных',
+          'rollout_data_why': 'Все пустые экраны, которые появлялись в '
+              'приложении, появлялись по одной причине: данные отстают, а '
+              'видит это только сотрудник, который экран открыл. Здесь то же '
+              'самое видит тот, кто может загрузить новые.',
+          'rollout_data_no_date': 'без даты',
+          'rollout_data_rows': 'записей: @count',
+          'rollout_data_people': 'людей: @count',
+          'days_ago': '@days дн. назад',
+          'data_payslips': 'Расчётные листы',
+          'data_access': 'Проходы турникета',
+          'data_menu': 'Меню столовой',
+          'data_news': 'Новости',
+          'data_leaves': 'Отпуска',
+          'data_directory': 'Внутренние телефоны',
+          'data_employees': 'Сотрудники (из них с учётной записью)',
           'rollout_passwords': 'Пароли',
           'rollout_passwords_temporary': 'С временным паролем',
           'rollout_passwords_why': 'Временный пароль — это табельный номер: он '
