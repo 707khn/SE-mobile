@@ -40,13 +40,66 @@ class _PayslipPageState extends State<PayslipPage> {
   bool _loading = false;
   String? _error;
 
+  /// Месяцы, за которые листок есть. null — сервер ещё не ответил или не
+  /// ответил вовсе: тогда экран ведёт себя как раньше и предлагает любой
+  /// месяц.
+  List<DateTime>? _periods;
+
   final _numberFormat = NumberFormat('#,##0.00', 'ru_RU');
 
   @override
   void initState() {
     super.initState();
-    _fetchPayslip();
+    _start();
   }
+
+  /// Сначала спрашиваем, за какие месяцы листок есть, и открываем самый
+  /// свежий.
+  ///
+  /// Раньше экран открывался на прошлом месяце. Листки приносят с задержкой,
+  /// и прошлый месяц почти никогда не тот, что уже в базе: 23 сентября
+  /// прошлый месяц — август, а последний загруженный листок — за июль. То
+  /// есть первое, что видел каждый, кто открыл «Расчётный лист», — «листок
+  /// не найден».
+  Future<void> _start() async {
+    // Список месяцев — это лишний поход на сервер перед самим листком.
+    // Показываем заглушку сразу, иначе экран на секунду остаётся пустым и
+    // выглядит так, будто ничего не происходит.
+    setState(() => _loading = true);
+    final periods = await fetchPayslipPeriods(employeeId: widget.employeeId);
+    if (!mounted) return;
+    setState(() {
+      _periods = periods;
+      if (periods != null && periods.isNotEmpty) {
+        _selectedDate = periods.first;
+      }
+    });
+    await _fetchPayslip();
+  }
+
+  /// Есть ли листок за этот месяц. Пока список не пришёл — считаем, что есть:
+  /// запрещать по незнанию хуже, чем сходить впустую.
+  bool _hasSlip(DateTime month) {
+    final periods = _periods;
+    if (periods == null) return true;
+    return periods
+        .any((p) => p.year == month.year && p.month == month.month);
+  }
+
+  /// Самый свежий месяц с листком — чтобы назвать его в сообщении и
+  /// перейти на него одним касанием.
+  DateTime? get _latestSlip {
+    final periods = _periods;
+    if (periods == null || periods.isEmpty) return null;
+    return periods.first;
+  }
+
+  /// За этот месяц листка нет, но за другие есть.
+  bool get _missingButHaveOthers =>
+      _error != null && !_hasSlip(_selectedDate) && _latestSlip != null;
+
+  /// Листков нет вовсе — предлагать перебирать месяцы не за чем.
+  bool get _noSlipsAtAll => _periods != null && _periods!.isEmpty;
 
   Future<void> _fetchPayslip() async {
     setState(() {
@@ -90,13 +143,41 @@ class _PayslipPageState extends State<PayslipPage> {
         (_selectedDate.year == now.year && _selectedDate.month >= now.month);
   }
 
+  /// Соседний месяц, в котором листок есть.
+  ///
+  /// Пока список месяцев неизвестен — просто соседний, как было. А когда
+  /// известен, ходить по пустым незачем: между июнем и июлем лежит вся
+  /// прошлая зима, и перелистывать её по одному месяцу — двенадцать нажатий
+  /// до следующего листка.
+  DateTime? _step(int direction) {
+    final periods = _periods;
+    if (periods == null) {
+      return DateTime(_selectedDate.year, _selectedDate.month + direction);
+    }
+    // periods отсортирован от свежих к старым.
+    for (final p in direction < 0 ? periods : periods.reversed) {
+      if (direction < 0 && p.isBefore(_selectedDate)) return p;
+      if (direction > 0 && p.isAfter(_selectedDate)) return p;
+    }
+    return null;
+  }
+
+  bool get _hasPrevMonth => _step(-1) != null;
+
+  bool get _hasNextMonth =>
+      _periods == null ? !_isCurrentOrFutureMonth : _step(1) != null;
+
   void _goToPrevMonth() {
-    setState(() => _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1));
+    final target = _step(-1);
+    if (target == null) return;
+    setState(() => _selectedDate = target);
     _fetchPayslip();
   }
 
   void _goToNextMonth() {
-    setState(() => _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1));
+    final target = _step(1);
+    if (target == null) return;
+    setState(() => _selectedDate = target);
     _fetchPayslip();
   }
 
@@ -160,14 +241,19 @@ class _PayslipPageState extends State<PayslipPage> {
                       final isSelected = m == selMonth && selYear == _selectedDate.year;
                       final isFuture = isCurrentYear && m > now.month;
                       final isCurrent = m == now.month && selYear == now.year;
+                      // Месяц без листка выглядит так же, как будущий: из
+                      // шестидесяти предлагавшихся заполнены два, и выбирать
+                      // вслепую значило шестьдесят раз получить «не найден».
+                      final isEmpty = !isFuture && !_hasSlip(DateTime(selYear, m));
+                      final isBlocked = isFuture || isEmpty;
                       return GestureDetector(
-                        onTap: isFuture ? null : () => setInner(() => selMonth = m),
+                        onTap: isBlocked ? null : () => setInner(() => selMonth = m),
                         child: Container(
                           margin: const EdgeInsets.all(2),
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? AppColors.mainColor
-                                : isFuture
+                                : isBlocked
                                     ? context.hairlineColor
                                     : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
@@ -181,7 +267,7 @@ class _PayslipPageState extends State<PayslipPage> {
                               style: TextStyle(
                                 color: isSelected
                                     ? Colors.white
-                                    : isFuture
+                                    : isBlocked
                                         ? context.mutedColor.withOpacity(0.55)
                                         : isCurrent
                                             ? context.accentColor
@@ -195,6 +281,14 @@ class _PayslipPageState extends State<PayslipPage> {
                       );
                     },
                   ),
+                  if (_periods != null) ...[
+                    const SizedBox(height: 8),
+                    Text('payslip_months_hint'.tr,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: context.mutedColor.withOpacity(0.8))),
+                  ],
                 ],
               ),
             );
@@ -259,7 +353,7 @@ class _PayslipPageState extends State<PayslipPage> {
                   final v = details.primaryVelocity ?? 0;
                   if (v > 250) {
                     _goToPrevMonth();
-                  } else if (v < -250 && !_isCurrentOrFutureMonth) {
+                  } else if (v < -250 && _hasNextMonth) {
                     _goToNextMonth();
                   }
                 },
@@ -278,7 +372,7 @@ class _PayslipPageState extends State<PayslipPage> {
                     children: [
                       IconButton(
                         icon: Icon(Icons.chevron_left, color: context.accentColor),
-                        onPressed: _loading ? null : _goToPrevMonth,
+                        onPressed: (_loading || !_hasPrevMonth) ? null : _goToPrevMonth,
                         tooltip: 'last_month'.tr,
                       ),
                       Icon(Icons.calendar_month, color: context.accentColor, size: 20),
@@ -292,11 +386,11 @@ class _PayslipPageState extends State<PayslipPage> {
                       IconButton(
                         icon: Icon(
                           Icons.chevron_right,
-                          color: _isCurrentOrFutureMonth
+                          color: !_hasNextMonth
                               ? context.hairlineColor
                               : context.accentColor,
                         ),
-                        onPressed: (_loading || _isCurrentOrFutureMonth) ? null : _goToNextMonth,
+                        onPressed: (_loading || !_hasNextMonth) ? null : _goToNextMonth,
                       ),
                       TextButton(
                         onPressed: _loading ? null : _pickMonth,
@@ -321,12 +415,48 @@ class _PayslipPageState extends State<PayslipPage> {
                         Text(_error!,
                             textAlign: TextAlign.center,
                             style: TextStyle(color: context.mutedColor, fontSize: 15)),
-                        SizedBox(height: Dimensions.height30 / 2),
-                        ElevatedButton.icon(
-                          onPressed: _fetchPayslip,
-                          icon: const Icon(Icons.refresh),
-                          label: Text('refresh'.tr),
-                        ),
+                        // «Листка нет» без продолжения отправляет человека
+                        // перебирать месяцы наугад. Последний, за который
+                        // листок есть, известен — называем его и переходим
+                        // одним касанием.
+                        if (_missingButHaveOthers) ...[
+                          SizedBox(height: Dimensions.height30 / 3),
+                          Text(
+                            'payslip_latest_is'.trParams({
+                              'period': DateFormat('LLLL yyyy', 'ru')
+                                  .format(_latestSlip!)
+                            }),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: context.mutedColor.withOpacity(0.75),
+                                fontSize: 13),
+                          ),
+                          SizedBox(height: Dimensions.height30 / 2),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() => _selectedDate = _latestSlip!);
+                              _fetchPayslip();
+                            },
+                            icon: const Icon(Icons.receipt_long_outlined),
+                            label: Text('payslip_open_latest'.tr),
+                          ),
+                        ] else if (_noSlipsAtAll) ...[
+                          SizedBox(height: Dimensions.height30 / 3),
+                          Text(
+                            'payslip_none_at_all'.tr,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: context.mutedColor.withOpacity(0.75),
+                                fontSize: 13),
+                          ),
+                        ] else ...[
+                          SizedBox(height: Dimensions.height30 / 2),
+                          ElevatedButton.icon(
+                            onPressed: _fetchPayslip,
+                            icon: const Icon(Icons.refresh),
+                            label: Text('refresh'.tr),
+                          ),
+                        ],
                       ],
                     ),
                   ),
