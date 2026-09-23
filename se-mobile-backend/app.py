@@ -1731,6 +1731,35 @@ def register_routes(app):
 
         return jsonify({'message': 'Failure'})
 
+    @app.route('/payslip/periods', methods=['POST'])
+    @require_auth
+    def payslip_periods():
+        """За какие месяцы у человека вообще есть расчётный лист.
+
+        Экран листка открывался на прошлом месяце — и был пуст. Сегодня
+        23 сентября, прошлый месяц — август, а листки загружены по июль:
+        каждый, кто открывал «Расчётный лист», первым делом видел «листок не
+        найден». Выбор месяца при этом предлагал любой месяц за пять лет,
+        из которых заполнено два.
+
+        Список месяцев решает обе задачи сразу: приложение открывается на
+        самом свежем листке, а в выборе месяца видно, где что-то есть.
+        """
+        data = request.get_json(silent=True) or {}
+        key_suffix = (data.get('key_suffix') or '').strip()
+        if not key_suffix:
+            viewer = getattr(g, 'employee', None)
+            key_suffix = viewer.employee_id if viewer is not None else ''
+        if not key_suffix or not _may_view(key_suffix):
+            return _deny()
+
+        rows = (db.session.query(Payslip.period_year, Payslip.period_month)
+                .filter(Payslip.employee_id == key_suffix)
+                .distinct().all())
+        periods = sorted(({'year': int(y), 'month': int(m)} for y, m in rows),
+                         key=lambda p: (p['year'], p['month']), reverse=True)
+        return jsonify({'message': 'Success', 'periods': periods})
+
     @app.route('/payslip', methods=['POST'])
     @require_auth
     def payslip():

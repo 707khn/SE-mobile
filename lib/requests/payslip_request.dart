@@ -194,3 +194,60 @@ Future<PayslipData?> _cachedPayslip(String month, String year) async {
     return null;
   }
 }
+
+
+/// Месяцы, за которые у человека есть расчётный лист, свежие первыми.
+///
+/// Экран открывался на прошлом месяце и был пуст: листки приносят с
+/// задержкой, и «прошлый месяц» почти никогда не тот, что есть в базе.
+/// Пустой список — значит листков нет вовсе; null — сервер не ответил, и
+/// экран ведёт себя как раньше.
+Future<List<DateTime>?> fetchPayslipPeriods({String? employeeId}) async {
+  final id = (employeeId != null && employeeId.isNotEmpty)
+      ? employeeId
+      : await _resolveEmployeeId();
+  if (id == null || id.isEmpty) return null;
+  try {
+    final response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/payslip/periods'),
+          headers: await authHeaders(),
+          body: jsonEncode({'key_suffix': id}),
+        )
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) return _cachedPeriods(id);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['message'] != 'Success' || body['periods'] is! List) {
+      return _cachedPeriods(id);
+    }
+    await OfflineCache.save('payslip_periods_$id', body);
+    return _periodsFrom(body);
+  } catch (_) {
+    // В цеху связи нет, а список месяцев меняется раз в месяц: сохранённый
+    // подойдёт.
+    return _cachedPeriods(id);
+  }
+}
+
+List<DateTime> _periodsFrom(Map<String, dynamic> body) {
+  final out = <DateTime>[];
+  for (final item in (body['periods'] as List)) {
+    if (item is! Map) continue;
+    final year = (item['year'] as num?)?.toInt();
+    final month = (item['month'] as num?)?.toInt();
+    if (year == null || month == null || month < 1 || month > 12) continue;
+    out.add(DateTime(year, month));
+  }
+  out.sort((a, b) => b.compareTo(a));
+  return out;
+}
+
+Future<List<DateTime>?> _cachedPeriods(String employeeId) async {
+  final saved = await OfflineCache.read('payslip_periods_$employeeId');
+  if (saved == null || saved['periods'] is! List) return null;
+  try {
+    return _periodsFrom(saved);
+  } catch (_) {
+    return null;
+  }
+}
