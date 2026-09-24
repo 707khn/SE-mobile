@@ -127,6 +127,58 @@ def _push_to(employee_ids, title, body, data=None):
     return sent
 
 
+# Очередь уведомлений и один работник на неё.
+#
+# Уведомления уходят через Firebase, то есть через сеть до Google. Пока
+# Firebase не настроен, всё это ничего не стоит: _push_to возвращает ноль и
+# сразу. Но в тот день, когда его настроят, каждая такая отправка станет
+# ожиданием внутри запроса — а звать её умеют турникет, выкладка меню,
+# загрузка расчётных листков и объявление.
+#
+# Хуже всего турникет. В пересменку это пятьсот проходов за несколько минут,
+# и каждый ждал бы Google, прежде чем ответить СКУД. Поэтому отправка уходит
+# в сторону.
+#
+# Работник один, а не поток на событие: пятьсот проходов — это пятьсот
+# потоков, и лекарство вышло бы хуже болезни. Очередь ограничена; переполнилась
+# — уведомление теряется с записью в журнал, потому что пропуск человека
+# важнее сообщения о нём.
+_NOTIFY_QUEUE_LIMIT = 1000
+_notify_queue = None
+_notify_worker = None
+_notify_start_lock = threading.Lock()
+
+
+def _notify_later(app, fn, *args, **kwargs):
+    """Сделать отправку уведомления, не задерживая запрос."""
+    global _notify_queue, _notify_worker
+    with _notify_start_lock:
+        if _notify_queue is None:
+            import queue as _queue
+            _notify_queue = _queue.Queue(maxsize=_NOTIFY_QUEUE_LIMIT)
+        if _notify_worker is None or not _notify_worker.is_alive():
+            _notify_worker = threading.Thread(
+                target=_notify_loop, args=(app,), name='notify', daemon=True)
+            _notify_worker.start()
+    try:
+        _notify_queue.put_nowait((fn, args, kwargs))
+    except Exception:
+        logging.warning('Очередь уведомлений переполнена — %s пропущено',
+                        getattr(fn, '__name__', fn))
+
+
+def _notify_loop(app):
+    while True:
+        fn, args, kwargs = _notify_queue.get()
+        try:
+            with app.app_context():
+                fn(*args, **kwargs)
+        except Exception as e:
+            logging.warning('Уведомление не отправлено: %s', e)
+        finally:
+            _notify_queue.task_done()
+
+
 def _push_to_everyone(title, body, data=None):
     """Уведомление всем, у кого установлено приложение."""
     return _push_to([t.employee_id for t in FcmToken.query.all()],
@@ -2292,9 +2344,9 @@ def register_routes(app):
         for display, employee_ids in by_period.items():
             # «Июль 2026» в середине фразы читается как заголовок — снижаем.
             period = display[:1].lower() + display[1:] if display else ''
-            _push_to(employee_ids, 'Зарплата',
-                     f'Расчётный лист за {period} готов'.replace('  ', ' '),
-                     {'type': 'payslip'})
+            _notify_later(app, _push_to, employee_ids, 'Зарплата',
+                          f'Расчётный лист за {period} готов'.replace('  ', ' '),
+                          {'type': 'payslip'})
 
         return jsonify({
             'message': 'Success',
@@ -2422,7 +2474,10 @@ def register_routes(app):
         db.session.commit()
 
         ts_str = ts.strftime('%H:%M')
-        _send_turnstile_notification(emp.full_name, direction, ts_str, employee_id)
+        # В стороне: в пересменку это пятьсот проходов за несколько минут, и
+        # каждый ждал бы ответа Google, прежде чем СКУД получит своё «Success».
+        _notify_later(app, _send_turnstile_notification,
+                      emp.full_name, direction, ts_str, employee_id)
 
         return jsonify({'message': 'Success', 'id': event.id})
 
@@ -2575,7 +2630,7 @@ def register_routes(app):
 
         db.session.commit()
         if was_new:
-            _notify_menu_published()
+            _notify_later(app, _notify_menu_published)
         return jsonify({'message': 'Success'})
 
     @app.route('/api/menu/import-excel', methods=['POST'])
@@ -2675,7 +2730,7 @@ def register_routes(app):
             })
 
         db.session.commit()
-        _notify_menu_published()
+        _notify_later(app, _notify_menu_published)
 
         lines = [
             f"{d['date_display']} — {d['count']} блюд "
@@ -2847,8 +2902,8 @@ def register_routes(app):
         db.session.commit()
 
         if item.is_published and not was_published:
-            _push_to_everyone('Объявление', item.title,
-                              {'type': 'news', 'id': item.id})
+            _notify_later(app, _push_to_everyone, 'Объявление', item.title,
+                          {'type': 'news', 'id': item.id})
         return jsonify({'message': 'Success', 'item': _news_json(item)})
 
     @app.route('/api/news/announcements', methods=['POST'])
