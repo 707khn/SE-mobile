@@ -6,6 +6,7 @@ import '../requests/directory_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/dimensions.dart';
 import '../utils/offline_cache.dart';
+import '../utils/search_fold.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/offline_notice.dart';
 import '../widgets/custom_text.dart';
@@ -68,14 +69,18 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
 
   /// Ищем по всему сразу: человека ищут и по фамилии, и по должности, и по
   /// отделу, а внутренний номер иногда помнят, а имя — нет.
+  ///
+  /// И не придираемся к раскладке: «Аскаров» находит «Асқаров». Иначе
+  /// двенадцать человек из справочника — включая Генерального директора —
+  /// нельзя было найти, не переключив клавиатуру на казахскую.
   List<_Entry> get _visible {
-    final query = _query.trim().toLowerCase();
+    final query = _query.trim();
     if (query.isEmpty) return _all;
     return _all
         .where((e) =>
-            e.name.toLowerCase().contains(query) ||
-            e.position.toLowerCase().contains(query) ||
-            e.department.toLowerCase().contains(query) ||
+            matchesQuery(e.name, query) ||
+            matchesQuery(e.position, query) ||
+            matchesQuery(e.department, query) ||
             e.extension.contains(query))
         .toList();
   }

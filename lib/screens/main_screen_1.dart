@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../functions/generate_csv.dart';
 import '../utils/access_report.dart';
+import '../utils/search_fold.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
@@ -556,7 +557,7 @@ class _MainMenu1State extends State<MainMenu1> {
                     ? reportsEntries
                     : reportsEntries
                         .where((e) => e.any((cell) =>
-                            cell.toLowerCase().contains(_filterText.toLowerCase())))
+                            matchesQuery(cell, _filterText)))
                         .toList();
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

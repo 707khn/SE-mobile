@@ -20,6 +20,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../functions/generate_csv.dart';
 import '../requests/reportdate_request.dart';
 import '../utils/colors.dart';
+import '../utils/search_fold.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
 import '../widgets/access_log_list.dart';
@@ -70,8 +71,10 @@ class _MainPage2State extends State<MainPage2> {
     employeeController.addListener(() {
       setState(() {
         searchText = employeeController.text;
+        // Начальник ищет подчинённого по фамилии, а на русской раскладке
+        // «Асқаров» не набрать: раскладку не спрашиваем.
         filteredEmployees = allEmployees
-            .where((e) => e.toLowerCase().contains(employeeController.text.toLowerCase()))
+            .where((e) => matchesQuery(e, employeeController.text))
             .toList();
       });
     });
@@ -388,7 +391,7 @@ class _MainPage2State extends State<MainPage2> {
                             setDialogState(() {
                               searchText = value;
                               filteredEmployees = allEmployees
-                                  .where((e) => e.toLowerCase().contains(value.toLowerCase()))
+                                  .where((e) => matchesQuery(e, value))
                                   .toList();
                             });
                           },
