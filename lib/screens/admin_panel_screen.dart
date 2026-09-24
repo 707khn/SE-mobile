@@ -6,6 +6,7 @@ import '../requests/admin_request.dart';
 import '../requests/account_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/search_fold.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/skeleton.dart';
@@ -81,8 +82,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       if (_onlyWithLogin && !e.hasLogin) return false;
       if (_department != null && e.department != _department) return false;
       if (q.isEmpty) return true;
-      return e.fullName.toLowerCase().contains(q) ||
-          e.jobTitle.toLowerCase().contains(q) ||
+      // Раскладка значения не имеет: «Аскаров» находит «Асқаров».
+      return matchesQuery(e.fullName, q) ||
+          matchesQuery(e.jobTitle, q) ||
           e.employeeId.toLowerCase().contains(q) ||
           e.login.toLowerCase().contains(q);
     }).toList();
