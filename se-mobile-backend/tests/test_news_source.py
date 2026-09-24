@@ -179,8 +179,22 @@ def test_source_is_the_site_when_nothing_is_configured(monkeypatch):
     assert 'нет связи' in app_module._news_status['error']
 
 
+def _wait_for_news_refresh(timeout=15):
+    """Дождаться похода за новостями, который идёт отдельным потоком."""
+    import threading
+    for thread in threading.enumerate():
+        if thread.name == 'news-refresh':
+            thread.join(timeout=timeout)
+            assert not thread.is_alive(), 'поход за новостями не завершился'
+
+
 def test_news_endpoint_shows_what_came_from_the_site(client, monkeypatch):
-    """Проверка целиком: страница сайта → лента в приложении."""
+    """Проверка целиком: страница сайта → лента в приложении.
+
+    Ходит за новостями отдельный поток: срок на поход — двенадцать секунд, и
+    ждать их должен не человек, открывший «Новости». Поэтому первый запрос
+    отдаёт то, что уже в базе, а увиденное на сайте появляется следом.
+    """
     monkeypatch.setattr(app_module, '_fetch', _fetcher({
         'https://se-btrz.com/news/': _PAGE_NO_FEED,
     }))
@@ -189,14 +203,43 @@ def test_news_endpoint_shows_what_came_from_the_site(client, monkeypatch):
                         lambda *a, **k: None)
     app_module._news_checked_at = None
 
-    response = client.get('/api/news')
-    assert response.status_code == 200
-    titles = [item['title'] for item in response.get_json()['items']]
+    first = client.get('/api/news')
+    assert first.status_code == 200
+    _wait_for_news_refresh()
+
+    titles = [item['title'] for item in client.get('/api/news').get_json()['items']]
     assert 'Открытие нового цеха металлоконструкций' in titles
     assert 'Субботник на территории предприятия' in titles
 
-    # Второй заход не задваивает: за новостями ходим не чаще раза в четверть
-    # часа, а уже загруженное узнаём по адресу.
+    # Второй заход не задваивает: уже загруженное узнаём по адресу.
     app_module._news_checked_at = None
+    client.get('/api/news')
+    _wait_for_news_refresh()
     again = client.get('/api/news').get_json()['items']
     assert len(again) == len(titles)
+
+
+def test_the_feed_does_not_make_anyone_wait(client, monkeypatch):
+    """Медленный сайт не задерживает того, кто открыл ленту.
+
+    Так и было: раз в четверть часа кому-то одному доставался вход в
+    «Новости» длиной в двенадцать секунд — ровно столько отведено на поход к
+    чужому сайту. Лента — едва ли не единственное, что в приложении
+    обновляется само, и заставлять ждать как раз её хуже всего.
+    """
+    import time
+
+    def _slow(url, timeout=None):
+        time.sleep(3)
+        raise OSError('сайт молчит')
+
+    monkeypatch.setattr(app_module, '_fetch', _slow)
+    app_module._news_checked_at = None
+
+    started = time.monotonic()
+    answer = client.get('/api/news')
+    spent = time.monotonic() - started
+
+    assert answer.status_code == 200
+    assert spent < 1.5, f'человек ждал {spent:.1f} с чужого сайта'
+    _wait_for_news_refresh()
