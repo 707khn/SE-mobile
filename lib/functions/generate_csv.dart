@@ -8,6 +8,8 @@ import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'export_file.dart';
+
 Future<void> generateTable(List<List<String>> data, BuildContext context) async {
   try {
     final directory = await getExternalStorageDirectories();
@@ -23,10 +25,15 @@ Future<void> generateTable(List<List<String>> data, BuildContext context) async 
     for (var entry in data) {
       rows.add(entry);
     }
-    var csv = const ListToCsvConverter().convert(rows);
+    // Точка с запятой, а не запятая: Excel с русской и казахской
+    // раскладкой считает разделителем списка именно её, и файл с запятыми
+    // открывается одним столбцом на всю строку.
+    var csv = utf8Bom +
+        const ListToCsvConverter(fieldDelimiter: ';').convert(rows);
     String tempDir = Directory.systemTemp.path;
-    String csvFilePath = '$tempDir/$name.csv';
-    String savePath = '$path/saved_report.csv';
+    final fileName = exportFileName(name, 'csv');
+    String csvFilePath = '$tempDir/$fileName';
+    String savePath = '$path/$fileName';
     await File(csvFilePath).writeAsString(csv);
     await File(savePath).writeAsString(csv);
     HapticFeedback.lightImpact();
@@ -48,9 +55,14 @@ Future<void> generateTableEmp(List<List<List<String>>> data, BuildContext contex
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String>? names = prefs.getStringList("emp_snames");
 
+    // Список имён и список отчётов ведутся порознь: names?[i] бросал
+    // RangeError, если один из них оказывался короче, и человек видел
+    // «Ошибка экспорта CSV: RangeError» вместо файла.
+    String nameAt(int i) =>
+        (names != null && i < names.length) ? names[i] : 'Сотрудник ${i + 1}';
+
     for (var i = 0; i < data.length; i++) {
-      String? name = names?[i];
-      rows.add(['$name', '', '', '']);
+      rows.add([nameAt(i), '', '', '']);
       rows.add(['col_date'.tr, 'col_time'.tr, 'col_event'.tr, 'col_door'.tr]);
       for (var entry in data[i]) {
         rows.add(entry);
@@ -58,10 +70,12 @@ Future<void> generateTableEmp(List<List<List<String>>> data, BuildContext contex
       rows.add(['', '', '', '']);
     }
 
-    var csv = const ListToCsvConverter().convert(rows);
+    var csv = utf8Bom +
+        const ListToCsvConverter(fieldDelimiter: ';').convert(rows);
     String tempDir = Directory.systemTemp.path;
-    String csvFilePath = '$tempDir/report.csv';
-    String savePath = '$path/saved_report.csv';
+    final fileName = exportFileName('report', 'csv');
+    String csvFilePath = '$tempDir/$fileName';
+    String savePath = '$path/$fileName';
     await File(csvFilePath).writeAsString(csv);
     await File(savePath).writeAsString(csv);
     HapticFeedback.lightImpact();
