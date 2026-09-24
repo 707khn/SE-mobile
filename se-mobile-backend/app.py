@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 # Werkzeug идёт вместе с Flask, ставить ничего не нужно. По умолчанию scrypt.
+from werkzeug.exceptions import HTTPException
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import (db, Employee, AccessRecord, Payslip,
                     PayslipAccrual, PayslipDeduction, PayslipPaid, PayslipBenefit,
@@ -1248,6 +1249,28 @@ def create_app():
                 _lock.close()
 
     register_routes(app)
+
+    @app.errorhandler(Exception)
+    def _unhandled(error):
+        """Последняя сетка: любая незамеченная ошибка — чистый JSON, не HTML.
+
+        Приложение всюду разбирает ответ как JSON. Когда обработчик падал,
+        Flask отдавал страницу с описанием ошибки, разбор ломался, и человек
+        видел «ошибка сети» — то есть ровно то же, что при пропавшей связи.
+        Отличить одно от другого было нельзя ни ему, ни поддержке.
+
+        Отказы вида 403 и 404 сюда тоже приходят: их отдаём как есть, со
+        своим кодом, а неожиданное — пятисотым и в журнал вместе с адресом.
+        """
+        if isinstance(error, HTTPException):
+            return jsonify({'message': 'Failure',
+                            'error': error.name,
+                            'status': error.code}), error.code
+        db.session.rollback()
+        logging.error('Необработанная ошибка на %s %s: %s',
+                      request.method, request.path, error, exc_info=True)
+        return jsonify({'message': 'Failure', 'error': 'internal'}), 500
+
     return app
 
 
@@ -2039,13 +2062,18 @@ def register_routes(app):
         key_suffix = data.get('key_suffix', '')
         if not _may_view(key_suffix):
             return _deny()
-        month = data.get('month', '')
-        year = data.get('year', '')
+        # Месяц и год приходят снаружи. int('август') — это ValueError и
+        # пятисотый ответ, который приложение показывает как «ошибка сети».
+        try:
+            month = int(data.get('month', ''))
+            year = int(data.get('year', ''))
+        except (TypeError, ValueError):
+            return jsonify({'message': 'Failure', 'error': 'bad_period'}), 400
 
         ps = Payslip.query.filter_by(
             employee_id=key_suffix,
-            period_month=int(month),
-            period_year=int(year)
+            period_month=month,
+            period_year=year
         ).first()
 
         if not ps:
@@ -2619,7 +2647,12 @@ def register_routes(app):
     def get_news():
         """Лента для сотрудников: новости сайта и одобренные объявления."""
         _refresh_site_news()
-        limit = min(int(request.args.get('limit', 50) or 50), 200)
+        # Сколько новостей отдать. Не число — берём обычные пятьдесят: это
+        # лента, а не запрос, который стоит отклонять из-за опечатки.
+        try:
+            limit = min(max(int(request.args.get('limit') or 50), 1), 200)
+        except (TypeError, ValueError):
+            limit = 50
         rows = (NewsItem.query
                 .filter_by(is_published=True)
                 .order_by(NewsItem.published_at.desc())
