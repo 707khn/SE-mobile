@@ -1,12 +1,20 @@
 """Учётные записи по справочнику и августовские проходы.
 
-Данные лежат в двух файлах рядом с кодом; проверяем не их содержимое, а то,
-что сидер применяет их целиком и не задваивает при повторном запуске.
+Проверяем не содержимое выгрузок, а то, что сидер применяет их целиком и не
+задваивает при повторном запуске.
+
+Список сотрудников лежит рядом с кодом: это ФИО, должность и подразделение —
+то же, что висит на стене. А зарплата и проходы через турникет в репозитории
+не лежат (см. data/README.md), поэтому проверки, которым нужны именно они,
+пропускаются там, где выгрузок нет. Пропуск виден в отчёте pytest с причиной:
+проверка не удалена, она просто не на чем работать.
 """
 
 import csv
 import datetime
 import os
+
+import pytest
 
 from models import db, Employee, UserAccount, AccessRecord, TurnstileEvent
 import app as app_module
@@ -17,6 +25,28 @@ _DATA = os.path.join(os.path.dirname(__file__), '..', 'data')
 def _rows(name):
     with open(os.path.join(_DATA, name), newline='', encoding='utf-8') as f:
         return list(csv.DictReader(f, delimiter=';'))
+
+
+def _seed_file(name):
+    """Путь к выгрузке, если она есть, иначе пропуск проверки.
+
+    Смотрим туда же, куда сидеры: сначала SEED_DATA_DIR, потом папка рядом с
+    кодом. Пропуск виден в отчёте pytest вместе с причиной — проверка не
+    удалена, ей просто не на чем работать.
+    """
+    path = app_module._seed_path(name)
+    if path is None:
+        pytest.skip(f'{name} нет: выгрузка не лежит в SEED_DATA_DIR')
+    return path
+
+
+def _seed_books():
+    """Книги расчётных листков, какие найдутся."""
+    books = app_module._seed_files('payslips_*.json')
+    if not books:
+        pytest.skip('книг расчётных листков нет: выгрузки не лежат '
+                    'в SEED_DATA_DIR')
+    return books
 
 
 def test_everyone_from_the_directory_exists(app):
@@ -48,6 +78,7 @@ def test_temporary_ids_are_gone(app):
 
 
 def test_august_access_is_loaded(app):
+    _seed_file('access_2026_08.csv')
     with app.app_context():
         august = AccessRecord.query.filter(
             AccessRecord.access_date >= datetime.date(2026, 8, 1),
@@ -80,11 +111,9 @@ def test_loading_twice_changes_nothing(app):
 
 def test_every_book_is_loaded(app):
     """Каждая книга из data/ доехала: листок есть у всех, кто есть в базе."""
-    import glob
     import json
     import re as _re
-    books = sorted(glob.glob(os.path.join(_DATA, 'payslips_*.json')))
-    assert books, 'книг расчётных листков в data/ не нашлось'
+    books = _seed_books()
 
     with app.app_context():
         from models import Payslip
@@ -153,6 +182,8 @@ def test_june_hands_over_to_july(app):
     и сходятся они только если обе разобраны верно: ошибка в знаке долга
     или в столбце сразу разводит месяцы.
     """
+    _seed_file('payslips_2026_06.json')
+    _seed_file('payslips_2026_07.json')
     with app.app_context():
         from models import Payslip
         june = {p.employee_id: p for p in Payslip.query.filter_by(

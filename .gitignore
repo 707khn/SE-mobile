@@ -42,3 +42,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Зарплата и передвижения людей в репозиторий не попадают — ни случайно, ни
+# намеренно. Место им на сервере, в SEED_DATA_DIR: см.
+# se-mobile-backend/data/README.md.
+#
+# Список сотрудников (employees_*.csv) остаётся: это ФИО, должность и
+# подразделение — то же, что висит на стене, — и на нём держатся проверки.
+se-mobile-backend/data/payslips_*.json
+se-mobile-backend/data/access_*.csv
+se-mobile-backend/data/*.xls
+se-mobile-backend/data/*.xlsx
