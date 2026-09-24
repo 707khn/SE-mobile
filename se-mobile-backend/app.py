@@ -1478,6 +1478,45 @@ def _latest_apk():
     }
 
 
+# Что сторож записал о перебоях. Файл пишет /usr/local/bin/se-mobile-watchdog,
+# приложение только читает.
+_WATCHDOG_LOG = os.environ.get(
+    'WATCHDOG_LOG', '/var/lib/se-mobile/watchdog/outages.log')
+
+
+def _outage_state(limit=5):
+    """Когда сервер в последний раз не отвечал.
+
+    Сбой 12 сентября прожил восемь дней, и узнали о нём от сотрудника.
+    Сторож теперь его заметит и поднимет упавшее, но заметить мало: надо,
+    чтобы это увидел человек. Поэтому последние записи показываются там же,
+    где копии базы и свежесть данных.
+
+    Пусто — хорошо: сервер не падал с тех пор, как завели журнал.
+    """
+    try:
+        with open(_WATCHDOG_LOG, encoding='utf-8', errors='replace') as f:
+            # Журнал растёт медленно (строка на сбой), но читать его целиком
+            # незачем: берём хвост.
+            lines = f.readlines()[-200:]
+    except FileNotFoundError:
+        return {'available': True, 'entries': [], 'total': 0}
+    except OSError as e:
+        return {'available': False, 'reason': str(e), 'entries': [], 'total': 0}
+
+    entries = []
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        when, _, what = line.partition(' ')
+        entries.append({'at': when, 'what': what})
+        if len(entries) >= limit:
+            break
+    return {'available': True, 'entries': entries,
+            'total': sum(1 for l in lines if l.strip())}
+
+
 def _backup_state():
     """Когда была последняя копия базы и сколько их всего.
 
@@ -1568,6 +1607,27 @@ def register_routes(app):
             return jsonify({'message': 'Failure', 'error': 'locked',
                             'retry_after': seconds}), 429
         return jsonify({'message': 'Failure'})
+
+    @app.route('/health', methods=['GET'])
+    def health():
+        """Жив ли сервер — вместе с базой, а не сам по себе.
+
+        Двенадцатого сентября приложение отвечало, а база лежала: процесс был
+        на месте, systemd считал службу исправной, и сбой прожил восемь дней —
+        ровно до первой жалобы сотрудника. Значит, «работает» надо проверять
+        запросом в базу, а не тем, что порт открыт.
+
+        Отвечает 503, когда базы нет: по этому коду за него может взяться и
+        сторож на сервере, и любой сторонний присмотр, если его когда-нибудь
+        заведут.
+        """
+        try:
+            db.session.execute(db.text('SELECT 1'))
+            return jsonify({'status': 'ok', 'database': 'ok'})
+        except Exception as e:
+            db.session.rollback()
+            logging.error('Проверка здоровья не прошла: %s', e)
+            return jsonify({'status': 'fail', 'database': str(e)[:200]}), 503
 
     @app.route('/api/app/latest', methods=['GET'])
     def app_latest():
@@ -2631,6 +2691,8 @@ def register_routes(app):
             # «сколько людей на старой версии» не на что и смотреть: обновиться
             # им неоткуда.
             'app': _latest_apk(),
+            # Что сторож записал о перебоях. Пусто — сервер не падал.
+            'outages': _outage_state(),
         })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])

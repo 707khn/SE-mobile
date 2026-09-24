@@ -116,6 +116,12 @@ class RolloutReport {
   /// Почему её нет.
   String appProblem = '';
 
+  /// Последние перебои, замеченные сторожем на сервере. Пусто — не падал.
+  List<Outage> outages = <Outage>[];
+
+  /// Сколько записей в журнале сторожа всего.
+  int outageTotal = 0;
+
   /// Копии базы: сколько дней назад делалась последняя и сколько их всего.
   /// null в [backupDaysAgo] — копий нет или папка недоступна.
   int? backupDaysAgo;
@@ -155,6 +161,15 @@ Future<RolloutReport> fetchRollout() async {
   report.temporaryPasswords =
       (body['temporary_passwords'] as num?)?.toInt() ?? 0;
   report.data = _dataSources(body['data']);
+  final outages = (body['outages'] as Map?) ?? {};
+  report.outageTotal = (outages['total'] as num?)?.toInt() ?? 0;
+  report.outages = ((outages['entries'] as List?) ?? [])
+      .whereType<Map>()
+      .map((e) => Outage(
+            at: DateTime.tryParse((e['at'] as String?) ?? ''),
+            what: (e['what'] as String?) ?? '',
+          ))
+      .toList();
   final app = (body['app'] as Map?) ?? {};
   if (app['available'] == true) {
     report.appOnServer = '${app['version']} (${app['build']})';
@@ -216,4 +231,17 @@ List<DataSource> _dataSources(dynamic raw) {
       note: (d['note'] as String?) ?? '',
     );
   }).toList();
+}
+
+
+/// Перебой, записанный сторожем на сервере.
+///
+/// Сбой 12 сентября прожил восемь дней, и узнали о нём от сотрудника.
+/// Сторож теперь поднимает упавшее сам, но заметить мало — надо, чтобы это
+/// увидел человек.
+class Outage {
+  const Outage({required this.at, required this.what});
+
+  final DateTime? at;
+  final String what;
 }
