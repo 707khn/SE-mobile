@@ -253,6 +253,35 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now se-mobile-backup.timer
 
+say "Сторож"
+# Двенадцатого сентября приложение отвечало, а база лежала: systemd считал
+# службу исправной, и сбой прожил восемь дней — до первой жалобы сотрудника.
+# Сторож спрашивает /health, который ходит в базу, и при двух неудачах подряд
+# поднимает то, что упало. Всё, что он делал, остаётся в
+# /var/lib/se-mobile/watchdog/outages.log — сколько сервер не работал, видно
+# потом, а не со слов.
+mkdir -p /var/lib/se-mobile/watchdog
+cp "$APP_DIR/deploy/watchdog.sh" /usr/local/bin/se-mobile-watchdog
+chmod +x /usr/local/bin/se-mobile-watchdog
+cat > /etc/systemd/system/se-mobile-watchdog.service <<'UNIT'
+[Unit]
+Description=Сторож SE-mobile
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/se-mobile-watchdog
+UNIT
+cat > /etc/systemd/system/se-mobile-watchdog.timer <<'UNIT'
+[Unit]
+Description=Сторож SE-mobile раз в две минуты
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now se-mobile-watchdog.timer
+
 say "Файрвол"
 ufw allow OpenSSH >/dev/null
 ufw allow 'Nginx Full' >/dev/null

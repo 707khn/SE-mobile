@@ -118,6 +118,20 @@ class _RolloutScreenState extends State<RolloutScreen> {
       Text('rollout_passwords_why'.tr,
           style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
       SizedBox(height: Dimensions.height30 / 1.5),
+      _section('rollout_outages'.tr),
+      if (r.outages.isEmpty)
+        _line('rollout_outages_none'.tr, '', muted: true)
+      else
+        ...r.outages.map((o) => _line(
+            o.at == null
+                ? o.what
+                : '${DateFormat('dd.MM HH:mm').format(o.at!.toLocal())} · ${o.what}',
+            '',
+            muted: true)),
+      SizedBox(height: Dimensions.height30 / 2),
+      Text('rollout_outages_why'.tr,
+          style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
+      SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_backups'.tr),
       if (r.backupProblem.isNotEmpty)
         _line('rollout_backups_none'.tr, '', muted: true)
