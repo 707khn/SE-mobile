@@ -2,6 +2,7 @@ import os
 import logging
 import re
 import secrets
+import threading
 from functools import wraps
 from datetime import date, datetime, timedelta, timezone
 from flask import Flask, request, jsonify, g
@@ -1019,12 +1020,57 @@ def _load_site_news(page_url):
     return parse_news_html(body, final_url), 'страница'
 
 
+# Пока один поток ходит за новостями, второму ходить незачем.
+_news_lock = threading.Lock()
+
+
+def _refresh_news_later(app):
+    """Сходить за новостями, не задерживая того, кто открыл ленту.
+
+    Раньше ходили прямо в его запросе. Срок на поход — двенадцать секунд, и
+    пока чужой сайт молчит, у человека крутится ожидание: раз в четверть часа
+    кому-то одному доставался именно такой вход в «Новости». Лента — едва ли
+    не единственное, что в приложении обновляется само, и заставлять ждать
+    как раз её — хуже всего.
+
+    Теперь ему отдаётся то, что уже в базе, а за новым идёт отдельный поток.
+    Следующий открывший увидит свежее.
+
+    Пора ли идти — решается здесь же, а не в обработчике: обработчику для
+    этого пришлось бы объявлять глобальную переменную, а такую забытую
+    строку Python встречает `UnboundLocalError` на каждом запросе ленты.
+    """
+    global _news_checked_at
+    now = datetime.utcnow()
+    if _news_checked_at is not None and now - _news_checked_at < _NEWS_REFRESH:
+        return
+    if not _news_lock.acquire(blocking=False):
+        return  # кто-то уже пошёл
+    _news_checked_at = now
+
+    def _run():
+        try:
+            with app.app_context():
+                _refresh_site_news(force=True)
+        except Exception as e:
+            logging.warning('Фоновое обновление новостей не удалось: %s', e)
+        finally:
+            _news_lock.release()
+
+    threading.Thread(target=_run, name='news-refresh', daemon=True).start()
+
+
 def _refresh_site_news(force=False):
     """Забирает новости сайта, если давно не забирали.
 
-    Ходим лениво, при чтении ленты приложением, а не по расписанию: отдельный
+    Ходим лениво, по факту чтения ленты, а не по расписанию: отдельный
     таймер — ещё одна деталь, которая ломается молча. Ошибка сети здесь не
     ошибка запроса: показываем то, что уже лежит в базе.
+
+    Сам поход блокирующий и занимает до двенадцати секунд. Из обработчика
+    запроса его зовут через _refresh_news_later, чтобы эти секунды ждал не
+    человек; напрямую — только администратор, который нажал «обновить» и ждёт
+    ответа по делу.
     """
     global _news_checked_at
     page_url = os.environ.get('NEWS_FEED_URL', '').strip() or _NEWS_SOURCE
@@ -2646,7 +2692,9 @@ def register_routes(app):
     @require_auth
     def get_news():
         """Лента для сотрудников: новости сайта и одобренные объявления."""
-        _refresh_site_news()
+        # За новыми ходим в стороне: двенадцать секунд чужого молчания не
+        # должны быть его двенадцатью секундами.
+        _refresh_news_later(app)
         # Сколько новостей отдать. Не число — берём обычные пятьдесят: это
         # лента, а не запрос, который стоит отклонять из-за опечатки.
         try:
