@@ -745,7 +745,7 @@ class _MainPage2State extends State<MainPage2> {
                   child: Text(
                     'select_employee_hint'.tr,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: context.mutedColor.withOpacity(0.55), fontSize: 13),
+                    style: TextStyle(color: context.mutedColor, fontSize: 13),
                   ),
                 ),
               ],

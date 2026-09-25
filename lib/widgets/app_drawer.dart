@@ -11,11 +11,11 @@ import '../screens/change_password_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/pin_screen.dart';
-import '../screens/home_shell.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
 import '../utils/app_version.dart';
 import '../utils/colors.dart';
+import '../utils/shell_tab.dart';
 import '../utils/dimensions.dart';
 import '../utils/theme_pref.dart';
 import '../utils/logout_helper.dart';
@@ -32,7 +32,7 @@ import '../utils/app_theme.dart';
 class AppDrawer extends StatefulWidget {
   const AppDrawer({Key? key, this.onNavigate, this.currentIndex}) : super(key: key);
 
-  /// Supplied by the tabs inside [HomeShell] to switch tab directly. When null
+  /// Supplied by the tabs inside the shell to switch tab directly. When null
   /// the drawer is on a pushed screen and rebuilds the shell instead.
   final ValueChanged<int>? onNavigate;
 
@@ -81,18 +81,20 @@ class _AppDrawerState extends State<AppDrawer> {
     return parts.isNotEmpty ? parts.first : _fullName;
   }
 
-  /// Inside the shell this switches tab; from a pushed screen it rebuilds the
-  /// shell on the requested tab, dropping the stack behind it.
+  /// Переход на вкладку — из самой вкладки или с открытого поверх экрана.
+  ///
+  /// Прежде со второго случая оболочка создавалась заново (`Get.offAll`).
+  /// Вместе с ней заново создавались все пять вкладок, уходило пять запросов
+  /// к серверу, а открытый расчётный лист, выбранный период и прокрутка
+  /// пропадали: человек нажимал «Проходы» и заодно терял всё, что успел
+  /// настроить.
+  ///
+  /// Теперь оболочка одна на сеанс. Меняем в ней вкладку и сворачиваем
+  /// стопку экранов, открытых поверх неё.
   void _goToTab(int index) {
-    final onNavigate = widget.onNavigate;
-    if (onNavigate != null) {
-      onNavigate(index);
-    } else {
-      Get.offAll(() => HomeShell(
-            fullName: _fullName,
-            job: _job,
-            initialIndex: index,
-          ));
+    ShellTab.open(index);
+    if (widget.onNavigate == null) {
+      Get.until((route) => route.isFirst);
     }
   }
 

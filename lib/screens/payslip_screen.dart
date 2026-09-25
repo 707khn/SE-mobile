@@ -233,7 +233,12 @@ class _PayslipPageState extends State<PayslipPage> {
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 4,
-                      childAspectRatio: 1.5,
+                      // Высотой, а не пропорцией. При пропорции 1.5 ячейка на
+                      // обычном телефоне выходила 40 точек — меньше
+                      // сорока восьми, ниже которых палец промахивается, а в
+                      // перчатке и подавно. Пропорция к тому же зависит от
+                      // ширины экрана, то есть на узком было бы ещё меньше.
+                      mainAxisExtent: 52,
                     ),
                     itemCount: 12,
                     itemBuilder: (ctx, i) {
@@ -286,8 +291,7 @@ class _PayslipPageState extends State<PayslipPage> {
                     Text('payslip_months_hint'.tr,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            fontSize: 12,
-                            color: context.mutedColor.withOpacity(0.8))),
+                            fontSize: 12, color: context.mutedColor)),
                   ],
                 ],
               ),
@@ -428,8 +432,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             }),
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                color: context.mutedColor.withOpacity(0.75),
-                                fontSize: 13),
+                                color: context.mutedColor, fontSize: 13),
                           ),
                           SizedBox(height: Dimensions.height30 / 2),
                           ElevatedButton.icon(
@@ -446,8 +449,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             'payslip_none_at_all'.tr,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                color: context.mutedColor.withOpacity(0.75),
-                                fontSize: 13),
+                                color: context.mutedColor, fontSize: 13),
                           ),
                         ] else ...[
                           SizedBox(height: Dimensions.height30 / 2),

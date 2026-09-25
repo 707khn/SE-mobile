@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../utils/colors.dart';
 import '../utils/role_helper.dart';
+import '../utils/shell_tab.dart';
 import 'home_screen.dart';
 import 'leave_screen.dart';
 import 'main_screen_1.dart';
@@ -31,14 +32,67 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  late int _selectedIndex = widget.initialIndex;
+  int get _selectedIndex => ShellTab.selected.value;
+
+  /// Вкладки, на которых человек уже побывал.
+  ///
+  /// IndexedStack создаёт всех своих детей сразу, а четверо из пяти при
+  /// создании идут в сеть: расчётный лист — дважды, отпуска, меню. То есть
+  /// запуск приложения отправлял пять-шесть запросов, четыре из них — за
+  /// экранами, которые человек, может, и не откроет, и все они задерживали
+  /// тот экран, который он открыть хотел.
+  ///
+  /// Вкладка создаётся, когда на неё заходят впервые, и дальше живёт: всё
+  /// сохранённое на ней остаётся, как и раньше.
+  late final Set<int> _visited = {widget.initialIndex};
+
+  @override
+  void initState() {
+    super.initState();
+    ShellTab.selected.value = widget.initialIndex;
+    ShellTab.selected.addListener(_onTabChanged);
+  }
+
+  @override
+  void dispose() {
+    ShellTab.selected.removeListener(_onTabChanged);
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (!mounted) return;
+    setState(() => _visited.add(ShellTab.selected.value));
+  }
 
   /// The admin account has no attendance, payslip or leave of its own, so the
   /// tabs would lead to empty screens. Only the admin panel is offered, from
   /// the Home tab — which makes the bar itself redundant.
   bool get _isAdmin => isSystemAdmin(widget.job);
 
-  void _navigateTo(int index) => setState(() => _selectedIndex = index);
+  void _navigateTo(int index) => ShellTab.open(index);
+
+  Widget _tab(int index) {
+    switch (index) {
+      case 1:
+        return MainPage1(
+          fullName: widget.fullName,
+          job: widget.job,
+          onNavigate: _navigateTo,
+        );
+      case 2:
+        return PayslipPage(onNavigate: _navigateTo);
+      case 3:
+        return LeavePage(onNavigate: _navigateTo);
+      case 4:
+        return MenuScreen(onNavigate: _navigateTo, job: widget.job);
+      default:
+        return HomeScreen(
+          fullName: widget.fullName,
+          job: widget.job,
+          onNavigate: _navigateTo,
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +104,7 @@ class _HomeShellState extends State<HomeShell> {
       onPopInvoked: (didPop) {
         if (didPop) return;
         if (_selectedIndex != 0) {
-          setState(() => _selectedIndex = 0);
+          ShellTab.open(0);
         } else {
           SystemNavigator.pop();
         }
@@ -59,19 +113,11 @@ class _HomeShellState extends State<HomeShell> {
         body: IndexedStack(
           index: _selectedIndex,
           children: [
-            HomeScreen(
-              fullName: widget.fullName,
-              job: widget.job,
-              onNavigate: _navigateTo,
-            ),
-            MainPage1(
-              fullName: widget.fullName,
-              job: widget.job,
-              onNavigate: _navigateTo,
-            ),
-            PayslipPage(onNavigate: _navigateTo),
-            LeavePage(onNavigate: _navigateTo),
-            MenuScreen(onNavigate: _navigateTo, job: widget.job),
+            for (var i = 0; i < 5; i++)
+              _visited.contains(i)
+                  ? _tab(i)
+                  // Ещё не открывали — и в сеть за ней не ходим.
+                  : const SizedBox.shrink(),
           ],
         ),
         bottomNavigationBar: _isAdmin

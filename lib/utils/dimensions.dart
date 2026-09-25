@@ -1,28 +1,48 @@
 import 'package:get/get.dart';
 
+import 'ui_scale.dart';
+
+/// Размеры: отступы, радиусы, кегли.
+///
+/// Названия — это размер на **эталонном телефоне 392×800**: `fontSize14` там
+/// и есть четырнадцать. На других экранах всё пропорционально, но с
+/// ограничением — см. [uiScale].
+///
+/// Прежде пропорция была без ограничения, и это било по тем, у кого телефон
+/// хуже: на экране 320×640 «четырнадцатый» кегль выходил **11,5** — мельче,
+/// чем читается в цеху, — а на планшете раздувался до **22,9**. Меньший экран
+/// требует относительно более крупного текста, а не более мелкого.
+///
+/// Считаются при обращении, а не один раз при загрузке класса: поворот экрана,
+/// раскладной телефон и режим двух окон меняют размеры, а запомненные при
+/// старте остались бы прежними.
 class Dimensions {
-  static double screenHeight = Get.context!.height;
-  static double screenWidth = Get.context!.width;
+  static double get screenHeight => Get.context?.height ?? kReferenceHeight;
+  static double get screenWidth => Get.context?.width ?? kReferenceWidth;
 
-  static double height30 = screenHeight/26.036;
-  static double height35 = screenHeight/22.319;
-  static double height60 = screenHeight/13.018;
-  static double height100 = screenHeight/7.848;
-  static double height120 = screenHeight/6.509;
+  static double get _v => uiScale(screenHeight, kReferenceHeight);
+  static double get _h => uiScale(screenWidth, kReferenceWidth);
 
-  static double width20 = screenWidth/19.624;
-  static double width40 = screenWidth/9.812;
-  static double width70 = screenWidth/5.610;
-  static double width120 = screenWidth/3.271;
+  static double get height30 => 30 * _v;
+  static double get height35 => 35 * _v;
+  static double get height60 => 60 * _v;
+  static double get height100 => 100 * _v;
+  static double get height120 => 120 * _v;
 
-  static double fontSize14 = screenHeight/55.792;
-  static double fontSize16 = screenHeight/48.818;
-  static double fontSize18 = screenHeight/43.393;
-  static double fontSize20 = screenHeight/39.0545;
-  static double fontSize25 = screenHeight/32.5545;
-  static double fontSize30 = screenHeight/26.036;
+  static double get width20 => 20 * _h;
+  static double get width40 => 40 * _h;
+  static double get width70 => 70 * _h;
+  static double get width120 => 120 * _h;
 
-  static double radius25 = screenHeight/31.244;
-  static double radius50 = screenHeight/15.622;
+  // Кегли множатся ещё и на системный размер шрифта — он берётся в main.dart
+  // и ограничен там же. Здесь только поправка на экран.
+  static double get fontSize14 => 14 * _v;
+  static double get fontSize16 => 16 * _v;
+  static double get fontSize18 => 18 * _v;
+  static double get fontSize20 => 20 * _v;
+  static double get fontSize25 => 25 * _v;
+  static double get fontSize30 => 30 * _v;
 
+  static double get radius25 => 25 * _v;
+  static double get radius50 => 50 * _v;
 }
