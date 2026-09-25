@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/logout_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
@@ -44,11 +45,11 @@ class _AdminPageState extends State<AdminPage> {
   Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "RU");
+      prefs.setString(AppValues.LANG, Lang.ru);
     }
     final login = await SecureStorageHelper.instance.getLogin();
     setState(() {
-      _lang = prefs.getString(AppValues.LANG)!;
+      _lang = Lang.code(prefs.getString(AppValues.LANG));
       _login = login;
     });
   }
@@ -152,7 +153,7 @@ class _AdminPageState extends State<AdminPage> {
                                         padding: EdgeInsets.only(right: Dimensions.width20 / 1.5),
                                         child: GestureDetector(
                                           onTap: _changeLanguage,
-                                          child: _lang == "KZ"
+                                          child: Lang.isKazakh(_lang)
                                               ? SizedBox(
                                                   width: Dimensions.width20 * 1.25,
                                                   height: Dimensions.height30 * 1.25,
@@ -397,7 +398,7 @@ class _AdminPageState extends State<AdminPage> {
     final firstName = (_nameParts.length >= 2 && _nameParts[1].isNotEmpty)
         ? _nameParts[1]
         : (_nameParts.isNotEmpty ? _nameParts.first : widget.fullName);
-    final days = _lang == 'RU'
+    final days = !Lang.isKazakh(_lang)
         ? ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
         : ['Дүйсенбі', 'Сейсенбі', 'Сәрсенбі', 'Бейсенбі', 'Жұма', 'Сенбі', 'Жексенбі'];
     final dayName = days[now.weekday - 1];
@@ -451,16 +452,11 @@ class _AdminPageState extends State<AdminPage> {
 
   _changeLanguage() async {
     Navigator.pop(context);
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    if (_lang == "KZ") {
-      prefs.setString(AppValues.LANG, "RU");
-      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
-    } else if (_lang == "RU") {
-      prefs.setString(AppValues.LANG, "KZ");
-      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
-    }
+    final prefs = await SharedPreferences.getInstance();
+    final next = Lang.isKazakh(_lang) ? Lang.ru : Lang.kk;
+    await prefs.setString(AppValues.LANG, next);
+    Get.updateLocale(Locale(next));
+    if (mounted) setState(() => _lang = next);
   }
 
   _exit() => confirmAndLogout(context);

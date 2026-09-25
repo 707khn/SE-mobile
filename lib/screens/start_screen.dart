@@ -5,6 +5,7 @@ import '../requests/login_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/secure_storage_helper.dart';
+import '../utils/lang.dart';
 import '../utils/variables.dart';
 import '../widgets/custom_login_field.dart';
 import '../widgets/custom_text.dart';
@@ -62,10 +63,10 @@ class CustomFormState extends State<CustomForm> {
   Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "RU");
+      prefs.setString(AppValues.LANG, Lang.ru);
     }
     setState(() {
-      _lang = prefs.getString(AppValues.LANG)!;
+      _lang = Lang.code(prefs.getString(AppValues.LANG));
     });
     final savedLogin = await SecureStorageHelper.instance.getLogin();
     if (savedLogin != null && savedLogin.isNotEmpty && loginController.text.isEmpty) {
@@ -117,11 +118,11 @@ class CustomFormState extends State<CustomForm> {
                         width: Dimensions.width20 * 1.25,
                         height: Dimensions.height30 * 1.25,
                         child: Image.asset(
-                            _lang == "KZ" ? 'assets/ru.png' : 'assets/kz.png'),
+                            Lang.isKazakh(_lang) ? 'assets/ru.png' : 'assets/kz.png'),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _lang == "KZ" ? 'RU' : 'KZ',
+                        Lang.isKazakh(_lang) ? 'RU' : 'KZ',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -183,15 +184,10 @@ class CustomFormState extends State<CustomForm> {
   }
 
   _changeLanguage() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    if (_lang == "KZ") {
-      prefs.setString(AppValues.LANG, "RU");
-      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      setState(() => _lang = prefs.getString(AppValues.LANG)!);
-    } else if (_lang == "RU") {
-      prefs.setString(AppValues.LANG, "KZ");
-      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      setState(() => _lang = prefs.getString(AppValues.LANG)!);
-    }
+    final prefs = await SharedPreferences.getInstance();
+    final next = Lang.isKazakh(_lang) ? Lang.ru : Lang.kk;
+    await prefs.setString(AppValues.LANG, next);
+    Get.updateLocale(Locale(next));
+    if (mounted) setState(() => _lang = next);
   }
 }

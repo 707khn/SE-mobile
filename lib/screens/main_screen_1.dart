@@ -13,6 +13,7 @@ import '../functions/generate_csv.dart';
 import '../utils/access_report.dart';
 import '../utils/search_fold.dart';
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
 import '../variables.dart';
@@ -68,7 +69,7 @@ class _MainPage1State extends State<MainPage1> {
   Future<void> initializeSharedPreferences() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "RU");
+      prefs.setString(AppValues.LANG, Lang.ru);
     }
   }
 

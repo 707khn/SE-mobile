@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/dimensions.dart';
 
 /// Day-by-day header used by the screens that show one date at a time.
@@ -32,11 +33,11 @@ class DayNavigator extends StatelessWidget {
   }
 
   String get _label {
-    final day = DateFormat('d MMMM', 'ru').format(date);
+    final day = DateFormat('d MMMM', Lang.dates).format(date);
     if (_isToday) return '${'today'.tr}, $day';
     // Capitalised by hand rather than via intl's helper, whose nullability
     // differs between versions.
-    final weekday = DateFormat('EEEE', 'ru').format(date);
+    final weekday = DateFormat('EEEE', Lang.dates).format(date);
     final named = weekday.isEmpty
         ? weekday
         : weekday[0].toUpperCase() + weekday.substring(1);

@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../requests/payslip_request.dart';
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/offline_notice.dart';
@@ -268,7 +269,7 @@ class _PayslipPageState extends State<PayslipPage> {
                           ),
                           child: Center(
                             child: Text(
-                              DateFormat('MMM', 'ru').format(DateTime(selYear, m)),
+                              DateFormat('MMM', Lang.dates).format(DateTime(selYear, m)),
                               style: TextStyle(
                                 color: isSelected
                                     ? Colors.white
@@ -383,7 +384,7 @@ class _PayslipPageState extends State<PayslipPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          DateFormat('MMMM yyyy', 'ru').format(_selectedDate),
+                          DateFormat('MMMM yyyy', Lang.dates).format(_selectedDate),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                       ),
@@ -427,7 +428,7 @@ class _PayslipPageState extends State<PayslipPage> {
                           SizedBox(height: Dimensions.height30 / 3),
                           Text(
                             'payslip_latest_is'.trParams({
-                              'period': DateFormat('LLLL yyyy', 'ru')
+                              'period': DateFormat('LLLL yyyy', Lang.dates)
                                   .format(_latestSlip!)
                             }),
                             textAlign: TextAlign.center,

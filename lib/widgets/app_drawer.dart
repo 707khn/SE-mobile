@@ -15,6 +15,7 @@ import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
 import '../utils/app_version.dart';
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/shell_tab.dart';
 import '../utils/dimensions.dart';
 import '../utils/theme_pref.dart';
@@ -44,7 +45,7 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
-  String _lang = "RU";
+  String _lang = Lang.ru;
   ThemeMode _themeMode = ThemeMode.system;
   String _fullName = '';
   String _job = '';
@@ -64,7 +65,7 @@ class _AppDrawerState extends State<AppDrawer> {
     final login = await storage.getLogin();
     if (!mounted) return;
     setState(() {
-      _lang = prefs.getString(AppValues.LANG) ?? "RU";
+      _lang = Lang.code(prefs.getString(AppValues.LANG));
       _themeMode = ThemePref.read(prefs);
       _fullName = fullName ?? '';
       _job = job ?? '';
@@ -199,7 +200,7 @@ class _AppDrawerState extends State<AppDrawer> {
                 ),
                 _item(
                   icon: Icons.translate,
-                  label: _lang == "KZ" ? 'Русский' : 'Қазақша',
+                  label: Lang.isKazakh(_lang) ? 'Русский' : 'Қазақша',
                   onTap: _changeLanguage,
                 ),
                 _item(
@@ -426,7 +427,7 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Future<void> _changeLanguage() async {
     final prefs = await SharedPreferences.getInstance();
-    final next = _lang == "KZ" ? "RU" : "KZ";
+    final next = Lang.isKazakh(_lang) ? Lang.ru : Lang.kk;
     await prefs.setString(AppValues.LANG, next);
     Get.updateLocale(Locale(next));
     if (mounted) setState(() => _lang = next);

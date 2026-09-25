@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:se_mobile/utils/lang.dart';
 import 'package:se_mobile/utils/localization.dart';
 
 /// Ключ, забытый в одном из языков, GetX показывает как есть: человек видит
@@ -8,14 +9,18 @@ import 'package:se_mobile/utils/localization.dart';
 void main() {
   final keys = LocaleString().keys;
 
-  test('оба языка на месте', () {
-    expect(keys.containsKey('RU'), isTrue);
-    expect(keys.containsKey('KZ'), isTrue);
+  test('оба языка на месте, и под настоящими кодами', () {
+    // «RU» и «KZ» — не коды языков. Пока они были ими, supportedLocales знал
+    // только про русский, и выбор даты, «ОК» и «Отмена» оставались русскими
+    // даже у того, кто переключил приложение на казахский.
+    expect(keys.containsKey(Lang.ru), isTrue);
+    expect(keys.containsKey(Lang.kk), isTrue);
+    expect(keys.keys.toSet(), <String>{Lang.ru, Lang.kk});
   });
 
   test('набор ключей совпадает', () {
-    final ru = keys['RU']!.keys.toSet();
-    final kz = keys['KZ']!.keys.toSet();
+    final ru = keys[Lang.ru]!.keys.toSet();
+    final kz = keys[Lang.kk]!.keys.toSet();
     expect(ru.difference(kz), isEmpty, reason: 'нет в казахском');
     expect(kz.difference(ru), isEmpty, reason: 'нет в русском');
   });
@@ -33,8 +38,8 @@ void main() {
     // «Вышла версия @version» без @version в казахском оставит человека без
     // номера версии — и никто не заметит.
     final pattern = RegExp(r'@[a-zA-Z_]+');
-    final ru = keys['RU']!;
-    final kz = keys['KZ']!;
+    final ru = keys[Lang.ru]!;
+    final kz = keys[Lang.kk]!;
     for (final key in ru.keys) {
       final inRu = pattern.allMatches(ru[key]!).map((m) => m.group(0)!).toSet();
       // Нет ключа в казахском — про это уже сказала проверка выше;

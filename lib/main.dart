@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/date_symbol_data_local.dart';
 import 'package:se_mobile/screens/start_screen.dart';
 import 'package:se_mobile/utils/app_theme.dart';
 import 'package:se_mobile/utils/colors.dart';
@@ -17,6 +16,7 @@ import 'screens/pin_screen.dart';
 import 'utils/api.dart';
 import 'utils/app_lock.dart';
 import 'utils/error_log.dart';
+import 'utils/lang.dart';
 import 'utils/secure_storage_helper.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
@@ -46,7 +46,10 @@ void main() {
           where: details.library ?? '');
     };
 
-    await initializeDateFormatting('ru');
+    // Русские названия месяцев и дней недели — и казахские, если intl их
+    // знает. Прежде готовились только русские, и переключённое на казахский
+    // приложение показывало «июля 2026».
+    await Lang.initDates();
     await initializeSharedPreferences();
 
     try {
@@ -87,9 +90,16 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('ru'),
-      ],
+      // Здесь перечислено то, что умеет сам Flutter: выбор даты, кнопки «ОК»
+      // и «Отмена», меню выделения текста. Пока в списке был один русский,
+      // всё это оставалось русским даже у того, кто переключил приложение на
+      // казахский.
+      //
+      // Казахский попадает в список, только если Flutter его знает: объявить
+      // язык, которого у него нет, — значит уронить экран на
+      // MaterialLocalizations.of. Не знает — эти надписи останутся русскими,
+      // а текст самого приложения всё равно казахский.
+      supportedLocales: Lang.supported,
       title: 'SemEng',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
@@ -148,7 +158,8 @@ class MyApp extends StatelessWidget {
           }
         },
       ),
-      locale: Locale(prefs.getString(AppValues.LANG) ?? "RU"),
+      locale: Lang.locale(prefs.getString(AppValues.LANG)),
+      fallbackLocale: const Locale(Lang.ru),
       translations: LocaleString(),
     );
   }
