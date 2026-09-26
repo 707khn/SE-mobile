@@ -1,0 +1,84 @@
+name: Проверки сервера
+
+# Их не запускал никто, кроме человека, который их писал. Сто двадцать пять
+# проверок сервера — того самого, от которого зависят сто тридцать человек, —
+# существовали и молчали: сломай кто-нибудь вход или права, узнали бы об этом
+# на боевом сервере.
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'se-mobile-backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'se-mobile-backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    # Дважды: на SQLite и на настоящем PostgreSQL.
+    #
+    # Это не перестраховка. SQLite прощает то, чего PostgreSQL не прощает:
+    # длину строковых колонок он не проверяет вовсе, а внешние ключи по
+    # умолчанию не ведёт. На обоих здесь уже обжигались на боевом сервере — на
+    # длине колонки и на auth_tokens при склейке сотрудников, — и в обоих
+    # случаях проверки на SQLite были зелёными.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: SQLite
+            database_url: ''
+          - name: PostgreSQL 16
+            database_url: 'postgresql://postgres:postgres@localhost:5432/se_mobile_test'
+
+    name: ${{ matrix.name }}
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: se_mobile_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            se-mobile-backend/requirements.txt
+            se-mobile-backend/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: se-mobile-backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: pytest
+        working-directory: se-mobile-backend
+        env:
+          # Пусто — conftest возьмёт SQLite в памяти.
+          DATABASE_URL: ${{ matrix.database_url }}
+        run: pytest tests/ -q

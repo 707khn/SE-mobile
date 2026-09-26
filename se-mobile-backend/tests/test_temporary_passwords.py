@@ -79,14 +79,15 @@ def test_the_seeder_finds_them_without_a_list(app):
         db.session.commit()
 
 
-def test_signing_in_with_the_number_asks_for_a_new_password(app, client):
+def test_signing_in_with_the_number_asks_for_a_new_password(app, client,
+                                                            remove_employee):
     """Тот же вопрос со стороны человека, который входит.
 
     Флаг ставится в момент входа, бесплатно: хеш всё равно только что
     проверен. Поэтому учётка, заведённая в обход сидеров, тоже попадётся.
     """
     with app.app_context():
-        db.session.add(Employee(employee_id='0000009001',
+        db.session.add(Employee(employee_id=remove_employee('0000009001'),
                                 full_name='Временный Пароль Тестович',
                                 job_title='Слесарь'))
         db.session.add(UserAccount(
@@ -117,10 +118,8 @@ def test_signing_in_with_the_number_asks_for_a_new_password(app, client):
     assert again['message'] == 'Success'
     assert again['must_change_password'] is False
 
-    with app.app_context():
-        db.session.delete(db.session.get(UserAccount, '0000009001'))
-        db.session.delete(db.session.get(Employee, '0000009001'))
-        db.session.commit()
+    # Убирает remove_employee: вход выдал пропуск, и просто удалить сотрудника
+    # PostgreSQL не даст — на него ссылается auth_tokens.
 
 
 def test_disabled_account_cannot_sign_in(app, client):
@@ -213,9 +212,12 @@ def test_resetting_the_admin_does_not_hand_back_the_word_admin(app, client):
                           headers={'Authorization': f'Bearer {admin_token}'})
     assert numeric.get_json()['temporary_password'] == '1874'
 
-    # Возвращаем администратора на известный пароль: учётка общая на весь прогон.
+    # Возвращаем администратора на известный пароль: учётка общая на весь
+    # прогон. Флаг оставляем поднятым — иначе второй прогон по той же базе
+    # (а на своём PostgreSQL их гоняют подряд) увидит администратора с
+    # «улёгшимся» паролем и справедливо возмутится. Входу флаг не мешает.
     with app.app_context():
         admin_account = db.session.get(UserAccount, 'admin')
         admin_account.password_hash = generate_password_hash(ADMIN_PASSWORD)
-        admin_account.must_change_password = False
+        admin_account.must_change_password = True
         db.session.commit()

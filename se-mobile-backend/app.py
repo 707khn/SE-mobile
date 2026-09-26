@@ -1272,7 +1272,10 @@ def create_app():
 
     logging.basicConfig(level=logging.INFO)
 
-    db_url = os.environ.get('DATABASE_URL', 'sqlite:///se_mobile.db')
+    # Пустая строка — это «не задано». `DATABASE_URL=` без значения в
+    # /etc/se-mobile.env иначе уехал бы в SQLAlchemy как адрес базы, и
+    # приложение упало бы на разборе строки вместо понятного отказа.
+    db_url = os.environ.get('DATABASE_URL', '').strip() or 'sqlite:///se_mobile.db'
     # Render выдаёт postgres://, SQLAlchemy требует postgresql://
     if db_url.startswith('postgres://'):
         db_url = db_url.replace('postgres://', 'postgresql://', 1)

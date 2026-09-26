@@ -13,6 +13,7 @@ import '../functions/generate_csv.dart';
 import '../utils/access_report.dart';
 import '../utils/search_fold.dart';
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
 import '../variables.dart';
@@ -68,7 +69,7 @@ class _MainPage1State extends State<MainPage1> {
   Future<void> initializeSharedPreferences() async {
     prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "RU");
+      prefs.setString(AppValues.LANG, Lang.ru);
     }
   }
 
@@ -525,7 +526,7 @@ class _MainMenu1State extends State<MainMenu1> {
                           style: TextStyle(
                               fontSize: 12.5,
                               height: 1.35,
-                              color: context.mutedColor.withOpacity(0.85))),
+                              color: context.mutedColor)),
                     ),
                   ],
                 ),
@@ -611,7 +612,10 @@ class _MainMenu1State extends State<MainMenu1> {
               Text(
                 _emptyHint,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: context.mutedColor.withOpacity(0.55), fontSize: 13),
+                // Без прозрачности. Это подпись, объясняющая пустой экран, —
+                // ровно то, ради чего человек сюда и смотрит. На 0,55 её
+                // контраст 2,1 при норме 4,5: в цеху и на солнце не читается.
+                style: TextStyle(color: context.mutedColor, fontSize: 13),
               ),
             ],
             SizedBox(height: Dimensions.height30),

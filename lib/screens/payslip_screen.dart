@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../requests/payslip_request.dart';
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/dimensions.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/offline_notice.dart';
@@ -233,7 +234,12 @@ class _PayslipPageState extends State<PayslipPage> {
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 4,
-                      childAspectRatio: 1.5,
+                      // Высотой, а не пропорцией. При пропорции 1.5 ячейка на
+                      // обычном телефоне выходила 40 точек — меньше
+                      // сорока восьми, ниже которых палец промахивается, а в
+                      // перчатке и подавно. Пропорция к тому же зависит от
+                      // ширины экрана, то есть на узком было бы ещё меньше.
+                      mainAxisExtent: 52,
                     ),
                     itemCount: 12,
                     itemBuilder: (ctx, i) {
@@ -263,7 +269,7 @@ class _PayslipPageState extends State<PayslipPage> {
                           ),
                           child: Center(
                             child: Text(
-                              DateFormat('MMM', 'ru').format(DateTime(selYear, m)),
+                              DateFormat('MMM', Lang.dates).format(DateTime(selYear, m)),
                               style: TextStyle(
                                 color: isSelected
                                     ? Colors.white
@@ -286,8 +292,7 @@ class _PayslipPageState extends State<PayslipPage> {
                     Text('payslip_months_hint'.tr,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            fontSize: 12,
-                            color: context.mutedColor.withOpacity(0.8))),
+                            fontSize: 12, color: context.mutedColor)),
                   ],
                 ],
               ),
@@ -379,7 +384,7 @@ class _PayslipPageState extends State<PayslipPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          DateFormat('MMMM yyyy', 'ru').format(_selectedDate),
+                          DateFormat('MMMM yyyy', Lang.dates).format(_selectedDate),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                       ),
@@ -423,13 +428,12 @@ class _PayslipPageState extends State<PayslipPage> {
                           SizedBox(height: Dimensions.height30 / 3),
                           Text(
                             'payslip_latest_is'.trParams({
-                              'period': DateFormat('LLLL yyyy', 'ru')
+                              'period': DateFormat('LLLL yyyy', Lang.dates)
                                   .format(_latestSlip!)
                             }),
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                color: context.mutedColor.withOpacity(0.75),
-                                fontSize: 13),
+                                color: context.mutedColor, fontSize: 13),
                           ),
                           SizedBox(height: Dimensions.height30 / 2),
                           ElevatedButton.icon(
@@ -446,8 +450,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             'payslip_none_at_all'.tr,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                color: context.mutedColor.withOpacity(0.75),
-                                fontSize: 13),
+                                color: context.mutedColor, fontSize: 13),
                           ),
                         ] else ...[
                           SizedBox(height: Dimensions.height30 / 2),

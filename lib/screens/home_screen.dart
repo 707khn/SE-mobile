@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/app_update.dart';
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
 import '../utils/variables.dart';
@@ -33,7 +34,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _lang = "RU";
+  String _lang = Lang.ru;
 
   /// Сборка новее установленной, если она лежит на сервере и человек её ещё
   /// не отложил.
@@ -59,10 +60,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "RU");
+      prefs.setString(AppValues.LANG, Lang.ru);
     }
     if (mounted) {
-      setState(() => _lang = prefs.getString(AppValues.LANG)!);
+      setState(() => _lang = Lang.code(prefs.getString(AppValues.LANG)));
     }
   }
 
@@ -307,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       greetKey = 'greeting_evening';
     }
-    final days = _lang == 'KZ'
+    final days = Lang.isKazakh(_lang)
         ? ['Дүйсенбі', 'Сейсенбі', 'Сәрсенбі', 'Бейсенбі', 'Жұма', 'Сенбі', 'Жексенбі']
         : ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
     final dayName = days[now.weekday - 1];

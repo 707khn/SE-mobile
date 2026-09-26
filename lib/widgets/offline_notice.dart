@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../utils/app_theme.dart';
+import '../utils/lang.dart';
 
 /// Полоска «показано сохранённое» над экраном, работающим без связи.
 ///
@@ -25,7 +26,7 @@ class OfflineNotice extends StatelessWidget {
         now.day == moment.day;
     final stamp = sameDay
         ? DateFormat('HH:mm').format(moment)
-        : DateFormat('d MMMM, HH:mm', 'ru').format(moment);
+        : DateFormat('d MMMM, HH:mm', Lang.dates).format(moment);
 
     return Container(
       width: double.infinity,

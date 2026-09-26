@@ -20,6 +20,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../functions/generate_csv.dart';
 import '../requests/reportdate_request.dart';
 import '../utils/colors.dart';
+import '../utils/lang.dart';
 import '../utils/search_fold.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
@@ -82,13 +83,13 @@ class _MainPage2State extends State<MainPage2> {
 
   Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
-    if (prefs.getString(AppValues.LANG) == null) {
-      prefs.setString(AppValues.LANG, "KZ");
-    }
+    // Умолчания здесь нет намеренно. Прежде этот экран при пустой настройке
+    // записывал «KZ», а main.dart считал умолчанием русский, — и язык
+    // зависел от того, какой экран открыли первым.
     final savedEmployees = prefs.getStringList("emp_snames");
     final login = await SecureStorageHelper.instance.getLogin();
     setState(() {
-      _lang = prefs.getString(AppValues.LANG)!;
+      _lang = Lang.code(prefs.getString(AppValues.LANG));
       _login = login;
       if (savedEmployees != null && savedEmployees.isNotEmpty) {
         employees = savedEmployees;
@@ -745,7 +746,7 @@ class _MainPage2State extends State<MainPage2> {
                   child: Text(
                     'select_employee_hint'.tr,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: context.mutedColor.withOpacity(0.55), fontSize: 13),
+                    style: TextStyle(color: context.mutedColor, fontSize: 13),
                   ),
                 ),
               ],
@@ -759,16 +760,11 @@ class _MainPage2State extends State<MainPage2> {
 
   _changeLanguage() async {
     Navigator.pop(context);
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    if (_lang == "KZ") {
-      prefs.setString(AppValues.LANG, "RU");
-      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
-    } else if (_lang == "RU") {
-      prefs.setString(AppValues.LANG, "KZ");
-      Get.updateLocale(Locale(prefs.getString(AppValues.LANG)!));
-      if (mounted) setState(() => _lang = prefs.getString(AppValues.LANG)!);
-    }
+    final prefs = await SharedPreferences.getInstance();
+    final next = Lang.isKazakh(_lang) ? Lang.ru : Lang.kk;
+    await prefs.setString(AppValues.LANG, next);
+    Get.updateLocale(Locale(next));
+    if (mounted) setState(() => _lang = next);
   }
 
   _exit() => confirmAndLogout(context);

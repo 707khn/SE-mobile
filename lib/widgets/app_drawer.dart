@@ -11,11 +11,12 @@ import '../screens/change_password_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/pin_screen.dart';
-import '../screens/home_shell.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
 import '../utils/app_version.dart';
 import '../utils/colors.dart';
+import '../utils/lang.dart';
+import '../utils/shell_tab.dart';
 import '../utils/dimensions.dart';
 import '../utils/theme_pref.dart';
 import '../utils/logout_helper.dart';
@@ -32,7 +33,7 @@ import '../utils/app_theme.dart';
 class AppDrawer extends StatefulWidget {
   const AppDrawer({Key? key, this.onNavigate, this.currentIndex}) : super(key: key);
 
-  /// Supplied by the tabs inside [HomeShell] to switch tab directly. When null
+  /// Supplied by the tabs inside the shell to switch tab directly. When null
   /// the drawer is on a pushed screen and rebuilds the shell instead.
   final ValueChanged<int>? onNavigate;
 
@@ -44,7 +45,7 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
-  String _lang = "RU";
+  String _lang = Lang.ru;
   ThemeMode _themeMode = ThemeMode.system;
   String _fullName = '';
   String _job = '';
@@ -64,7 +65,7 @@ class _AppDrawerState extends State<AppDrawer> {
     final login = await storage.getLogin();
     if (!mounted) return;
     setState(() {
-      _lang = prefs.getString(AppValues.LANG) ?? "RU";
+      _lang = Lang.code(prefs.getString(AppValues.LANG));
       _themeMode = ThemePref.read(prefs);
       _fullName = fullName ?? '';
       _job = job ?? '';
@@ -81,18 +82,20 @@ class _AppDrawerState extends State<AppDrawer> {
     return parts.isNotEmpty ? parts.first : _fullName;
   }
 
-  /// Inside the shell this switches tab; from a pushed screen it rebuilds the
-  /// shell on the requested tab, dropping the stack behind it.
+  /// Переход на вкладку — из самой вкладки или с открытого поверх экрана.
+  ///
+  /// Прежде со второго случая оболочка создавалась заново (`Get.offAll`).
+  /// Вместе с ней заново создавались все пять вкладок, уходило пять запросов
+  /// к серверу, а открытый расчётный лист, выбранный период и прокрутка
+  /// пропадали: человек нажимал «Проходы» и заодно терял всё, что успел
+  /// настроить.
+  ///
+  /// Теперь оболочка одна на сеанс. Меняем в ней вкладку и сворачиваем
+  /// стопку экранов, открытых поверх неё.
   void _goToTab(int index) {
-    final onNavigate = widget.onNavigate;
-    if (onNavigate != null) {
-      onNavigate(index);
-    } else {
-      Get.offAll(() => HomeShell(
-            fullName: _fullName,
-            job: _job,
-            initialIndex: index,
-          ));
+    ShellTab.open(index);
+    if (widget.onNavigate == null) {
+      Get.until((route) => route.isFirst);
     }
   }
 
@@ -197,7 +200,7 @@ class _AppDrawerState extends State<AppDrawer> {
                 ),
                 _item(
                   icon: Icons.translate,
-                  label: _lang == "KZ" ? 'Русский' : 'Қазақша',
+                  label: Lang.isKazakh(_lang) ? 'Русский' : 'Қазақша',
                   onTap: _changeLanguage,
                 ),
                 _item(
@@ -424,7 +427,7 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Future<void> _changeLanguage() async {
     final prefs = await SharedPreferences.getInstance();
-    final next = _lang == "KZ" ? "RU" : "KZ";
+    final next = Lang.isKazakh(_lang) ? Lang.ru : Lang.kk;
     await prefs.setString(AppValues.LANG, next);
     Get.updateLocale(Locale(next));
     if (mounted) setState(() => _lang = next);
