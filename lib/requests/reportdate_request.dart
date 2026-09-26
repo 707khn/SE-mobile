@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
@@ -7,6 +6,7 @@ import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../utils/access_report.dart';
 import '../utils/api.dart';
+import '../utils/load_problem.dart';
 
 /// [employeeId] overrides the signed-in user — used by the admin panel.
 Future<AccessReport> getReportDateEntries(BuildContext context, startdate, enddate,
@@ -41,11 +41,9 @@ Future<AccessReport> getReportDateEntries(BuildContext context, startdate, endda
       }
       return AccessReport(report, coverage);
     } else {
-      return AccessReport.failed;
+      return AccessReport.failedWith(problemForStatus(response.statusCode));
     }
-  } on TimeoutException {
-    return AccessReport.failed;
   } catch (e) {
-    return AccessReport.failed;
+    return AccessReport.failedWith(problemOf(e));
   }
 }

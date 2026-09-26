@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:se_mobile/utils/access_report.dart';
+import 'package:se_mobile/utils/load_problem.dart';
 
 /// Пустой список проходов значил что угодно: нет связи, человека нет в
 /// выгрузке СКУД, в эти дни не проходил. Экран на все три отвечал «нет данных,
@@ -79,6 +80,13 @@ void main() {
 
     test('отказ отличим от пустоты', () {
       expect(AccessReport.failed.isFailure, isTrue);
+    });
+
+    test('отказ несёт причину — экран скажет, что случилось', () {
+      final report = AccessReport.failedWith(LoadProblem.offline);
+      expect(report.isFailure, isTrue);
+      expect(report.problem, LoadProblem.offline);
+      expect(AccessReport.empty.problem, isNull);
     });
 
     test('заполненный отчёт отказом не считается', () {

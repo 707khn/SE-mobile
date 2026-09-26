@@ -21,6 +21,8 @@ import '../widgets/access_log_list.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../utils/app_theme.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 
 
 class MainPage1 extends StatefulWidget {
@@ -157,6 +159,11 @@ class _MainMenu1State extends State<MainMenu1> {
   bool _loadingReport = false;
   bool _dateError = false;
   bool _initError = false;
+  LoadProblem? _problem;
+
+  /// Что повторить по кнопке на экране ошибки: последний месяц или
+  /// выбранный период — смотря что не загрузилось.
+  late Future<void> Function() _retryLoad = _initData;
 
   /// По какое число вообще загружены проходы и есть ли они у этого человека.
   /// Пока сервер не ответил — null, и экран ведёт себя как раньше.
@@ -176,6 +183,7 @@ class _MainMenu1State extends State<MainMenu1> {
   }
 
   Future<void> _initData() async {
+    _retryLoad = _initData;
     setState(() { _loadingReport = true; _initError = false; });
     final report = await getReportEntries(context);
     reportsEntries = report.entries;
@@ -183,6 +191,7 @@ class _MainMenu1State extends State<MainMenu1> {
       setState(() {
         _loadingReport = false;
         _initError = report.isFailure;
+        _problem = report.problem;
         _coverage = report.coverage ?? _coverage;
         _shownPeriodStart = null;
       });
@@ -258,7 +267,13 @@ class _MainMenu1State extends State<MainMenu1> {
     if (startDate.isAfter(endDate)) {
       final tmp = startDate; startDate = endDate; endDate = tmp;
     }
-    setState(() { _loadingReport = true; _dateError = false; _filterText = ''; });
+    _retryLoad = _loadDateReport;
+    setState(() {
+      _loadingReport = true;
+      _dateError = false;
+      _initError = false;
+      _filterText = '';
+    });
     _filterController.clear();
     final report = await getReportDateEntries(
       context,
@@ -270,6 +285,10 @@ class _MainMenu1State extends State<MainMenu1> {
     if (!mounted) return;
     setState(() {
       _loadingReport = false;
+      // Раньше неудача здесь не отмечалась, и экран говорил «за этот период
+      // проходов нет» человеку, у которого просто не было связи.
+      _initError = report.isFailure;
+      _problem = report.problem;
       _coverage = report.coverage ?? _coverage;
       _shownPeriodStart = startDate;
     });
@@ -585,20 +604,8 @@ class _MainMenu1State extends State<MainMenu1> {
                 );
               }),
             ] else if (!_loadingReport && _initError) ...[
-              const SizedBox(height: 32),
-              Icon(Icons.wifi_off, size: 56, color: context.mutedColor.withOpacity(0.55)),
               const SizedBox(height: 8),
-              Text(
-                'load_error'.tr,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: context.mutedColor, fontSize: 15),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: _initData,
-                icon: const Icon(Icons.refresh),
-                label: Text('refresh'.tr),
-              ),
+              LoadErrorView(problem: _problem, onRetry: () => _retryLoad()),
             ] else if (!_loadingReport && !_hasData) ...[
               const SizedBox(height: 32),
               Icon(_emptyIcon, size: 56, color: context.mutedColor.withOpacity(0.55)),
