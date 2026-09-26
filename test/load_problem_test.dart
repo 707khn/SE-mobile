@@ -38,4 +38,12 @@ void main() {
     expect(problemIn({problemKey: 'что-то новое'}), isNull);
     expect(problemOfAny(TimeoutException('x')), LoadProblem.slow);
   });
+
+  test('техническая строка — короткая, в одну строку и называет причину', () {
+    final detail = problemDetail(SocketException(
+        "Failed host lookup: 'api.se-btrz.com'\n  (OS Error: errno = 7)"));
+    expect(detail, contains('Failed host lookup'));
+    expect(detail, isNot(contains('\n')));
+    expect(problemDetail(FormatException('x' * 500)).length, lessThanOrEqualTo(161));
+  });
 }

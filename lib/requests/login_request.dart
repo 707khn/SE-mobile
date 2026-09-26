@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../screens/change_password_screen.dart';
 import '../screens/pin_screen.dart';
 import '../utils/dimensions.dart';
+import '../utils/load_problem.dart';
 import '../utils/login_lock.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
@@ -29,13 +30,19 @@ enum _Result {
 }
 
 class _Attempt {
-  const _Attempt(this.result, {this.body, this.message, this.retryAfter});
+  const _Attempt(this.result,
+      {this.body, this.problem, this.detail, this.retryAfter});
 
   final _Result result;
   final Map<String, dynamic>? body;
 
-  /// Готовый текст ошибки, если он зависит от кода ответа.
-  final String? message;
+  /// Что случилось — для [_Result.serverProblem].
+  final LoadProblem? problem;
+
+  /// Техническая строка мелким шрифтом под объяснением: «HTTP 502»,
+  /// «SocketException: Failed host lookup…». Человеку она ни к чему, а по
+  /// снимку экрана из неё сразу видно, где искать.
+  final String? detail;
 
   /// Через сколько секунд вход снова откроется — для [_Result.locked].
   final int? retryAfter;
@@ -104,10 +111,11 @@ Future<void> loginToAccount(
           title: 'login_locked_title'.tr);
       break;
     case _Result.timedOut:
-      _showNetworkError(context, 'server_not_responding'.tr);
+      _showProblem(context, LoadProblem.slow, null);
       break;
     case _Result.serverProblem:
-      _showNetworkError(context, attempt.message ?? 'connection_error'.tr);
+      _showProblem(
+          context, attempt.problem ?? LoadProblem.server, attempt.detail);
       break;
   }
 }
@@ -132,7 +140,8 @@ Future<_Attempt> _attemptLogin(String login, String password) async {
     }
     if (response.statusCode != 200) {
       return _Attempt(_Result.serverProblem,
-          message: '${'server_error'.tr} (${response.statusCode})');
+          problem: problemForStatus(response.statusCode),
+          detail: 'HTTP ${response.statusCode}');
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -142,13 +151,19 @@ Future<_Attempt> _attemptLogin(String login, String password) async {
     // Сервер честно сообщил, что у него сломалась база, — это не повод
     // обвинять человека в неверном пароле.
     if (body['error'] == 'internal') {
-      return _Attempt(_Result.serverProblem, message: 'server_error'.tr);
+      return const _Attempt(_Result.serverProblem,
+          problem: LoadProblem.server, detail: 'error: internal');
     }
     return const _Attempt(_Result.wrongCredentials);
   } on TimeoutException {
     return const _Attempt(_Result.timedOut);
-  } catch (_) {
-    return _Attempt(_Result.serverProblem, message: 'connection_error'.tr);
+  } catch (e) {
+    // Сюда попадает всё, где ответа-кода нет: нет сети, не нашёлся адрес,
+    // не сошёлся сертификат, пришёл не JSON. Раньше на всё это было одно
+    // «Ошибка подключения к серверу», и по снимку экрана нельзя было понять,
+    // чинить ли телефон, сервер или сертификат.
+    return _Attempt(_Result.serverProblem,
+        problem: problemOf(e), detail: problemDetail(e));
   }
 }
 
@@ -221,6 +236,44 @@ int? _retryAfter(http.Response response) {
     }
   } catch (_) {}
   return int.tryParse(response.headers['retry-after'] ?? '');
+}
+
+/// Вход не удался не по вине человека: что случилось и что делать.
+void _showProblem(BuildContext context, LoadProblem problem, String? detail) {
+  if (!context.mounted) return;
+  final (title, hint) = switch (problem) {
+    LoadProblem.offline => ('problem_offline_title'.tr, 'problem_offline_hint'.tr),
+    LoadProblem.slow => ('problem_slow_title'.tr, 'problem_slow_hint'.tr),
+    LoadProblem.server => ('problem_server_title'.tr, 'problem_server_hint'.tr),
+    LoadProblem.denied => ('problem_denied_title'.tr, 'problem_denied_hint'.tr),
+  };
+  showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(hint),
+          if (detail != null && detail.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SelectableText(
+              detail,
+              style: TextStyle(
+                  fontSize: 11.5, color: Theme.of(dialogContext).hintColor),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: Text('ok'.tr),
+        ),
+      ],
+    ),
+  );
 }
 
 void _showNetworkError(BuildContext context, String message,

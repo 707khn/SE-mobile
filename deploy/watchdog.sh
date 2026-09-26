@@ -12,6 +12,13 @@
 set -u
 
 HEALTH_URL=${HEALTH_URL:-http://127.0.0.1:8000/health}
+
+# Имя, по которому ходят телефоны. Приложение может быть живо, а до него не
+# дойти: 26 сентября из конфига nginx пропала секция 443 — файл из
+# репозитория скопировали поверх того, куда certbot дописал сертификат.
+# Сервер отвечал на 127.0.0.1, сторож был доволен, а все телефоны видели
+# «Ошибка подключения к серверу». Пустое значение выключает эту проверку.
+PUBLIC_HOST=${PUBLIC_HOST-api.se-btrz.com}
 STATE_DIR=${WATCHDOG_STATE_DIR:-/var/lib/se-mobile/watchdog}
 OUTAGES="$STATE_DIR/outages.log"
 FAILS="$STATE_DIR/consecutive-failures"
@@ -33,6 +40,30 @@ mkdir -p "$STATE_DIR" || {
 }
 
 now=$(date +%s)
+HTTPS_DOWN="$STATE_DIR/https-down"
+
+# Дойдут ли телефоны: nginx, порт 443, сертификат. Спрашиваем через
+# 127.0.0.1 (--resolve), а не через внешний адрес: запрос машины к самой
+# себе по внешнему IP в облаке часто не проходит и без всякой поломки.
+# Перезапуск приложения тут не поможет, поэтому только записываем — и только
+# при смене состояния, а не каждые две минуты.
+check_https() {
+    [ -n "$PUBLIC_HOST" ] || return 0
+    local outside
+    if outside=$(curl -fsS --max-time 10 \
+            --resolve "$PUBLIC_HOST:443:127.0.0.1" \
+            "https://$PUBLIC_HOST/health" 2>&1); then
+        if [ -e "$HTTPS_DOWN" ]; then
+            rm -f "$HTTPS_DOWN"
+            echo "$(date -Is) https://$PUBLIC_HOST снова отвечает" >> "$OUTAGES"
+        fi
+    elif [ ! -e "$HTTPS_DOWN" ]; then
+        touch "$HTTPS_DOWN"
+        echo "$(date -Is) приложение живо, но https://$PUBLIC_HOST не отвечает — телефоны не войдут: $outside" >> "$OUTAGES"
+        echo "https://$PUBLIC_HOST не отвечает: $outside" >&2
+    fi
+}
+
 answer=$(curl -fsS --max-time 10 "$HEALTH_URL" 2>&1)
 code=$?
 
@@ -43,6 +74,7 @@ if [ $code -eq 0 ]; then
         echo "Сервер отвечает снова"
     fi
     echo 0 > "$FAILS"
+    check_https
     exit 0
 fi
 
