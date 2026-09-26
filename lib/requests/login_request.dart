@@ -7,6 +7,7 @@ import '../screens/change_password_screen.dart';
 import '../screens/pin_screen.dart';
 import '../utils/dimensions.dart';
 import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 import '../utils/login_lock.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
@@ -241,12 +242,7 @@ int? _retryAfter(http.Response response) {
 /// Вход не удался не по вине человека: что случилось и что делать.
 void _showProblem(BuildContext context, LoadProblem problem, String? detail) {
   if (!context.mounted) return;
-  final (title, hint) = switch (problem) {
-    LoadProblem.offline => ('problem_offline_title'.tr, 'problem_offline_hint'.tr),
-    LoadProblem.slow => ('problem_slow_title'.tr, 'problem_slow_hint'.tr),
-    LoadProblem.server => ('problem_server_title'.tr, 'problem_server_hint'.tr),
-    LoadProblem.denied => ('problem_denied_title'.tr, 'problem_denied_hint'.tr),
-  };
+  final (title, hint) = problemTexts(problem);
   showDialog(
     context: context,
     builder: (dialogContext) => AlertDialog(

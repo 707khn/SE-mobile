@@ -4,6 +4,26 @@ import 'package:get/get.dart';
 import '../utils/app_theme.dart';
 import '../utils/load_problem.dart';
 
+/// Заголовок и подсказка для причины — одни и те же везде, где она
+/// показывается: на экране ошибки, в окне входа, под формой смены пароля.
+/// `null` — причина неизвестна.
+(String, String) problemTexts(LoadProblem? problem) => switch (problem) {
+      LoadProblem.offline =>
+        ('problem_offline_title'.tr, 'problem_offline_hint'.tr),
+      LoadProblem.slow => ('problem_slow_title'.tr, 'problem_slow_hint'.tr),
+      LoadProblem.server =>
+        ('problem_server_title'.tr, 'problem_server_hint'.tr),
+      LoadProblem.denied =>
+        ('problem_denied_title'.tr, 'problem_denied_hint'.tr),
+      null => ('load_error'.tr, 'problem_generic_hint'.tr),
+    };
+
+/// Одной строкой — для места, где под сообщение отведена строка текста.
+String problemMessage(LoadProblem? problem) {
+  final (title, hint) = problemTexts(problem);
+  return '$title. $hint';
+}
+
 /// Экран «не загрузилось»: что случилось, что с этим делать и кнопка повтора.
 ///
 /// Одна на всё приложение. Прежде таких было три копии, чуть разные по
@@ -19,33 +39,14 @@ class LoadErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, title, hint) = switch (problem) {
-      LoadProblem.offline => (
-          Icons.wifi_off_rounded,
-          'problem_offline_title'.tr,
-          'problem_offline_hint'.tr
-        ),
-      LoadProblem.slow => (
-          Icons.hourglass_bottom_rounded,
-          'problem_slow_title'.tr,
-          'problem_slow_hint'.tr
-        ),
-      LoadProblem.server => (
-          Icons.cloud_off_rounded,
-          'problem_server_title'.tr,
-          'problem_server_hint'.tr
-        ),
-      LoadProblem.denied => (
-          Icons.lock_outline_rounded,
-          'problem_denied_title'.tr,
-          'problem_denied_hint'.tr
-        ),
-      null => (
-          Icons.error_outline_rounded,
-          'load_error'.tr,
-          'problem_generic_hint'.tr
-        ),
+    final icon = switch (problem) {
+      LoadProblem.offline => Icons.wifi_off_rounded,
+      LoadProblem.slow => Icons.hourglass_bottom_rounded,
+      LoadProblem.server => Icons.cloud_off_rounded,
+      LoadProblem.denied => Icons.lock_outline_rounded,
+      null => Icons.error_outline_rounded,
     };
+    final (title, hint) = problemTexts(problem);
 
     return Center(
       child: SingleChildScrollView(

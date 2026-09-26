@@ -9,6 +9,7 @@ import '../utils/logout_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import 'pin_screen.dart';
 import '../utils/app_theme.dart';
+import '../widgets/load_error_view.dart';
 
 /// Экран «придумайте пароль».
 ///
@@ -74,7 +75,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       _error = null;
     });
 
-    final result = await changePassword(
+    final (result, problem) = await changePassword(
       oldPassword: _oldController.text.trim(),
       newPassword: fresh,
     );
@@ -111,7 +112,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         break;
       case PasswordChangeResult.noAccount:
       case PasswordChangeResult.networkError:
-        setState(() => _error = 'connection_error'.tr);
+        // Раньше здесь всегда было «Ошибка подключения к серверу» — и когда
+        // сети нет, и когда сервер ответил ошибкой.
+        setState(() => _error = problemMessage(problem));
         break;
     }
   }

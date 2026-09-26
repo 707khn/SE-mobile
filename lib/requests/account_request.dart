@@ -1,9 +1,9 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
 import '../utils/api.dart';
+import '../utils/load_problem.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
@@ -19,7 +19,10 @@ enum PasswordChangeResult {
   networkError,
 }
 
-Future<PasswordChangeResult> changePassword({
+/// Результат смены пароля и — если до ответа не дошло — почему.
+typedef PasswordChange = (PasswordChangeResult, LoadProblem?);
+
+Future<PasswordChange> changePassword({
   required String oldPassword,
   required String newPassword,
 }) async {
@@ -37,7 +40,7 @@ Future<PasswordChangeResult> changePassword({
 
     if (response.statusCode == 401) {
       await returnToLogin();
-      return PasswordChangeResult.networkError;
+      return (PasswordChangeResult.networkError, null);
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -45,26 +48,27 @@ Future<PasswordChangeResult> changePassword({
       // Сервер погасил все пропуска и выдал новый — сохраняем, иначе
       // следующий же запрос улетит с недействительным.
       await SecureStorageHelper.instance.saveToken((body['token'] as String?) ?? '');
-      return PasswordChangeResult.ok;
+      return (PasswordChangeResult.ok, null);
     }
     switch (body['error']) {
       case 'wrong_password':
-        return PasswordChangeResult.wrongOldPassword;
+        return (PasswordChangeResult.wrongOldPassword, null);
       case 'too_short':
-        return PasswordChangeResult.tooShort;
+        return (PasswordChangeResult.tooShort, null);
       case 'same_as_login':
-        return PasswordChangeResult.sameAsLogin;
+        return (PasswordChangeResult.sameAsLogin, null);
       case 'too_simple':
-        return PasswordChangeResult.tooSimple;
+        return (PasswordChangeResult.tooSimple, null);
       case 'no_account':
-        return PasswordChangeResult.noAccount;
+        return (PasswordChangeResult.noAccount, LoadProblem.server);
       default:
-        return PasswordChangeResult.networkError;
+        return (
+          PasswordChangeResult.networkError,
+          problemForStatus(response.statusCode)
+        );
     }
-  } on TimeoutException {
-    return PasswordChangeResult.networkError;
-  } catch (_) {
-    return PasswordChangeResult.networkError;
+  } catch (e) {
+    return (PasswordChangeResult.networkError, problemOf(e));
   }
 }
 
@@ -118,7 +122,10 @@ Future<List<AccountRow>> fetchAccounts() async {
 
 /// Сбрасывает пароль сотрудника. Возвращает временный пароль, который надо
 /// ему передать, или null при неудаче.
-Future<String?> resetPassword(String login) async {
+/// Временный пароль, а если его нет — почему.
+typedef PasswordReset = (String?, LoadProblem?);
+
+Future<PasswordReset> resetPassword(String login) async {
   try {
     final response = await http
         .post(
@@ -126,11 +133,14 @@ Future<String?> resetPassword(String login) async {
           headers: await authHeaders(),
         )
         .timeout(const Duration(seconds: 20));
-    if (await handledUnauthorized(response)) return null;
-    if (response.statusCode != 200) return null;
+    if (await handledUnauthorized(response)) return (null, null);
+    if (response.statusCode != 200) {
+      return (null, problemForStatus(response.statusCode));
+    }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
-    return body['temporary_password'] as String?;
-  } catch (_) {
-    return null;
+    final temporary = body['temporary_password'] as String?;
+    return (temporary, temporary == null ? LoadProblem.server : null);
+  } catch (e) {
+    return (null, problemOf(e));
   }
 }

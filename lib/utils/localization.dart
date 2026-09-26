@@ -215,9 +215,6 @@ class LocaleString extends Translations {
               'Біраз уақыттан кейін қайталап көріңіз.',
           'ok': 'Жақсы',
           'error': 'Қате',
-          'server_error': 'Сервер қатесі',
-          'server_not_responding': 'Сервер жауап бермейді. Интернет байланысын тексеріңіз.',
-          'connection_error': 'Серверге қосылу мүмкін болмады',
           'load_error': 'Деректерді жүктеу мүмкін болмады',
           'problem_offline_title': 'Байланыс жоқ',
           'problem_offline_hint': 'Интернетті тексеріңіз. Егер ол бар болса — '
@@ -528,9 +525,6 @@ class LocaleString extends Translations {
               'Попробуйте немного позже.',
           'ok': 'Понятно',
           'error': 'Ошибка',
-          'server_error': 'Ошибка сервера',
-          'server_not_responding': 'Сервер не отвечает. Проверьте подключение.',
-          'connection_error': 'Ошибка подключения к серверу',
           'load_error': 'Не удалось загрузить данные',
           'problem_offline_title': 'Нет связи',
           'problem_offline_hint': 'Проверьте интернет. Если он есть — '
