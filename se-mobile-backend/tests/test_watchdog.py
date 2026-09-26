@@ -71,3 +71,46 @@ def test_no_log_means_no_outages_not_an_error(app, tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, '_WATCHDOG_LOG', str(tmp_path))
     broken = app_module._outage_state()
     assert broken['available'] is False and broken['reason']
+
+
+def _run_watchdog(tmp_path, https_ok):
+    """Сторож с подменённым curl: приложение живо, HTTPS — как скажем."""
+    import subprocess
+    import stat
+
+    fake = tmp_path / 'bin'
+    fake.mkdir(exist_ok=True)
+    curl = fake / 'curl'
+    curl.write_text(
+        '#!/bin/bash\n'
+        'case "$*" in\n'
+        f'  *--resolve*) {"echo ok" if https_ok else "echo refused >&2; exit 7"} ;;\n'
+        '  *) echo \'{"status":"ok"}\' ;;\n'
+        'esac\n', encoding='utf-8')
+    curl.chmod(curl.stat().st_mode | stat.S_IEXEC)
+    script = os.path.join(os.path.dirname(__file__), '..', '..', 'deploy',
+                          'watchdog.sh')
+    env = dict(os.environ, PATH=f'{fake}:{os.environ["PATH"]}',
+               WATCHDOG_STATE_DIR=str(tmp_path / 'state'))
+    return subprocess.run(['bash', script], env=env, capture_output=True,
+                          text=True, timeout=30)
+
+
+def test_watchdog_notices_https_gone_while_the_app_is_alive(tmp_path):
+    """26 сентября: приложение отвечало, а секция 443 пропала из nginx.
+
+    Сторож спрашивал только 127.0.0.1:8000 и был доволен, а все телефоны
+    видели «Ошибка подключения к серверу». Теперь это попадает в журнал —
+    один раз при поломке и один раз при починке, а не каждые две минуты.
+    """
+    log = tmp_path / 'state' / 'outages.log'
+
+    assert _run_watchdog(tmp_path, https_ok=False).returncode == 0
+    assert _run_watchdog(tmp_path, https_ok=False).returncode == 0
+    lines = log.read_text(encoding='utf-8').splitlines()
+    assert len(lines) == 1 and 'не отвечает' in lines[0] and 'refused' in lines[0]
+
+    _run_watchdog(tmp_path, https_ok=True)
+    _run_watchdog(tmp_path, https_ok=True)
+    lines = log.read_text(encoding='utf-8').splitlines()
+    assert len(lines) == 2 and 'снова отвечает' in lines[1]

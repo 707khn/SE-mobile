@@ -188,7 +188,19 @@ say "nginx"
 cp "$APP_DIR/deploy/nginx-se-mobile.conf" /etc/nginx/sites-available/se-mobile
 ln -sf /etc/nginx/sites-available/se-mobile /etc/nginx/sites-enabled/se-mobile
 rm -f /etc/nginx/sites-enabled/default
+# Файл из репозитория — без HTTPS: секцию 443 certbot дописывает в него на
+# сервере. Скопировали файл заново — секция пропала, и приложение у всех
+# отвечает «Ошибка подключения к серверу», хотя сервер жив. Так и было
+# 26 сентября. Если сертификат уже выдан, возвращаем его в конфиг сразу.
+if [ -d "/etc/letsencrypt/live/$DOMAIN" ]; then
+    certbot install --nginx --cert-name "$DOMAIN" --redirect --non-interactive
+fi
 nginx -t && systemctl reload nginx
+if [ -d "/etc/letsencrypt/live/$DOMAIN" ]; then
+    curl -fsS -o /dev/null "https://$DOMAIN/health" \
+        && echo "https://$DOMAIN отвечает" \
+        || { echo "https://$DOMAIN НЕ отвечает — телефоны не войдут"; exit 1; }
+fi
 
 say "Папка для выгрузок"
 # Сюда кладут выгрузки с предприятия — расчётные листки, проходы, справочник.
