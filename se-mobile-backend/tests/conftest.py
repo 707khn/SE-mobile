@@ -74,3 +74,33 @@ def remove_employee(app):
             if row is not None:
                 _db.session.delete(row)
         _db.session.commit()
+
+
+@pytest.fixture(autouse=True)
+def no_internet(monkeypatch):
+    """Проверки не ходят на настоящий сайт завода — и не оставляют хвостов.
+
+    Любой запрос ленты отправляет поток за новостями на se-btrz.com. Здесь
+    интернета нет, и поход обрывается сразу. На сборке GitHub интернет есть,
+    и поход, начатый проверкой формы ошибок, шёл по-настоящему: забирал живые
+    новости завода и держал замок, пока следующая проверка ждала свою
+    подменённую страницу. Её поход не начинался — замок занят, — и она
+    находила в ленте «Юбилей» и «антикоррупционную политику» вместо своих
+    двух заметок. Проверка падала на сборке и проходила здесь.
+
+    Поэтому по умолчанию сайт «не отвечает», а проверки новостей подставляют
+    свою страницу сами. После каждой проверки дожидаемся начатого похода и
+    сбрасываем отметку «недавно ходили», чтобы следующая начинала с чистого.
+    """
+    import threading
+    import app as app_module
+
+    def _offline(url, timeout=8):
+        raise OSError(f'в проверках нет интернета: {url}')
+
+    monkeypatch.setattr(app_module, '_fetch', _offline)
+    yield
+    for thread in threading.enumerate():
+        if thread.name == 'news-refresh':
+            thread.join(timeout=15)
+    app_module._news_checked_at = None
