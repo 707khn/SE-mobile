@@ -9,10 +9,16 @@ on:
     branches: [ "main" ]
     paths:
       - 'se-mobile-backend/**'
+      # Сторож и setup.sh лежат здесь, а проверяются серверными тестами
+      # (test_watchdog.py): правка одного скрипта тоже должна их запускать.
+      - 'deploy/**'
       - '.github/workflows/backend.yml'
   pull_request:
     paths:
       - 'se-mobile-backend/**'
+      # Сторож и setup.sh лежат здесь, а проверяются серверными тестами
+      # (test_watchdog.py): правка одного скрипта тоже должна их запускать.
+      - 'deploy/**'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
 

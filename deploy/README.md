@@ -151,12 +151,26 @@ sudo tail -20 /var/lib/se-mobile/watchdog/outages.log
 Теперь сборка лежит на сервере, а приложение само говорит человеку, что вышла
 новая, и открывает ссылку на скачивание.
 
-```bash
-# Скачать apk из Actions (артефакт se-mobile-release-apk), затем на сервере:
-sudo cp se-mobile-1.8.2+12.apk /var/www/se-mobile/
-sudo chmod 644 /var/www/se-mobile/se-mobile-*.apk
-curl -s https://api.se-btrz.com/api/app/latest
-```
+1. **На своём компьютере.** Страница сборки в GitHub → Actions → «Build
+   Android APK» → внизу **Artifacts** → `se-mobile-release-apk`. Это zip,
+   внутри `se-mobile-<версия>+<номер>.apk` — распакуйте.
+2. **Оттуда же — на сервер** (PowerShell в папке с файлом):
+
+   ```powershell
+   scp "se-mobile-1.14.1+21.apk" ubuntu@87.199.130.179:/tmp/
+   ```
+
+3. **На сервере.** Папку создаёт `setup.sh`; если сервер ставили до неё —
+   `mkdir` ниже её заведёт:
+
+   ```bash
+   sudo mkdir -p /var/www/se-mobile
+   sudo mv /tmp/se-mobile-*.apk /var/www/se-mobile/
+   sudo chmod 644 /var/www/se-mobile/se-mobile-*.apk
+   curl -s --resolve api.se-btrz.com:443:127.0.0.1 https://api.se-btrz.com/api/app/latest
+   ```
+
+   В ответе — версия и номер сборки только что положенного файла.
 
 Имя файла менять не надо: **версия записана в имени**, сборка сама его так
 называет, и сервер читает версию оттуда же. Отдельного файла с номером версии
