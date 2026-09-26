@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../utils/variables.dart';
 import '../utils/api.dart';
+import '../utils/load_problem.dart';
 
 /// One row of the staff directory shown in the admin panel.
 class AdminEmployee {
@@ -60,7 +61,8 @@ Future<List<AdminEmployee>> fetchAllEmployees() async {
 
   if (await handledUnauthorized(response)) return const <AdminEmployee>[];
   if (response.statusCode != 200) {
-    throw HttpException('HTTP ${response.statusCode}');
+    throw LoadFailure(problemForStatus(response.statusCode),
+        'HTTP ${response.statusCode}');
   }
   final body = jsonDecode(response.body) as Map<String, dynamic>;
   final rows = (body['employees'] as List<dynamic>?) ?? [];
@@ -68,14 +70,6 @@ Future<List<AdminEmployee>> fetchAllEmployees() async {
       .map((e) => AdminEmployee.fromJson(e as Map<String, dynamic>))
       .toList();
 }
-
-class HttpException implements Exception {
-  const HttpException(this.message);
-  final String message;
-  @override
-  String toString() => 'HttpException: $message';
-}
-
 
 /// Готовность к включению обязательной проверки пропуска.
 ///
@@ -144,7 +138,8 @@ Future<RolloutReport> fetchRollout() async {
           headers: await authHeaders())
       .timeout(const Duration(seconds: 20));
   if (response.statusCode != 200) {
-    throw HttpException('HTTP ${response.statusCode}');
+    throw LoadFailure(problemForStatus(response.statusCode),
+        'HTTP ${response.statusCode}');
   }
   final body = jsonDecode(response.body) as Map<String, dynamic>;
   final versions = (body['by_version'] as Map?) ?? {};
@@ -182,7 +177,6 @@ Future<RolloutReport> fetchRollout() async {
       backups['available'] == false ? ((backups['reason'] as String?) ?? '') : '';
   return report;
 }
-
 
 /// Свежесть одного источника данных: листки, проходы, меню, новости.
 ///
@@ -232,7 +226,6 @@ List<DataSource> _dataSources(dynamic raw) {
     );
   }).toList();
 }
-
 
 /// Перебой, записанный сторожем на сервере.
 ///

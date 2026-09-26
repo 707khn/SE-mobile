@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../requests/menu_request.dart';
-import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
 import '../utils/offline_cache.dart';
@@ -14,6 +13,8 @@ import '../widgets/day_navigator.dart';
 import '../widgets/skeleton.dart';
 import 'menu_edit_screen.dart';
 import '../utils/app_theme.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({Key? key, this.onNavigate, this.job = ''}) : super(key: key);
@@ -33,6 +34,7 @@ class _MenuScreenState extends State<MenuScreen> {
   DateTime _selectedDate = DateTime.now();
   bool _loading = false;
   bool _error = false;
+  LoadProblem? _problem;
   List<dynamic> _items = [];
   DateTime? _cachedAt;
 
@@ -54,7 +56,12 @@ class _MenuScreenState extends State<MenuScreen> {
         _items = result['items'] as List<dynamic>;
       } else {
         _items = [];
-        _error = result['items'] == null;
+        // Пустой день сервер отдаёт как Success с пустым списком, так что
+        // Failure — это всегда сбой. Раньше здесь проверялось `items == null`,
+        // а сбой приходил с пустым списком: без связи и без сохранённого
+        // человек видел «меню не опубликовано» вместо «нет связи».
+        _problem = problemIn(result);
+        _error = true;
       }
     });
   }
@@ -167,25 +174,8 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
-  Widget _buildError() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.wifi_off, size: 64, color: context.mutedColor.withOpacity(0.55)),
-          SizedBox(height: Dimensions.height30 / 2),
-          BigText(content: 'connection_error'.tr, color: context.mutedColor),
-          SizedBox(height: Dimensions.height30 / 2),
-          TextButton.icon(
-            onPressed: _loadMenu,
-            icon: const Icon(Icons.refresh),
-            label: Text('refresh'.tr),
-            style: TextButton.styleFrom(foregroundColor: AppColors.mainColor),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildError() =>
+      LoadErrorView(problem: _problem, onRetry: _loadMenu);
 
   SliverList _buildMenuList() {
     final grouped = _groupByCategory();

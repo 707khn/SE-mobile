@@ -13,6 +13,8 @@ import '../widgets/skeleton.dart';
 import 'admin_employee_screen.dart';
 import 'rollout_screen.dart';
 import '../utils/app_theme.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 
 /// Staff directory for the system administrator: search anyone, open their
 /// turnstile report, payslips and leave.
@@ -29,6 +31,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   List<AdminEmployee> _all = [];
   bool _loading = true;
   bool _error = false;
+  LoadProblem? _problem;
   String _query = '';
   String? _department; // null = all departments
   bool _onlyWithLogin = false;
@@ -57,11 +60,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         _all = rows;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _error = true;
+        _problem = problemOfAny(e);
       });
     }
   }
@@ -397,24 +401,5 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     );
   }
 
-  Widget _buildError() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.wifi_off, size: 60, color: context.mutedColor.withOpacity(0.55)),
-          SizedBox(height: Dimensions.height30 / 2),
-          Text('load_error'.tr,
-              style: TextStyle(color: context.mutedColor, fontSize: 15)),
-          SizedBox(height: Dimensions.height30 / 2),
-          TextButton.icon(
-            onPressed: _load,
-            icon: const Icon(Icons.refresh),
-            label: Text('refresh'.tr),
-            style: TextButton.styleFrom(foregroundColor: AppColors.mainColor),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildError() => LoadErrorView(problem: _problem, onRetry: _load);
 }

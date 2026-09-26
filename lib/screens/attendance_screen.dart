@@ -9,6 +9,8 @@ import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
 import '../utils/app_theme.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({Key? key}) : super(key: key);
@@ -21,6 +23,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   DateTime _selectedDate = DateTime.now();
   bool _loading = false;
   bool _error = false;
+  LoadProblem? _problem;
   List<_EmployeeDay> _rows = [];
 
   @override
@@ -43,6 +46,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _rows = _parseEvents(result['events'] as List<dynamic>);
       } else {
         _error = true;
+        _problem = problemIn(result);
         _rows = [];
       }
     });
@@ -268,26 +272,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  Widget _buildError() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.wifi_off, size: 64, color: context.mutedColor.withOpacity(0.55)),
-          SizedBox(height: Dimensions.height30 / 2),
-          BigText(content: 'connection_error'.tr, color: context.mutedColor),
-          SizedBox(height: Dimensions.height30 / 2),
-          TextButton.icon(
-            onPressed: _load,
-            icon: const Icon(Icons.refresh),
-            label: Text('refresh'.tr),
-            style: TextButton.styleFrom(
-                foregroundColor: AppColors.mainColor),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildError() => LoadErrorView(problem: _problem, onRetry: _load);
 
   String _initials(String name) {
     final parts = name.trim().split(' ');
