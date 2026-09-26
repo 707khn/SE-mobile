@@ -7,11 +7,11 @@ import 'package:se_mobile/utils/load_problem.dart';
 
 void main() {
   test('нет соединения — «нет связи», а не «ошибка сервера»', () {
-    expect(problemOf(const SocketException('Failed host lookup')),
+    expect(problemOf(SocketException('Failed host lookup')),
         LoadProblem.offline);
     expect(problemOf(http.ClientException('Connection closed')),
         LoadProblem.offline);
-    expect(problemOf(const HandshakeException('bad cert')),
+    expect(problemOf(HandshakeException('bad cert')),
         LoadProblem.offline);
   });
 
