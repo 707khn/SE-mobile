@@ -1276,9 +1276,18 @@ def create_app():
     # /etc/se-mobile.env иначе уехал бы в SQLAlchemy как адрес базы, и
     # приложение упало бы на разборе строки вместо понятного отказа.
     db_url = os.environ.get('DATABASE_URL', '').strip() or 'sqlite:///se_mobile.db'
-    # Render выдаёт postgres://, SQLAlchemy требует postgresql://
-    if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    # Драйвер называем явно. «postgresql://» без драйвера SQLAlchemy
+    # раскрывает сам, и в версии 2.1 раскрывает иначе, чем в 2.0: вместо
+    # psycopg2, который стоит в requirements.txt, ищет psycopg третьей
+    # версии, которого там нет. Приложение при этом не поднимается вовсе —
+    # «No module named 'psycopg'» ещё до первого запроса. Так упала первая же
+    # сборка на чистой машине, и так упал бы боевой сервер при первой
+    # переустановке зависимостей: в /etc/se-mobile.env у него стоит ровно
+    # «postgresql://». Render выдаёт ещё и «postgres://» — его тоже сюда.
+    for bare in ('postgres://', 'postgresql://'):
+        if db_url.startswith(bare):
+            db_url = 'postgresql+psycopg2://' + db_url[len(bare):]
+            break
     # Маскируем пароль в логе
     safe_url = db_url.split('@')[-1] if '@' in db_url else db_url
     logging.info(f'DB backend: {safe_url}')
