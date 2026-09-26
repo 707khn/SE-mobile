@@ -60,3 +60,12 @@ class LoadFailure implements Exception {
 /// Причина по чему угодно, пойманному в `catch` на экране.
 LoadProblem problemOfAny(Object error) =>
     error is LoadFailure ? error.problem : problemOf(error);
+
+/// Короткая техническая строка об ошибке — для снимка экрана в поддержку.
+///
+/// Пароль в неё попасть не может: исключения сети и разбора ответа знают
+/// адрес и причину, но не тело запроса.
+String problemDetail(Object error) {
+  final text = error.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+  return text.length > 160 ? '${text.substring(0, 160)}…' : text;
+}
