@@ -335,10 +335,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     );
     if (ok != true) return;
 
-    final temporary = await resetPassword(e.login);
+    final (temporary, problem) = await resetPassword(e.login);
     if (!mounted) return;
     if (temporary == null) {
-      Get.snackbar('error'.tr, 'connection_error'.tr,
+      final (title, hint) = problemTexts(problem);
+      Get.snackbar(title, hint,
           snackPosition: SnackPosition.BOTTOM, margin: const EdgeInsets.all(12));
       return;
     }
