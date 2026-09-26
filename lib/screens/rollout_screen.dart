@@ -6,6 +6,8 @@ import '../requests/admin_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 
 /// «Обновление»: дошла ли новая сборка до всех.
 ///
@@ -24,6 +26,7 @@ class _RolloutScreenState extends State<RolloutScreen> {
   RolloutReport? _report;
   bool _loading = true;
   bool _error = false;
+  LoadProblem? _problem;
 
   @override
   void initState() {
@@ -43,11 +46,12 @@ class _RolloutScreenState extends State<RolloutScreen> {
         _report = report;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _error = true;
+        _problem = problemOfAny(e);
       });
     }
   }
@@ -69,7 +73,7 @@ class _RolloutScreenState extends State<RolloutScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error || _report == null
-              ? Center(child: Text('connection_error'.tr))
+              ? LoadErrorView(problem: _problem, onRetry: _load)
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(

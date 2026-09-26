@@ -72,8 +72,20 @@ def test_each_source_has_a_name_in_both_languages():
     список названий — в Dart, и разойтись им ничего не мешает.
     """
     text = open(_LOCALIZATION, encoding='utf-8').read()
-    kz = text[text.index("'KZ': {"):text.index("'RU': {")]
-    ru = text[text.index("'RU': {"):]
+
+    # Где начинается раздел языка. Ключи карты были строками «'KZ'» и «'RU'»,
+    # теперь это Lang.kk и Lang.ru — понимаем оба вида, чтобы следующее
+    # переименование не уронило проверку молча на поиске подстроки.
+    def start(*marks):
+        for mark in marks:
+            if mark in text:
+                return text.index(mark)
+        raise AssertionError(f'в localization.dart не нашлось ни одного из {marks}')
+
+    kz_at = start('Lang.kk: {', "'KZ': {", "'kk': {")
+    ru_at = start('Lang.ru: {', "'RU': {", "'ru': {")
+    kz = text[kz_at:ru_at] if kz_at < ru_at else text[kz_at:]
+    ru = text[ru_at:kz_at] if ru_at < kz_at else text[ru_at:]
 
     # Ключи берём из самого исходника функции: список, который надо было бы
     # помнить, и есть то, что всегда отстаёт.

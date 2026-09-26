@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
@@ -7,6 +6,7 @@ import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../utils/access_report.dart';
 import '../utils/api.dart';
+import '../utils/load_problem.dart';
 
 Future<AccessReport> getReportEntries(BuildContext context) async {
   final login = await SecureStorageHelper.instance.getEmployeeId();
@@ -37,11 +37,9 @@ Future<AccessReport> getReportEntries(BuildContext context) async {
       }
       return AccessReport(report, coverage);
     } else {
-      return AccessReport.failed;
+      return AccessReport.failedWith(problemForStatus(response.statusCode));
     }
-  } on TimeoutException {
-    return AccessReport.failed;
   } catch (e) {
-    return AccessReport.failed;
+    return AccessReport.failedWith(problemOf(e));
   }
 }

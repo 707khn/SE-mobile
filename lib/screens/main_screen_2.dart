@@ -29,6 +29,8 @@ import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/icon_button_drawer.dart';
 import '../utils/app_theme.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 
 class MainPage2 extends StatefulWidget {
   final String fullName;
@@ -57,6 +59,7 @@ class _MainPage2State extends State<MainPage2> {
   List<String> allEmployees = [];
   List<String> filteredEmployees = [];
   bool _dateError = false;
+  LoadProblem? _problem;
   List<String>? _employeesCache;
   bool _employeesCacheLoading = false;
   String _filterText = '';
@@ -101,6 +104,33 @@ class _MainPage2State extends State<MainPage2> {
       reportsEntries.isNotEmpty &&
       !(reportsEntries.length == 1 &&
           (reportsEntries[0][0].isEmpty || reportsEntries[0][0] == 'no'));
+
+  /// Отчёт по сотруднику не пришёл. Раньше этот случай попадал в «нет
+  /// данных — выберите сотрудника» — хотя сотрудник как раз выбран.
+  bool get _loadFailed =>
+      reportsEntries.length == 1 &&
+      reportsEntries[0].isNotEmpty &&
+      reportsEntries[0][0] == 'no';
+
+  /// Повтор по кнопке на экране ошибки: тот же сотрудник, те же даты.
+  Future<void> _retryEmployeeReport() async {
+    setState(() => _loadingReport = true);
+    final data = await getEmployeeDate(
+      context,
+      DateFormat('yyyy-MM-dd').format(startDate),
+      DateFormat('yyyy-MM-dd').format(endDate),
+    );
+    if (!mounted) return;
+    setState(() {
+      _loadingReport = false;
+      _problem = data.problem;
+      reportsEntries = data.entries;
+      // Строка выгрузки этого сотрудника — последняя: заменяем неудачную.
+      if (reportsEntriesForMsg.isNotEmpty) {
+        reportsEntriesForMsg[reportsEntriesForMsg.length - 1] = data.entries;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -424,6 +454,15 @@ class _MainPage2State extends State<MainPage2> {
                               builder: (BuildContext context, snapshot) {
                                 if (snapshot.hasData) {
                                   final raw = snapshot.data!;
+                                  // Список не пришёл — так и говорим, с
+                                  // повтором, а не «записей нет». Повтор —
+                                  // просто перерисовка: неудача не
+                                  // запоминается, и список запросится снова.
+                                  if (raw.length == 1 && raw[0] == 'no') {
+                                    return LoadErrorView(
+                                      onRetry: () => setDialogState(() {}),
+                                    );
+                                  }
                                   allEmployees = ([...raw]
                                     ..removeWhere((e) => e == 'no' || e.isEmpty)
                                     ..sort((a, b) => a.compareTo(b)));
@@ -458,6 +497,7 @@ class _MainPage2State extends State<MainPage2> {
                                             DateFormat('yyyy-MM-dd').format(endDate),
                                           );
                                           reportsEntries = data.entries;
+                                          _problem = data.problem;
                                           reportsEntriesForMsg.add(data.entries);
                                           if (mounted) {
                                             setState(() {
@@ -476,10 +516,13 @@ class _MainPage2State extends State<MainPage2> {
                                   );
                                 } else if (snapshot.connectionState == ConnectionState.waiting) {
                                   return const Center(child: CircularProgressIndicator());
-                                } else if (snapshot.hasError) {
-                                  return Center(child: Text('load_error'.tr, style: TextStyle(color: context.mutedColor)));
                                 } else {
-                                  return Center(child: Text('load_error'.tr, style: TextStyle(color: context.mutedColor)));
+                                  return LoadErrorView(
+                                    problem: snapshot.hasError
+                                        ? problemOfAny(snapshot.error!)
+                                        : null,
+                                    onRetry: () => setDialogState(() {}),
+                                  );
                                 }
                               },
                             ),
@@ -731,6 +774,9 @@ class _MainPage2State extends State<MainPage2> {
                   ],
                   );
                 }),
+              ] else if (_loadFailed) ...[
+                const SizedBox(height: 8),
+                LoadErrorView(problem: _problem, onRetry: _retryEmployeeReport),
               ] else ...[
                 const SizedBox(height: 24),
                 Icon(Icons.person_search, size: 56, color: context.mutedColor.withOpacity(0.55)),
@@ -778,7 +824,10 @@ class _MainPage2State extends State<MainPage2> {
   Future<List<String>> _getEmployeesCached() async {
     if (_employeesCache != null) return _employeesCache!;
     final result = await getAllEmployees(context);
-    if (mounted) _employeesCache = result;
+    // Неудачу («no») не запоминаем: иначе список оставался пустым до
+    // перезапуска приложения, и повторно открыть его было бесполезно.
+    final failed = result.length == 1 && result[0] == 'no';
+    if (mounted && !failed) _employeesCache = result;
     return result;
   }
 

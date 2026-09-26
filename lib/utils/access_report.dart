@@ -1,3 +1,5 @@
+import 'load_problem.dart';
+
 /// Проходы турникета вместе с объяснением, почему их может не быть.
 ///
 /// Пустой список на этом экране раньше значил что угодно: нет связи, нет
@@ -61,7 +63,7 @@ class AccessCoverage {
 
 /// Ответ на запрос проходов: сами записи и то, чем объяснить их отсутствие.
 class AccessReport {
-  const AccessReport(this.entries, this.coverage);
+  const AccessReport(this.entries, this.coverage, {this.problem});
 
   /// Как и раньше: дата, время, событие, точка прохода.
   final List<List<String>> entries;
@@ -69,12 +71,21 @@ class AccessReport {
   /// null у старого сервера — тогда экран ведёт себя по-прежнему.
   final AccessCoverage? coverage;
 
+  /// Почему ответа нет — только у неудачного.
+  final LoadProblem? problem;
+
   static const AccessReport empty = AccessReport(<List<String>>[], null);
 
   /// Ответ не получен вовсе: связь, тайм-аут, отказ сервера.
   static final AccessReport failed = AccessReport([
     <String>['no']
   ], null);
+
+  /// То же, с причиной: экран скажет «нет связи» или «сервер ответил
+  /// ошибкой», а не одно общее «не удалось загрузить».
+  static AccessReport failedWith(LoadProblem problem) => AccessReport([
+        <String>['no']
+      ], null, problem: problem);
 
   bool get isFailure =>
       entries.length == 1 && entries[0].isNotEmpty && entries[0][0] == 'no';

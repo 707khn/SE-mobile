@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../screens/change_password_screen.dart';
 import '../screens/pin_screen.dart';
 import '../utils/dimensions.dart';
+import '../utils/login_lock.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
@@ -22,16 +23,22 @@ enum _Result {
 
   /// Ждали дольше таймаута — обычно сервер ещё просыпается.
   timedOut,
+
+  /// Пять неверных попыток подряд — вход под этим логином закрыт на время.
+  locked,
 }
 
 class _Attempt {
-  const _Attempt(this.result, {this.body, this.message});
+  const _Attempt(this.result, {this.body, this.message, this.retryAfter});
 
   final _Result result;
   final Map<String, dynamic>? body;
 
   /// Готовый текст ошибки, если он зависит от кода ответа.
   final String? message;
+
+  /// Через сколько секунд вход снова откроется — для [_Result.locked].
+  final int? retryAfter;
 }
 
 /// Будит сервер, пока человек набирает логин.
@@ -89,7 +96,12 @@ Future<void> loginToAccount(
       }
       break;
     case _Result.wrongCredentials:
-      _showNotRegistered(context);
+      _showWrongCredentials(context);
+      break;
+    case _Result.locked:
+      _showNetworkError(
+          context, _lockedMessage(attempt.retryAfter),
+          title: 'login_locked_title'.tr);
       break;
     case _Result.timedOut:
       _showNetworkError(context, 'server_not_responding'.tr);
@@ -110,6 +122,14 @@ Future<_Attempt> _attemptLogin(String login, String password) async {
         )
         .timeout(const Duration(seconds: 60));
 
+    // Пять неверных попыток — и сервер закрывает вход под этим логином,
+    // отвечая 429 с «locked» и числом секунд до открытия. Раньше это
+    // показывалось как «Ошибка сервера (429)»: человек думал, что сломан
+    // сервер, и продолжал пробовать, хотя сервер прямо сказал, когда можно.
+    if (response.statusCode == 429) {
+      final retry = _retryAfter(response);
+      return _Attempt(_Result.locked, retryAfter: retry);
+    }
     if (response.statusCode != 200) {
       return _Attempt(_Result.serverProblem,
           message: '${'server_error'.tr} (${response.statusCode})');
@@ -132,60 +152,89 @@ Future<_Attempt> _attemptLogin(String login, String password) async {
   }
 }
 
-void _showNotRegistered(BuildContext context) {
+/// Логин и пароль не подошли.
+///
+/// Прежде здесь было «Данный логин не зарегистрирован!» — и это неправда
+/// для всякого, кто просто ошибся в пароле, то есть почти для всех. Сервер
+/// нарочно не говорит, что именно не подошло: иначе по ответам можно было бы
+/// перебрать, какие табельные номера заведены. Значит, и приложение не
+/// должно делать вид, что знает. «Не зарегистрирован» отправлял человека
+/// искать беду с учётной записью, которой не было, — ровно так и вышло с
+/// одной сотрудницей, чей логин был в порядке.
+void _showWrongCredentials(BuildContext context) {
   if (!context.mounted) return;
   showDialog(
     context: context,
     builder: (BuildContext context) {
       return AlertDialog(
         contentPadding: EdgeInsets.symmetric(
-            horizontal: Dimensions.width20 / 2,
-            vertical: Dimensions.height30 / 6),
+            horizontal: Dimensions.width20,
+            vertical: Dimensions.height30 / 2),
         content: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
               'assets/logotype.png',
-              height: Dimensions.height60 * 1.5,
-              width: Dimensions.height60 * 1.5,
+              height: Dimensions.height60 * 1.2,
+              width: Dimensions.height60 * 1.2,
             ),
+            const SizedBox(height: 8),
             Text(
-              'login_not_registered'.tr,
+              'login_wrong_title'.tr,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: Dimensions.fontSize16),
+              style: TextStyle(
+                  fontSize: Dimensions.fontSize16, fontWeight: FontWeight.w600),
             ),
-            SizedBox(height: Dimensions.height30 / 2),
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: Dimensions.height30 / 5),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 8),
+            Text(
+              'login_wrong_hint'.tr,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('ok'.tr),
+          ),
+        ],
       );
     },
   );
 }
 
-void _showNetworkError(BuildContext context, String message) {
+/// «Попробуйте через N мин.» — из числа секунд, которое прислал сервер.
+String _lockedMessage(int? seconds) {
+  final minutes = lockMinutes(seconds);
+  if (minutes == null) return 'login_locked_soon'.tr;
+  return 'login_locked_wait'.trParams({'minutes': '$minutes'});
+}
+
+/// Сколько секунд ждать: из тела ответа, а если его нет — из заголовка.
+int? _retryAfter(http.Response response) {
+  try {
+    final body = jsonDecode(response.body);
+    if (body is Map && body['retry_after'] is num) {
+      return (body['retry_after'] as num).toInt();
+    }
+  } catch (_) {}
+  return int.tryParse(response.headers['retry-after'] ?? '');
+}
+
+void _showNetworkError(BuildContext context, String message,
+    {String? title}) {
   if (!context.mounted) return;
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: Text('error'.tr),
+      title: Text(title ?? 'error'.tr),
       content: Text(message),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('OK'),
+          child: Text('ok'.tr),
         ),
       ],
     ),

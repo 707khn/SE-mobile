@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
@@ -7,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../utils/variables.dart';
 import '../utils/access_report.dart';
 import '../utils/api.dart';
+import '../utils/load_problem.dart';
 
 Future<AccessReport> getEmployeeDate(BuildContext context, startdate, enddate) async {
   final prefs = await SharedPreferences.getInstance();
@@ -45,11 +45,9 @@ Future<AccessReport> getEmployeeDate(BuildContext context, startdate, enddate) a
       }
 
     } else {
-      return AccessReport.failed;
+      return AccessReport.failedWith(problemForStatus(response.statusCode));
     }
-  } on TimeoutException {
-    return AccessReport.failed;
   } catch (e) {
-    return AccessReport.failed;
+    return AccessReport.failedWith(problemOf(e));
   }
 }
