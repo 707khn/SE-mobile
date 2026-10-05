@@ -39,6 +39,19 @@ if (keystorePropertiesFile.exists()) {
     }
 }
 
+// Для какого канала сборка: `--dart-define=STORE=play` — для Google Play,
+// без него — для раздачи файлом с нашего сервера. Одна настройка на обе
+// стороны: её же читает Dart (lib/utils/store.dart), и разойтись им нельзя.
+// Flutter передаёт dart-define в Gradle списком base64 через запятую.
+def dartDefines = [:]
+if (project.hasProperty('dart-defines')) {
+    project.property('dart-defines').split(',').each { entry ->
+        def pair = new String(entry.decodeBase64(), 'UTF-8').split('=', 2)
+        if (pair.length == 2) dartDefines[pair[0]] = pair[1]
+    }
+}
+def forPlay = dartDefines['STORE'] == 'play'
+
 android {
     namespace "com.example.se_mobile.se_mobile"
     compileSdk flutter.compileSdkVersion
@@ -59,7 +72,14 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.se_mobile.se_mobile"
+        // Google Play не принимает пакеты com.example.*, поэтому в Play своё
+        // имя — по домену предприятия, se-btrz.com. Оно навсегда: сменить его
+        // в Play после первой публикации нельзя.
+        //
+        // Сборка для сервера оставляет старое: у пятисот человек приложение
+        // стоит под ним, и обновление с другим именем встало бы рядом вторым
+        // значком, а не поверх. namespace (пакет кода) от этого не зависит.
+        applicationId forPlay ? "com.sebtrz.mobile" : "com.example.se_mobile.se_mobile"
         // Android 7.0 и новее: ниже Flutter 3.47 не собирает. Целевая версия
         // (36) — от Flutter; Google Play требует свежую и каждый год поднимает
         // планку, так что Flutter надо обновлять хотя бы раз в год.
