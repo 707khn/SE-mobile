@@ -33,6 +33,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # На машине GitHub около 14 ГБ свободного места, а Flutter со своим
+      # кэшем, кэш Gradle, NDK и три сборки подряд занимают почти всё — 5
+      # октября сборка упала с «No space left on device». Убираем то, что
+      # здесь стоит, но нам не нужно: .NET, Haskell, Boost, CodeQL — это
+      # больше 10 ГБ. Android SDK и Java не трогаем.
+      - name: Освободить место на диске
+        run: |
+          df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h / | tail -1
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -128,22 +141,6 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
-      # Для Google Play — отдельная сборка: своё имя пакета (com.sebtrz.mobile)
-      # и без своей проверки обновлений — Play обновляет сам и не разрешает
-      # приложению делать это в обход него (lib/utils/store.dart). Play
-      # принимает .aab, а не .apk. Подписывается тем же ключом: для Play он —
-      # ключ загрузки, окончательную подпись ставит сам Play.
-      - name: Build AAB для Google Play
-        run: flutter build appbundle --release --dart-define=STORE=play
-
-      - name: Пропустит ли Google Play
-        run: .github/scripts/check-play-bundle.sh build/app/outputs/bundle/release/app-release.aab
-
-      # Отладочная сборка рядом — как запасной путь и как способ отличить
-      # «не работает вообще» от «не работает только release».
-      - name: Build debug APK
-        run: flutter build apk --debug
-
       # Чтобы по файлу было видно, чем он подписан: с «своим» ключом сборка
       # встанет поверх прежней, с отладочным — нет.
       - name: Чем подписано
@@ -161,32 +158,58 @@ jobs:
       # него лежит. Отдельного файла с номером версии нет намеренно: номер,
       # который надо где-то повторить, рано или поздно отстаёт. Здесь он
       # переезжает вместе с файлом.
-      - name: Назвать файл версией
+      #
+      # Каждый файл выгружается сразу, как собран, а не все в конце: 5 октября
+      # на третьей сборке подряд кончилось место на диске, и не сохранился
+      # ни один из двух уже готовых.
+      - name: Назвать APK версией
         run: |
           PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
           cp build/app/outputs/flutter-apk/app-release.apk "se-mobile-$PUB.apk"
-          cp build/app/outputs/bundle/release/app-release.aab "se-mobile-play-$PUB.aab"
-          ls -lh "se-mobile-$PUB.apk" "se-mobile-play-$PUB.aab"
+          ls -lh "se-mobile-$PUB.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: se-mobile-release-apk
           path: se-mobile-*.apk
           retention-days: 7
           overwrite: true
 
+      # Для Google Play — отдельная сборка: своё имя пакета (com.sebtrz.mobile)
+      # и без своей проверки обновлений — Play обновляет сам и не разрешает
+      # приложению делать это в обход него (lib/utils/store.dart). Play
+      # принимает .aab, а не .apk. Подписывается тем же ключом: для Play он —
+      # ключ загрузки, окончательную подпись ставит сам Play.
+      - name: Build AAB для Google Play
+        run: flutter build appbundle --release --dart-define=STORE=play
+
+      - name: Пропустит ли Google Play
+        run: .github/scripts/check-play-bundle.sh build/app/outputs/bundle/release/app-release.aab
+
+      - name: Назвать AAB версией
+        run: |
+          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
+          cp build/app/outputs/bundle/release/app-release.aab "se-mobile-play-$PUB.aab"
+          ls -lh "se-mobile-play-$PUB.aab"
+          df -h / | tail -1
+
       # Этот файл загружают в Play Console: «Рабочая версия» или
       # «Закрытое тестирование» → «Создать выпуск».
       - name: Upload AAB для Google Play
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: se-mobile-play-aab
           path: se-mobile-play-*.aab
           retention-days: 30
           overwrite: true
+
+      # Отладочная сборка — последней и необязательной: запасной путь и
+      # способ отличить «не работает вообще» от «не работает только release».
+      # Если на неё не хватит места, рабочие файлы уже выгружены.
+      - name: Build debug APK
+        continue-on-error: true
+        run: flutter build apk --debug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
