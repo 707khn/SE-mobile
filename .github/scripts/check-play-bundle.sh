@@ -13,8 +13,13 @@ EXPECTED_PACKAGE=${2:-com.sebtrz.mobile}
 manifest=$(unzip -p "$AAB" base/manifest/AndroidManifest.xml | tr -c '[:print:]' '\n')
 
 fail=0
-if ! grep -qx "$EXPECTED_PACKAGE" <<<"$manifest"; then
+# Строки в protobuf идут подряд с байтами разметки, и рядом с именем может
+# оказаться печатный символ — поэтому ищем имя целиком, но не всю строку.
+escaped=${EXPECTED_PACKAGE//./\\.}
+if ! grep -qE "(^|[^A-Za-z0-9_.])${escaped}([^A-Za-z0-9_.]|$)" <<<"$manifest"; then
     echo "::error::В $AAB нет пакета $EXPECTED_PACKAGE — собрано без --dart-define=STORE=play?"
+    echo "Похожие на имя пакета строки в манифесте:"
+    grep -oE '[a-z][a-z0-9_]*(\.[a-z0-9_]+){2,}' <<<"$manifest" | sort -u | head -20 | sed 's/^/  /'
     fail=1
 fi
 for permission in QUERY_ALL_PACKAGES MANAGE_EXTERNAL_STORAGE REQUEST_INSTALL_PACKAGES \
