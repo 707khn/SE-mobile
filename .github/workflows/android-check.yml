@@ -1,0 +1,56 @@
+name: Android build
+
+# Собирается ли Android-приложение — до слияния, а не после.
+#
+# Полная сборка с подписью идёт только после попадания в main
+# (build-apk.yml). Правки Gradle, плагинов и версий Flutter ломают именно
+# сборку, а не код, — и проверки приложения (app-check.yml) этого не видят.
+# Здесь — та же сборка для Google Play, только с отладочной подписью: ключа
+# в PR нет и не нужно.
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/android-check.yml'
+      - '.github/workflows/build-apk.yml'
+      - '.github/scripts/check-play-bundle.sh'
+
+concurrency:
+  group: android-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: 'stable'
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties', 'pubspec.lock') }}
+          restore-keys: gradle-
+
+      - run: flutter pub get
+
+      - name: AAB для Google Play
+        run: flutter build appbundle --release --dart-define=STORE=play
+
+      - name: Пропустит ли Google Play
+        run: .github/scripts/check-play-bundle.sh build/app/outputs/bundle/release/app-release.aab
+
+      # И обычная сборка для раздачи с сервера: у неё старое имя пакета.
+      - name: APK для сервера
+        run: flutter build apk --release

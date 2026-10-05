@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_version.dart';
+import 'store.dart';
 import 'variables.dart';
 
 /// Есть ли на сервере сборка новее той, что стоит на телефоне.
@@ -45,6 +46,8 @@ class AppUpdate {
   /// Никогда не бросает: проверка обновления, роняющая приложение, — худшее,
   /// что можно придумать.
   static Future<AppUpdate?> check() async {
+    // Из Google Play обновляет только Play: своя загрузка apk там запрещена.
+    if (kFromPlay) return null;
     try {
       final response = await http
           .get(Uri.parse('${AppValues.baseUrl}/api/app/latest'))

@@ -215,10 +215,10 @@ Future<List<DateTime>?> fetchPayslipPeriods({String? employeeId}) async {
           body: jsonEncode({'key_suffix': id}),
         )
         .timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200) return _cachedPeriods(id);
+    if (response.statusCode != 200) return await _cachedPeriods(id);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['message'] != 'Success' || body['periods'] is! List) {
-      return _cachedPeriods(id);
+      return await _cachedPeriods(id);
     }
     await OfflineCache.save('payslip_periods_$id', body);
     return _periodsFrom(body);

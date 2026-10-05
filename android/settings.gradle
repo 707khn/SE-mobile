@@ -18,8 +18,12 @@ pluginManagement {
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "8.9.1" apply false
-    id "org.jetbrains.kotlin.android" version "2.1.0" apply false
+    // Нижние планки задаёт Flutter: 3.47 отказывается собирать с AGP ниже
+    // 8.11.1, Kotlin ниже 2.2.20 и Gradle ниже 8.14. Шаблон самого Flutter уже
+    // на AGP 9, но там несовместимые изменения, а плагины проекта старые —
+    // остаёмся на последней 8.x.
+    id "com.android.application" version "8.13.0" apply false
+    id "org.jetbrains.kotlin.android" version "2.2.20" apply false
 }
 
 include ":app"
