@@ -5,7 +5,7 @@ import secrets
 import threading
 from functools import wraps
 from datetime import date, datetime, timedelta, timezone
-from flask import Flask, request, jsonify, g
+from flask import Flask, Response, request, jsonify, g
 from flask_cors import CORS
 # Werkzeug идёт вместе с Flask, ставить ничего не нужно. По умолчанию scrypt.
 from werkzeug.exceptions import HTTPException
@@ -22,6 +22,7 @@ from parser_directory_excel import parse_directory_excel
 from parser_news_feed import parse_news_feed, looks_like_feed, feed_links
 from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
+from privacy import privacy_page
 
 _ONE_DAY = timedelta(days=1)
 
@@ -1740,6 +1741,14 @@ def register_routes(app):
             return jsonify({'message': 'Failure', 'error': 'locked',
                             'retry_after': seconds}), 429
         return jsonify({'message': 'Failure'})
+
+    @app.route('/privacy', methods=['GET'])
+    def privacy():
+        """Политика конфиденциальности — ссылка на неё нужна Google Play.
+
+        Без пропуска: её открывают из магазина, до всякого входа.
+        """
+        return Response(privacy_page(), mimetype='text/html')
 
     @app.route('/health', methods=['GET'])
     def health():
