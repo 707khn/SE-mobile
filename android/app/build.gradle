@@ -42,7 +42,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace "com.example.se_mobile.se_mobile"
     compileSdk flutter.compileSdkVersion
-    ndkVersion "27.0.12077973"
+    ndkVersion flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -60,7 +60,10 @@ android {
 
     defaultConfig {
         applicationId "com.example.se_mobile.se_mobile"
-        minSdkVersion 21
+        // Android 7.0 и новее: ниже Flutter 3.47 не собирает. Целевая версия
+        // (36) — от Flutter; Google Play требует свежую и каждый год поднимает
+        // планку, так что Flutter надо обновлять хотя бы раз в год.
+        minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
@@ -103,5 +106,4 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.0"
 }
