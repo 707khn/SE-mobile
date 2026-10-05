@@ -47,7 +47,7 @@ Future<void> generateExcel(List<List<String>> data, BuildContext context) async 
     await File(excelFilePath).writeAsBytes(excelBytes);
     await File(savePath).writeAsBytes(excelBytes);
     HapticFeedback.lightImpact();
-    Share.shareFiles([excelFilePath], text: 'send_report_tooltip'.tr);
+    Share.shareXFiles([XFile(excelFilePath)], text: 'send_report_tooltip'.tr);
   } catch (e) {
     _showError(context, 'Ошибка экспорта Excel: $e');
   }
@@ -108,7 +108,7 @@ Future<void> generateExcelEmp(List<List<List<String>>> data, BuildContext contex
     await File(excelFilePath).writeAsBytes(excelBytes);
     await File(savePath).writeAsBytes(excelBytes);
     HapticFeedback.lightImpact();
-    Share.shareFiles([excelFilePath], text: 'send_report_tooltip'.tr);
+    Share.shareXFiles([XFile(excelFilePath)], text: 'send_report_tooltip'.tr);
   } catch (e) {
     _showError(context, 'Ошибка экспорта Excel: $e');
   }

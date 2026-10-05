@@ -37,7 +37,7 @@ Future<void> generateTable(List<List<String>> data, BuildContext context) async 
     await File(csvFilePath).writeAsString(csv);
     await File(savePath).writeAsString(csv);
     HapticFeedback.lightImpact();
-    Share.shareFiles([csvFilePath], text: 'send_report_tooltip'.tr);
+    Share.shareXFiles([XFile(csvFilePath)], text: 'send_report_tooltip'.tr);
   } catch (e) {
     _showError(context, 'Ошибка экспорта CSV: $e');
   }
@@ -79,7 +79,7 @@ Future<void> generateTableEmp(List<List<List<String>>> data, BuildContext contex
     await File(csvFilePath).writeAsString(csv);
     await File(savePath).writeAsString(csv);
     HapticFeedback.lightImpact();
-    Share.shareFiles([csvFilePath], text: 'send_report_tooltip'.tr);
+    Share.shareXFiles([XFile(csvFilePath)], text: 'send_report_tooltip'.tr);
   } catch (e) {
     _showError(context, 'Ошибка экспорта CSV: $e');
   }
