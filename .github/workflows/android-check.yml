@@ -28,6 +28,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # На машине GitHub около 14 ГБ свободного места, а Flutter со своим
+      # кэшем, кэш Gradle, NDK и три сборки подряд занимают почти всё — 5
+      # октября сборка упала с «No space left on device». Убираем то, что
+      # здесь стоит, но нам не нужно: .NET, Haskell, Boost, CodeQL — это
+      # больше 10 ГБ. Android SDK и Java не трогаем.
+      - name: Освободить место на диске
+        run: |
+          df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h / | tail -1
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.6'
