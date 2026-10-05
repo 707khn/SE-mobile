@@ -47,6 +47,12 @@ dependencies:
   firebase_messaging: ^15.1.3
   flutter_local_notifications: ^17.2.3
 
+# Заставка при запуске. Сама она уже лежит в ресурсах Android, а генератор в
+# зависимостях не держим: у него свой Android-модуль, собранный под Android 31,
+# и `flutter build apk` собирает его вместе со всеми — с новыми библиотеками
+# AndroidX сборка падает (даже из dev_dependencies). Пересоздать заставку:
+#   dart pub global activate flutter_native_splash
+#   dart pub global run flutter_native_splash:create
 flutter_native_splash:
   color: "#ffffff"
   image: assets/logo.png
@@ -55,11 +61,6 @@ flutter_native_splash:
   cupertino_icons: ^1.0.2
 
 dev_dependencies:
-  # Только генератор заставки (dart run flutter_native_splash:create): сама
-  # заставка уже лежит в ресурсах Android. Среди обычных зависимостей он тянул
-  # в сборку свой Android-модуль, собранный под Android 31, — с новыми
-  # библиотеками AndroidX такой не собирается.
-  flutter_native_splash: ^2.4.4
   flutter_test:
     sdk: flutter
   integration_test:
