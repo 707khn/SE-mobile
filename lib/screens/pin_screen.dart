@@ -348,10 +348,9 @@ class _PinScreenState extends State<PinScreen> {
   /// Первый шаг — запомнить, второй — сверить и сохранить.
   Future<void> _choose(String entered) async {
     if (_first == null) {
-      if (_tooSimple(entered)) {
-        _reject('pin_too_simple'.tr);
-        return;
-      }
+      // Любой код из четырёх цифр, в том числе 1111 и 1234: так попросило
+      // предприятие. От подбора защищает не сложность кода, а счётчик —
+      // после пяти неверных попыток приложение выходит из учётной записи.
       setState(() {
         _first = entered;
         _entered = '';
@@ -429,14 +428,5 @@ class _PinScreenState extends State<PinScreen> {
       ),
     );
     if (confirmed == true) await forceLogout();
-  }
-
-  /// Код, который подберут с первого раза: четыре одинаковые цифры или
-  /// четыре подряд в любую сторону.
-  bool _tooSimple(String pin) {
-    if (RegExp(r'^(\d)\1{3}$').hasMatch(pin)) return true;
-    const digits = '0123456789';
-    const reversed = '9876543210';
-    return digits.contains(pin) || reversed.contains(pin);
   }
 }
