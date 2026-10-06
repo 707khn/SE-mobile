@@ -1,28 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../screens/about_screen.dart';
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
-import '../screens/change_password_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/news_screen.dart';
-import '../screens/pin_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
+import '../screens/settings_screen.dart';
 import '../utils/app_version.dart';
 import '../utils/colors.dart';
-import '../utils/lang.dart';
 import '../utils/shell_tab.dart';
 import '../utils/dimensions.dart';
-import '../utils/theme_pref.dart';
 import '../utils/logout_helper.dart';
 import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
-import '../utils/variables.dart';
 import 'icon_button_drawer.dart';
 import '../utils/app_theme.dart';
 
@@ -45,8 +39,6 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
-  String _lang = Lang.ru;
-  ThemeMode _themeMode = ThemeMode.system;
   String _fullName = '';
   String _job = '';
   String? _login;
@@ -59,14 +51,11 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Future<void> _loadProfile() async {
     final storage = SecureStorageHelper.instance;
-    final prefs = await SharedPreferences.getInstance();
     final fullName = await storage.getFullName();
     final job = await storage.getJob();
     final login = await storage.getLogin();
     if (!mounted) return;
     setState(() {
-      _lang = Lang.code(prefs.getString(AppValues.LANG));
-      _themeMode = ThemePref.read(prefs);
       _fullName = fullName ?? '';
       _job = job ?? '';
       _login = login;
@@ -107,11 +96,15 @@ class _AppDrawerState extends State<AppDrawer> {
           _buildHeader(),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.only(top: 8, bottom: 8),
               children: [
+                // Разделы приложения — первыми и без заголовка: за ними в
+                // меню и приходят. У администратора нижней панели нет, у
+                // него на этом месте свои экраны.
                 if (_isAdmin) ...[
+                  _section('drawer_admin'.tr),
                   _item(
-                    icon: Icons.admin_panel_settings,
+                    icon: Icons.admin_panel_settings_outlined,
                     label: 'admin_panel'.tr,
                     onTap: () => Get.to(() => const AdminPanelScreen()),
                   ),
@@ -153,21 +146,21 @@ class _AppDrawerState extends State<AppDrawer> {
                     onTap: () => _goToTab(4),
                   ),
                   if (isAdminRole(_job)) ...[
-                    const Divider(height: 1),
+                    _section('drawer_manager'.tr),
                     _item(
                       icon: Icons.groups_outlined,
-                      label: 'employee report'.tr,
+                      label: 'drawer_staff_report'.tr,
                       onTap: () => Get.to(
                           () => MainPage2(fullName: _fullName, job: _job)),
                     ),
                     _item(
-                      icon: Icons.badge_outlined,
+                      icon: Icons.insights_outlined,
                       label: 'attendance'.tr,
                       onTap: () => Get.to(() => const AttendanceScreen()),
                     ),
                   ],
                 ],
-                const Divider(height: 1),
+                _section('drawer_company'.tr),
                 _item(
                   icon: Icons.campaign_outlined,
                   label: 'news'.tr,
@@ -178,49 +171,51 @@ class _AppDrawerState extends State<AppDrawer> {
                   label: 'directory'.tr,
                   onTap: () => Get.to(() => const DirectoryScreen()),
                 ),
+                const SizedBox(height: 8),
+                const Divider(height: 1, indent: 28, endIndent: 28),
+                const SizedBox(height: 8),
+                // Оформление, язык, пароль, код и «О программе» — на своём
+                // экране: в меню они занимали половину списка.
                 _item(
-                  icon: Icons.lock_outline,
-                  label: 'password_change_title'.tr,
-                  onTap: () => Get.to(() => ChangePasswordScreen(
-                        fullName: _fullName,
-                        job: _job,
-                        currentPassword: '',
-                        mandatory: false,
-                      )),
-                ),
-                _item(
-                  icon: Icons.pin_outlined,
-                  label: 'pin_change_title'.tr,
-                  onTap: () => Get.to(() => const PinScreen(mode: PinMode.change)),
-                ),
-                _item(
-                  icon: ThemePref.icon(_themeMode),
-                  label: '${'theme'.tr}: ${ThemePref.label(_themeMode)}',
-                  onTap: _pickTheme,
-                ),
-                _item(
-                  icon: Icons.translate,
-                  label: Lang.isKazakh(_lang) ? 'Русский' : 'Қазақша',
-                  onTap: _changeLanguage,
-                ),
-                _item(
-                  icon: Icons.info_outline,
-                  label: 'about_title'.tr,
-                  onTap: () => Get.to(() => const AboutScreen()),
-                ),
-                _item(
-                  icon: Icons.logout,
-                  label: 'log_out_title'.tr,
-                  color: Colors.red.shade700,
-                  onTap: () => confirmAndLogout(context),
+                  icon: Icons.settings_outlined,
+                  label: 'drawer_settings'.tr,
+                  onTap: () => Get.to(() => const SettingsScreen()),
                 ),
               ],
             ),
           ),
           const Divider(height: 1),
+          // «Выйти» — не в общем списке, а всегда на виду внизу: в конце
+          // длинного списка его приходилось искать прокруткой, а среди
+          // настроек на него легко было нажать случайно.
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: _item(
+              icon: Icons.logout,
+              label: 'log_out_title'.tr,
+              color: Colors.red.shade700,
+              onTap: () => confirmAndLogout(context),
+            ),
+          ),
           _buildSocial(),
           _buildVersion(),
         ],
+      ),
+    );
+  }
+
+  /// Подзаголовок группы пунктов.
+  Widget _section(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 18, 20, 6),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.8,
+          color: context.mutedColor,
+        ),
       ),
     );
   }
@@ -248,7 +243,7 @@ class _AppDrawerState extends State<AppDrawer> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20, 18),
+      padding: EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20, 16),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.mainColor, AppColors.gradientColor2],
@@ -256,58 +251,76 @@ class _AppDrawerState extends State<AppDrawer> {
           end: Alignment.bottomRight,
         ),
       ),
+      // Значок рядом с именем, а не над ним: шапка в столбик занимала
+      // пятую часть экрана, и пункты меню уезжали вниз.
       child: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: Dimensions.height30 / 2),
-            CircleAvatar(
-              radius: 26,
-              backgroundColor: Colors.white.withOpacity(0.2),
-              child: Text(
-                _givenName.isNotEmpty ? _givenName[0].toUpperCase() : '?',
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+        child: Padding(
+          padding: EdgeInsets.only(top: Dimensions.height30 / 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: Text(
+                  _givenName.isNotEmpty ? _givenName[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            GestureDetector(
-              onLongPress: () => _copy(_fullName),
-              child: Text(
-                _fullName,
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              _job,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (_login != null && _login!.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              GestureDetector(
-                onTap: () => _copy(_login!),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.badge_outlined, size: 12, color: Colors.white54),
-                    const SizedBox(width: 4),
-                    Text(
-                      _login!,
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12, letterSpacing: 1),
+                    GestureDetector(
+                      onLongPress: () => _copy(_fullName),
+                      child: Text(
+                        _fullName,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    if (_job.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        _job,
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (_login != null && _login!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () => _copy(_login!),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.badge_outlined,
+                                size: 12, color: Colors.white54),
+                            const SizedBox(width: 4),
+                            Text(
+                              _login!,
+                              style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                  letterSpacing: 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -315,7 +328,7 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Widget _buildSocial() {
     return SizedBox(
-      height: Dimensions.height60 * 1.5,
+      height: Dimensions.height60,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -341,36 +354,62 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   /// Closes the drawer first, so the destination is not left behind it.
+  ///
+  /// Выбранный раздел подсвечен скруглённой плашкой с отступами, как в
+  /// Material 3: полоса во всю ширину сливалась с соседними строками.
   Widget _item({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
     int? index,
     Color? color,
+    String? value,
   }) {
     final selected = index != null && index == widget.currentIndex;
     final tint = color ?? (selected ? AppColors.mainColor : context.mutedColor);
-    return ListTile(
-      dense: true,
-      selected: selected,
-      selectedTileColor: AppColors.mainColor.withOpacity(0.08),
-      leading: Icon(icon, size: 21, color: tint),
-      title: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13,
-          color: color ?? (selected ? AppColors.mainColor : context.inkColor),
-          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
+      child: ListTile(
+        selected: selected,
+        selectedTileColor: AppColors.mainColor.withOpacity(0.10),
+        shape: const StadiumBorder(),
+        visualDensity: const VisualDensity(vertical: -2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        minLeadingWidth: 24,
+        leading: Icon(selected ? _filled(icon) : icon, size: 22, color: tint),
+        title: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            color: color ?? (selected ? AppColors.mainColor : context.inkColor),
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+          ),
         ),
+        trailing: value == null
+            ? null
+            : Text(value,
+                style: TextStyle(fontSize: 13, color: context.mutedColor)),
+        onTap: () {
+          Navigator.pop(context);
+          HapticFeedback.selectionClick();
+          // Re-tapping the section you are already on should just close.
+          if (selected) return;
+          onTap();
+        },
       ),
-      onTap: () {
-        Navigator.pop(context);
-        HapticFeedback.selectionClick();
-        // Re-tapping the section you are already on should just close.
-        if (selected) return;
-        onTap();
-      },
     );
+  }
+
+  /// Залитый вариант значка у выбранного раздела — как на нижней панели.
+  static IconData _filled(IconData icon) {
+    if (icon == Icons.home_outlined) return Icons.home;
+    if (icon == Icons.sensor_door_outlined) return Icons.sensor_door;
+    if (icon == Icons.receipt_long_outlined) return Icons.receipt_long;
+    if (icon == Icons.beach_access_outlined) return Icons.beach_access;
+    if (icon == Icons.restaurant_menu_outlined) return Icons.restaurant_menu;
+    return icon;
   }
 
   void _copy(String value) {
@@ -386,50 +425,4 @@ class _AppDrawerState extends State<AppDrawer> {
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
-  /// Три варианта в одном листе: следовать телефону, всегда светлая,
-  /// всегда тёмная. Список короткий, поэтому не диалог, а нижний лист —
-  /// до него дотягивается большой палец.
-  Future<void> _pickTheme() async {
-    final chosen = await showModalBottomSheet<ThemeMode>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('theme'.tr,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold)),
-              ),
-            ),
-            for (final mode in ThemeMode.values)
-              RadioListTile<ThemeMode>(
-                value: mode,
-                groupValue: _themeMode,
-                dense: true,
-                secondary: Icon(ThemePref.icon(mode), size: 21),
-                title: Text(ThemePref.label(mode),
-                    style: const TextStyle(fontSize: 14)),
-                onChanged: (value) => Navigator.pop(ctx, value),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-    if (chosen == null) return;
-    await ThemePref.write(chosen);
-    if (mounted) setState(() => _themeMode = chosen);
-  }
-
-  Future<void> _changeLanguage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final next = Lang.isKazakh(_lang) ? Lang.ru : Lang.kk;
-    await prefs.setString(AppValues.LANG, next);
-    Get.updateLocale(Locale(next));
-    if (mounted) setState(() => _lang = next);
-  }
 }
