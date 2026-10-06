@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
@@ -93,6 +94,38 @@ PayslipItem _toItem(dynamic e) {
     name: m['name'] as String,
     amount: (m['amount'] as num).toDouble(),
   );
+}
+
+/// Листок файлом Excel в вёрстке 1С — для кнопки «Поделиться».
+///
+/// Null — файла получить не удалось (нет связи, нет листка): тогда экран
+/// делится текстом. Повторов, как у самого листка, здесь нет — человек
+/// ждёт с открытым экраном, и минута ожидания хуже текста сразу.
+Future<Uint8List?> downloadPayslipXlsx(String month, String year,
+    {String? employeeId}) async {
+  final id = (employeeId != null && employeeId.isNotEmpty)
+      ? employeeId
+      : await _resolveEmployeeId();
+  if (id == null || id.isEmpty) return null;
+  try {
+    final response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/payslip/xlsx'),
+          headers: await authHeaders(),
+          body: jsonEncode({'key_suffix': id, 'month': month, 'year': year}),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (await handledUnauthorized(response)) return null;
+    final type = response.headers['content-type'] ?? '';
+    // Старый сервер, где этого адреса ещё нет, ответит страницей ошибки, а
+    // не файлом — её отправлять нельзя.
+    if (response.statusCode != 200 || !type.contains('spreadsheetml')) {
+      return null;
+    }
+    return response.bodyBytes;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// [employeeId] overrides the signed-in user — used by the admin panel to read

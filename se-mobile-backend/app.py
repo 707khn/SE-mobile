@@ -4,8 +4,9 @@ import re
 import secrets
 import threading
 from functools import wraps
+from io import BytesIO
 from datetime import date, datetime, timedelta, timezone
-from flask import Flask, Response, request, jsonify, g
+from flask import Flask, Response, request, jsonify, g, send_file
 from flask_cors import CORS
 # Werkzeug идёт вместе с Flask, ставить ничего не нужно. По умолчанию scrypt.
 from werkzeug.exceptions import HTTPException
@@ -23,6 +24,7 @@ from parser_news_feed import parse_news_feed, looks_like_feed, feed_links
 from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
 from privacy import privacy_page
+from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
 
@@ -185,6 +187,8 @@ def _push_to_everyone(title, body, data=None):
     return _push_to([t.employee_id for t in FcmToken.query.all()],
                     title, body, data)
 
+
+_XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 _MONTHS_RU = ('январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль',
               'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь')
@@ -1692,6 +1696,7 @@ def register_routes(app):
                 'POST /director_report',
                 'POST /get_sname',
                 'POST /payslip',
+                'POST /payslip/xlsx',
                 'POST /leaves',
                 'POST /api/fcm-token',
                 'DELETE /api/fcm-token',
@@ -2174,29 +2179,40 @@ def register_routes(app):
                          key=lambda p: (p['year'], p['month']), reverse=True)
         return jsonify({'message': 'Success', 'periods': periods})
 
-    @app.route('/payslip', methods=['POST'])
-    @require_auth
-    def payslip():
-        data = request.get_json()
+    def _requested_payslip():
+        """Листок из тела запроса — или готовый ответ-отказ вторым значением.
+
+        Общий для /payslip и /payslip/xlsx: файл не должен открываться
+        там, где не открывается сам листок.
+        """
+        data = request.get_json(silent=True) or {}
         key_suffix = data.get('key_suffix', '')
         if not _may_view(key_suffix):
-            return _deny()
+            return None, _deny()
         # Месяц и год приходят снаружи. int('август') — это ValueError и
         # пятисотый ответ, который приложение показывает как «ошибка сети».
         try:
             month = int(data.get('month', ''))
             year = int(data.get('year', ''))
         except (TypeError, ValueError):
-            return jsonify({'message': 'Failure', 'error': 'bad_period'}), 400
+            return None, (jsonify({'message': 'Failure',
+                                   'error': 'bad_period'}), 400)
 
         ps = Payslip.query.filter_by(
             employee_id=key_suffix,
             period_month=month,
             period_year=year
         ).first()
-
         if not ps:
-            return jsonify({'message': 'Failure'})
+            return None, jsonify({'message': 'Failure'})
+        return ps, None
+
+    @app.route('/payslip', methods=['POST'])
+    @require_auth
+    def payslip():
+        ps, refusal = _requested_payslip()
+        if refusal is not None:
+            return refusal
 
         return jsonify({
             'message': 'Success',
@@ -2230,6 +2246,26 @@ def register_routes(app):
                 'debt_end': ps.debt_end or 0.0,
             }
         })
+
+    @app.route('/payslip/xlsx', methods=['POST'])
+    @require_auth
+    def payslip_xlsx():
+        """Тот же листок файлом Excel — для кнопки «Поделиться».
+
+        Тело и права — как у /payslip. Нет листка — тот же ответ
+        «Failure», что и там: приложение тогда делится текстом.
+        """
+        ps, refusal = _requested_payslip()
+        if refusal is not None:
+            return refusal
+        body = build_payslip_xlsx(ps, ps.employee.full_name)
+        response = send_file(
+            BytesIO(body), mimetype=_XLSX_MIME, as_attachment=True,
+            download_name=payslip_file_name(ps))
+        # Листок — это зарплата. Ни один промежуточный кэш хранить его не
+        # должен.
+        response.headers['Cache-Control'] = 'no-store'
+        return response
 
     @app.route('/api/admin/upload-payslip-xml', methods=['POST'])
     def upload_payslip_xml():
