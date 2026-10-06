@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../requests/payslip_request.dart';
@@ -182,16 +185,66 @@ class _PayslipPageState extends State<PayslipPage> {
     _fetchPayslip();
   }
 
-  void _sharePayslip() {
-    if (_payslip == null) return;
-    final buf = StringBuffer();
-    buf.writeln(_payslip!.employee);
-    buf.writeln(_payslip!.period);
-    buf.writeln('');
-    buf.writeln('${'accruals'.tr}: ${_numberFormat.format(_payslip!.totalAccruals)} ₸');
-    buf.writeln('${'deductions'.tr}: ${_numberFormat.format(_payslip!.totalDeductions)} ₸');
-    buf.writeln('${'net pay'.tr}: ${_numberFormat.format(_payslip!.netPay)} ₸');
+  bool _sharing = false;
+
+  static const _xlsxMime =
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  static const _monthsRu = [
+    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль',
+    'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+  ];
+
+  /// «Поделиться» отправляет листок файлом Excel в вёрстке 1С — так его
+  /// просят в бухгалтерии и в банке. Файл собирает сервер. Без связи —
+  /// прежний текст с итогами, чтобы кнопка не молчала.
+  Future<void> _sharePayslip() async {
+    final payslip = _payslip;
+    if (payslip == null || _sharing) return;
     HapticFeedback.lightImpact();
+    final date = _selectedDate;
+    setState(() => _sharing = true);
+    try {
+      final bytes = await downloadPayslipXlsx(
+        date.month.toString().padLeft(2, '0'),
+        date.year.toString(),
+        employeeId: widget.employeeId,
+      );
+      if (!mounted) return;
+      if (bytes != null) {
+        // Своя папка во временных: перед каждой отправкой она чистится,
+        // чтобы чужие и старые листки не копились на телефоне.
+        final dir = Directory('${(await getTemporaryDirectory()).path}/payslips');
+        if (await dir.exists()) await dir.delete(recursive: true);
+        await dir.create(recursive: true);
+        final name =
+            'Расчетный листок ${_monthsRu[date.month - 1]} ${date.year}.xlsx';
+        final file = File('${dir.path}/$name');
+        await file.writeAsBytes(bytes, flush: true);
+        await Share.shareXFiles(
+          [XFile(file.path, mimeType: _xlsxMime, name: name)],
+          subject: name,
+        );
+        return;
+      }
+    } catch (_) {
+      // Не вышло с файлом — ниже отправится текст.
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('payslip_share_text'.tr)));
+    _shareText(payslip);
+  }
+
+  void _shareText(PayslipData payslip) {
+    final buf = StringBuffer();
+    buf.writeln(payslip.employee);
+    buf.writeln(payslip.period);
+    buf.writeln('');
+    buf.writeln('${'accruals'.tr}: ${_numberFormat.format(payslip.totalAccruals)} ₸');
+    buf.writeln('${'deductions'.tr}: ${_numberFormat.format(payslip.totalDeductions)} ₸');
+    buf.writeln('${'net pay'.tr}: ${_numberFormat.format(payslip.netPay)} ₸');
     Share.share(buf.toString());
   }
 
@@ -337,9 +390,14 @@ class _PayslipPageState extends State<PayslipPage> {
         actions: [
           if (_payslip != null)
             IconButton(
-              icon: const Icon(Icons.share),
+              icon: _sharing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.share),
               tooltip: 'share'.tr,
-              onPressed: _sharePayslip,
+              onPressed: _sharing ? null : _sharePayslip,
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
