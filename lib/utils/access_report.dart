@@ -63,7 +63,8 @@ class AccessCoverage {
 
 /// Ответ на запрос проходов: сами записи и то, чем объяснить их отсутствие.
 class AccessReport {
-  const AccessReport(this.entries, this.coverage, {this.problem});
+  const AccessReport(this.entries, this.coverage,
+      {this.problem, this.cachedAt});
 
   /// Как и раньше: дата, время, событие, точка прохода.
   final List<List<String>> entries;
@@ -73,6 +74,9 @@ class AccessReport {
 
   /// Почему ответа нет — только у неудачного.
   final LoadProblem? problem;
+
+  /// Показана сохранённая копия: когда её получили с сервера.
+  final DateTime? cachedAt;
 
   static const AccessReport empty = AccessReport(<List<String>>[], null);
 

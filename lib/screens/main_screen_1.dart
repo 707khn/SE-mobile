@@ -23,6 +23,7 @@ import '../widgets/custom_text.dart';
 import '../utils/app_theme.dart';
 import '../utils/load_problem.dart';
 import '../widgets/load_error_view.dart';
+import '../widgets/offline_notice.dart';
 
 
 class MainPage1 extends StatefulWidget {
@@ -169,6 +170,9 @@ class _MainMenu1State extends State<MainMenu1> {
   /// Пока сервер не ответил — null, и экран ведёт себя как раньше.
   AccessCoverage? _coverage;
 
+  /// Показана копия, сохранённая на телефоне: когда её получили.
+  DateTime? _cachedAt;
+
   /// Начало показанного периода, чтобы отличить «период позже выгрузки» от
   /// «в эти дни не проходил». null — показан весь отчёт целиком.
   DateTime? _shownPeriodStart;
@@ -193,6 +197,7 @@ class _MainMenu1State extends State<MainMenu1> {
         _initError = report.isFailure;
         _problem = report.problem;
         _coverage = report.coverage ?? _coverage;
+        _cachedAt = report.cachedAt;
         _shownPeriodStart = null;
       });
       if (_hasData) {
@@ -290,6 +295,7 @@ class _MainMenu1State extends State<MainMenu1> {
       _initError = report.isFailure;
       _problem = report.problem;
       _coverage = report.coverage ?? _coverage;
+      _cachedAt = report.cachedAt;
       _shownPeriodStart = startDate;
     });
     if (_hasData) {
@@ -531,6 +537,13 @@ class _MainMenu1State extends State<MainMenu1> {
             // Отчёт всегда отстаёт: выгрузку из СКУД приносят раз в месяц.
             // Строка снимает вопрос «почему сегодняшнего прохода не видно»
             // до того, как он задан.
+            // Связи нет, а этот период уже загружали: показываем копию и
+            // говорим, от какого она числа.
+            if (!_loadingReport && _cachedAt != null)
+              Padding(
+                padding: EdgeInsets.only(bottom: Dimensions.height30 / 3),
+                child: OfflineNotice(at: _cachedAt),
+              ),
             if (!_loadingReport && _dataIsBehind)
               Padding(
                 padding: EdgeInsets.only(bottom: Dimensions.height30 / 3),
