@@ -1697,6 +1697,7 @@ def register_routes(app):
                 'POST /get_sname',
                 'POST /payslip',
                 'POST /payslip/xlsx',
+                'POST /api/home',
                 'POST /leaves',
                 'POST /api/fcm-token',
                 'DELETE /api/fcm-token',
@@ -2627,6 +2628,37 @@ def register_routes(app):
 
     # ── Canteen menu ──────────────────────────────────────────────────────────
 
+    @app.route('/api/home', methods=['POST'])
+    @require_auth
+    def home_summary():
+        """Сводка для главного экрана — одним запросом.
+
+        Главный экран был плиткой из тех же пяти разделов, что и нижняя
+        панель: чтобы узнать, во сколько тебя отметил турникет или вышел ли
+        листок, надо было зайти в раздел и подождать. Здесь — по строке на
+        раздел. Один запрос, а не четыре: главный экран открывают все пятьсот
+        человек, и каждый раз.
+
+        Сумм здесь нет: главный экран показывают через плечо, а зарплата — не
+        то, что должен увидеть сосед. Только месяц, за который листок есть.
+        """
+        data = request.get_json(silent=True) or {}
+        key_suffix = (data.get('key_suffix') or '').strip()
+        if not key_suffix:
+            viewer = getattr(g, 'employee', None)
+            key_suffix = viewer.employee_id if viewer is not None else ''
+        if not key_suffix or not _may_view(key_suffix):
+            return _deny()
+        today = _plant_today()
+        return jsonify({
+            'message': 'Success',
+            'today': today.isoformat(),
+            'access': _home_access(key_suffix, today),
+            'payslip': _home_payslip(key_suffix),
+            'leave': _home_leave(key_suffix),
+            'menu': _home_menu(today),
+        })
+
     @app.route('/api/menu', methods=['GET'])
     @require_auth
     def get_menu():
@@ -3132,6 +3164,73 @@ def register_routes(app):
             db.session.delete(menu)
             db.session.commit()
         return jsonify({'message': 'Success'})
+
+
+def _home_access(employee_id, today):
+    """Последний день с проходами: когда пришёл и когда ушёл.
+
+    Сегодняшний день берётся из событий турникета — они приходят сразу.
+    Выгрузку СКУД приносят раз в месяц, поэтому, если сегодня событий нет,
+    показываем последний загруженный день, с его датой: «06.10, вход 07:52»
+    честнее пустоты.
+    """
+    try:
+        start = datetime(today.year, today.month, today.day)
+        events = (TurnstileEvent.query
+                  .filter(TurnstileEvent.employee_id == employee_id,
+                          TurnstileEvent.timestamp >= start,
+                          TurnstileEvent.timestamp < start + _ONE_DAY)
+                  .order_by(TurnstileEvent.timestamp).all())
+        if events:
+            ins = [e.timestamp for e in events if e.direction == 'in']
+            outs = [e.timestamp for e in events if e.direction == 'out']
+            return {'date': today.isoformat(),
+                    'first_in': min(ins).strftime('%H:%M') if ins else None,
+                    'last_out': max(outs).strftime('%H:%M') if outs else None}
+
+        last = (db.session.query(db.func.max(AccessRecord.access_date))
+                .filter(AccessRecord.employee_id == employee_id).scalar())
+        if last is None:
+            return None
+        rows = AccessRecord.query.filter_by(employee_id=employee_id,
+                                            access_date=last).all()
+        # «Проход» — точка без направления; приходом её считаем, уходом нет.
+        ins = [r.access_time for r in rows if r.event_type in ('Вход', 'Проход')]
+        outs = [r.access_time for r in rows if r.event_type == 'Выход']
+        return {'date': last.isoformat(),
+                'first_in': min(ins) if ins else None,
+                'last_out': max(outs) if outs else None}
+    except Exception as e:
+        db.session.rollback()
+        logging.warning('Сводка: проходы %s не прочитались: %s', employee_id, e)
+        return None
+
+
+def _home_payslip(employee_id):
+    row = (db.session.query(Payslip.period_year, Payslip.period_month)
+           .filter(Payslip.employee_id == employee_id)
+           .order_by(Payslip.period_year.desc(), Payslip.period_month.desc())
+           .first())
+    return {'year': int(row[0]), 'month': int(row[1])} if row else None
+
+
+def _home_leave(employee_id):
+    """Сколько дней отпуска осталось — всех видов вместе.
+
+    Видов обычно два: ежегодный и экологический. На главном экране важно
+    одно число — сколько ещё можно отдыхать; по видам — в разделе «Отпуск».
+    """
+    balances = LeaveBalance.query.filter_by(employee_id=employee_id).all()
+    if not balances:
+        return None
+    return {'remaining_days': sum(max(b.remaining_days or 0, 0)
+                                  for b in balances)}
+
+
+def _home_menu(today):
+    menu = MenuDate.query.filter_by(date=today).first()
+    items = sorted(menu.items, key=lambda i: i.id) if menu else []
+    return {'count': len(items), 'dishes': [i.name for i in items[:3]]}
 
 
 def _access_to_dict(record):
