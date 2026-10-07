@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/start_screen.dart';
+import '../services/fcm_service.dart';
 import '../variables.dart';
 import 'secure_storage_helper.dart';
 import 'api.dart';
@@ -39,6 +40,8 @@ Future<void> confirmAndLogout(BuildContext context) async {
 /// Спрашивать здесь нечего — решение уже принято, а `message` объясняет,
 /// почему человек вдруг оказался на экране входа.
 Future<void> forceLogout({String? message}) async {
+  // Сначала отвязываем телефон от уведомлений — пока пропуск ещё годен.
+  await FcmService.unregisterToken();
   // Гасим пропуск на сервере, чтобы он не остался годным ещё месяц.
   // Не получилось — не беда: локально его всё равно стираем.
   await revokeToken();

@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:se_mobile/utils/api.dart';
 import 'package:se_mobile/utils/variables.dart';
 
 class FcmService {
@@ -56,36 +59,63 @@ class FcmService {
     });
   }
 
+  /// Подписка на смену токена — одна на весь процесс: раньше каждая
+  /// регистрация добавляла ещё одну.
+  static StreamSubscription<String>? _refresh;
+
+  /// Firebase поднят: без google-services.json его нет, и тогда
+  /// уведомлений нет вовсе — молча, приложение работает и без них.
+  static bool get _ready => Firebase.apps.isNotEmpty;
+
+  /// Привязать этот телефон к вошедшему сотруднику.
+  ///
+  /// Раньше функция была, но её никто не вызывал, а пропуска она не
+  /// посылала — после включения проверки входа сервер отказал бы ей. То есть
+  /// уведомления не заработали бы и после подключения Firebase.
   static Future<void> registerToken(String employeeId) async {
+    if (!_ready || employeeId.isEmpty) return;
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
-
-      await http.post(
-        Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'employee_id': employeeId, 'token': token}),
-      );
-
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        await http.post(
-          Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'employee_id': employeeId, 'token': newToken}),
-        );
-      });
+      await _send(employeeId, token);
+      await _refresh?.cancel();
+      _refresh = FirebaseMessaging.instance.onTokenRefresh
+          .listen((newToken) => _send(employeeId, newToken));
     } catch (_) {}
   }
 
-  static Future<void> unregisterToken() async {
+  static Future<void> _send(String employeeId, String token) async {
     try {
+      await http
+          .post(
+            Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
+            headers: await authHeaders(),
+            body: jsonEncode({'employee_id': employeeId, 'token': token}),
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {}
+  }
+
+  /// Отвязать телефон при выходе — пока пропуск ещё действует.
+  ///
+  /// Иначе после смены пользователя на этом телефоне продолжали бы
+  /// появляться уведомления прежнего: о его листке, его проходах. Токен
+  /// заодно сбрасывается, и следующий вошедший получит новый.
+  static Future<void> unregisterToken() async {
+    if (!_ready) return;
+    try {
+      await _refresh?.cancel();
+      _refresh = null;
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
-      await http.delete(
-        Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'token': token}),
-      );
+      await http
+          .delete(
+            Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
+            headers: await authHeaders(),
+            body: jsonEncode({'token': token}),
+          )
+          .timeout(const Duration(seconds: 8));
+      await FirebaseMessaging.instance.deleteToken();
     } catch (_) {}
   }
 }

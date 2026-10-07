@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../services/fcm_service.dart';
 import '../utils/colors.dart';
 import '../utils/role_helper.dart';
+import '../utils/secure_storage_helper.dart';
 import '../utils/shell_tab.dart';
 import 'home_screen.dart';
 import 'leave_screen.dart';
@@ -51,6 +53,15 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     ShellTab.selected.value = widget.initialIndex;
     ShellTab.selected.addListener(_onTabChanged);
+    _registerForPush();
+  }
+
+  /// Оболочка открывается после входа — по коду или по паролю, — и это
+  /// единственное место, через которое проходят все. Без Firebase это
+  /// ничего не делает.
+  Future<void> _registerForPush() async {
+    final id = await SecureStorageHelper.instance.getEmployeeId();
+    if (id != null) await FcmService.registerToken(id);
   }
 
   @override
