@@ -10,6 +10,8 @@ import '../utils/search_fold.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/offline_notice.dart';
 import '../widgets/custom_text.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 
 /// Телефонный справочник предприятия.
 ///
@@ -28,6 +30,9 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
 
   bool _loading = true;
   bool _error = false;
+
+  /// Почему не загрузилось — когда и сохранённого нет.
+  LoadProblem? _problem;
   List<_Entry> _all = [];
   DateTime? _cachedAt;
   String _query = '';
@@ -55,6 +60,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       setState(() {
         _loading = false;
         _error = true;
+        _problem = problemIn(body);
       });
       return;
     }
@@ -153,7 +159,11 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error) {
-      return _message('directory_error'.tr, retry: true);
+      // Причина известна — общий вид, как на других экранах; нет — прежнее
+      // «не удалось загрузить справочник».
+      return _problem != null
+          ? LoadErrorView(problem: _problem, onRetry: _load)
+          : _message('directory_error'.tr, retry: true);
     }
     if (_all.isEmpty) {
       return _message('directory_empty'.tr);

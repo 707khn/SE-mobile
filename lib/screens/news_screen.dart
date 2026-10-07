@@ -11,6 +11,8 @@ import '../utils/offline_cache.dart';
 import '../widgets/offline_notice.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 import 'news_admin_screen.dart';
 
 /// Лента предприятия: новости с сайта и объявления.
@@ -29,6 +31,9 @@ class NewsScreen extends StatefulWidget {
 class _NewsScreenState extends State<NewsScreen> {
   bool _loading = true;
   bool _error = false;
+
+  /// Почему не загрузилось — когда и сохранённого нет.
+  LoadProblem? _problem;
   List<_NewsItem> _items = [];
   DateTime? _cachedAt;
 
@@ -49,6 +54,7 @@ class _NewsScreenState extends State<NewsScreen> {
       setState(() {
         _loading = false;
         _error = true;
+        _problem = problemIn(body);
       });
       return;
     }
@@ -101,6 +107,9 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error && _problem != null) {
+      return LoadErrorView(problem: _problem, onRetry: _load);
+    }
     if (_error) {
       return Center(
         child: Column(
