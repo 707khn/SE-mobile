@@ -4,6 +4,8 @@
 	<dict>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>NSFaceIDUsageDescription</key>
+		<string>Вход в SE Mobile по лицу вместо кода</string>
 		<key>CFBundleDisplayName</key>
 		<string>Se Mobile</string>
 		<key>CFBundleExecutable</key>
