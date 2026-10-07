@@ -224,18 +224,13 @@ def test_get_sname_list(client):
     assert len(body['fio']) >= 3
 
 
-def test_get_sname_by_iin(client):
-    # ИИН сотрудника 001 в нынешних сидерах; демонстрационный из ранней
-    # версии оттуда убрали, а тест остался на него смотреть.
+def test_get_sname_by_iin_is_closed(client):
+    """По ИИН сервер больше никого не называет: приложение этого не
+    спрашивает, а ответ раскрывал, чей это номер."""
     r = _post(client, '/get_sname', {'emp_iin': '000000002114'})
     body = r.get_json()
-    assert body['message'] == 'Success'
-    assert body['employee'][0]['iin'] == '000000002114'
-
-
-def test_get_sname_unknown_iin(client):
-    r = _post(client, '/get_sname', {'emp_iin': '000000000000'})
-    assert r.get_json()['message'] == 'Failure'
+    assert body['message'] == 'Failure'
+    assert 'employee' not in body
 
 
 # ---------------------------------------------------------------------------
