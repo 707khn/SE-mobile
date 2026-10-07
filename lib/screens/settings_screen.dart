@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/app_theme.dart';
 import '../utils/app_version.dart';
-import '../utils/biometric.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
 import '../utils/secure_storage_helper.dart';
@@ -34,10 +33,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _fullName = '';
   String _job = '';
 
-  /// null — на телефоне нет датчика или в нём ничего не заведено: тогда и
-  /// строки нет.
-  bool? _biometric;
-
   @override
   void initState() {
     super.initState();
@@ -49,16 +44,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final storage = SecureStorageHelper.instance;
     final fullName = await storage.getFullName();
     final job = await storage.getJob();
-    final biometric = await Biometric.available()
-        ? await storage.biometricEnabled()
-        : null;
     if (!mounted) return;
     setState(() {
       _lang = Lang.code(prefs.getString(AppValues.LANG));
       _themeMode = ThemePref.read(prefs);
       _fullName = fullName ?? '';
       _job = job ?? '';
-      _biometric = biometric;
     });
   }
 
@@ -101,16 +92,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: 'pin_change_title'.tr,
             onTap: () => Get.to(() => const PinScreen(mode: PinMode.change)),
           ),
-          if (_biometric != null)
-            SwitchListTile(
-              secondary: Icon(Icons.fingerprint, color: context.mutedColor),
-              title: Text('settings_biometric'.tr,
-                  style: const TextStyle(fontSize: 15)),
-              subtitle: Text('settings_biometric_hint'.tr,
-                  style: TextStyle(fontSize: 12, color: context.mutedColor)),
-              value: _biometric!,
-              onChanged: _setBiometric,
-            ),
           _section('settings_app'.tr),
           _tile(
             icon: Icons.info_outline,
@@ -162,15 +143,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onTap();
       },
     );
-  }
-
-  /// Включаем, только если палец подошёл прямо сейчас: иначе при следующем
-  /// входе человек упрётся в окно, которое его не узнаёт.
-  Future<void> _setBiometric(bool on) async {
-    HapticFeedback.selectionClick();
-    if (on && !await Biometric.authenticate()) return;
-    await SecureStorageHelper.instance.setBiometricEnabled(on);
-    if (mounted) setState(() => _biometric = on);
   }
 
   /// Выбор из короткого списка — нижним листом: до него дотягивается
