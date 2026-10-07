@@ -126,7 +126,4 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
-    // Темы Theme.AppCompat для LaunchTheme (см. res/values/styles.xml): без
-    // них окно отпечатка пальца падает на Android 8 и старше.
-    implementation 'androidx.appcompat:appcompat:1.7.1'
 }

@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../utils/app_theme.dart';
-import '../utils/biometric.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
@@ -95,34 +94,10 @@ class _PinScreenState extends State<PinScreen> {
   String? _error;
   bool _busy = false;
 
-  /// Вход по отпечатку включён и датчик на месте: на клавиатуре появляется
-  /// кнопка с отпечатком, а системное окно открывается само.
-  bool _biometric = false;
-
   @override
   void initState() {
     super.initState();
     _open++;
-    if (_unlocking) _prepareBiometric();
-  }
-
-  Future<void> _prepareBiometric() async {
-    if (!await SecureStorageHelper.instance.biometricEnabled()) return;
-    if (!await Biometric.available()) return;
-    if (!mounted) return;
-    setState(() => _biometric = true);
-    // Сразу, без нажатия: ради этого его и включали. Отменил окно — на
-    // экране обычный код, а повторить можно кнопкой на клавиатуре.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _tryBiometric());
-  }
-
-  Future<void> _tryBiometric() async {
-    if (!_biometric || _busy || !mounted) return;
-    setState(() => _busy = true);
-    final ok = await Biometric.authenticate();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (ok) await _unlocked();
   }
 
   @override
@@ -278,21 +253,7 @@ class _PinScreenState extends State<PinScreen> {
   }
 
   Widget _key(String value) {
-    if (value.isEmpty) {
-      // Пустая клетка слева от нуля — место для отпечатка, как в банковских
-      // приложениях: там его и ищут.
-      if (!(_unlocking && _biometric)) return const SizedBox.shrink();
-      return InkWell(
-        borderRadius: BorderRadius.circular(40),
-        onTap: _busy ? null : _tryBiometric,
-        child: Center(
-          child: Tooltip(
-            message: 'biometric_title'.tr,
-            child: Icon(Icons.fingerprint, size: 30, color: context.accentColor),
-          ),
-        ),
-      );
-    }
+    if (value.isEmpty) return const SizedBox.shrink();
     final isBackspace = value == '<';
     return InkWell(
       borderRadius: BorderRadius.circular(40),
@@ -361,7 +322,13 @@ class _PinScreenState extends State<PinScreen> {
     if (!mounted) return;
 
     if (entered == saved) {
-      await _unlocked();
+      await secure.resetPinFails();
+      if (!mounted) return;
+      if (widget.mode == PinMode.relock) {
+        Get.back();
+      } else {
+        await _openApp();
+      }
       return;
     }
 
@@ -376,18 +343,6 @@ class _PinScreenState extends State<PinScreen> {
     }
     _reject('pin_wrong'.tr,
         extra: 'pin_attempts_left'.trParams({'count': '${_maxFails - fails}'}));
-  }
-
-  /// Код или отпечаток подошли: счётчик ошибок — с нуля, и дальше в
-  /// приложение или туда, где его свернули.
-  Future<void> _unlocked() async {
-    await SecureStorageHelper.instance.resetPinFails();
-    if (!mounted) return;
-    if (widget.mode == PinMode.relock) {
-      Get.back();
-    } else {
-      await _openApp();
-    }
   }
 
   /// Первый шаг — запомнить, второй — сверить и сохранить.
@@ -418,39 +373,7 @@ class _PinScreenState extends State<PinScreen> {
           snackPosition: SnackPosition.BOTTOM,
           margin: const EdgeInsets.all(12));
     } else {
-      await _offerBiometric();
-      if (!mounted) return;
       await _openApp();
-    }
-  }
-
-  /// Один раз, сразу после того как код придуман: предложить входить по
-  /// отпечатку. Потом это меняется в «Настройках».
-  Future<void> _offerBiometric() async {
-    if (!await Biometric.available() || !mounted) return;
-    final want = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.fingerprint, size: 36, color: context.accentColor),
-        title: Text('biometric_offer_title'.tr),
-        content: Text('biometric_offer_body'.tr),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('later'.tr),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('biometric_enable'.tr),
-          ),
-        ],
-      ),
-    );
-    if (want != true) return;
-    // Включаем, только если палец действительно подошёл: иначе завтра утром
-    // человек упрётся в окно, которое его не узнаёт.
-    if (await Biometric.authenticate()) {
-      await SecureStorageHelper.instance.setBiometricEnabled(true);
     }
   }
 
