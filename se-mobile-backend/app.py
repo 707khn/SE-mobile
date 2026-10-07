@@ -2118,38 +2118,37 @@ def register_routes(app):
     @app.route('/get_sname', methods=['POST'])
     @require_auth
     def get_sname():
-        data = request.get_json()
+        """Кого руководитель может выбрать в «Отчёте сотрудников».
 
-        if 'key_suffix' in data:
-            # The employee report lists the requester's own department only, so
-            # a manager sees their team rather than the whole company. Falls
-            # back to everyone when the requester has no department on record.
-            me = Employee.query.get(data['key_suffix'])
-            query = Employee.query
-            if me and me.department:
-                query = query.filter(
-                    Employee.department == me.department,
-                    Employee.employee_id != me.employee_id,
-                )
-            # Some people exist twice (a legacy id kept alongside the tabular
-            # one), so collapse repeats to keep the picker clean.
-            names = list(dict.fromkeys(e.full_name for e in query.all()))
-            return jsonify({'fio': names})
+        Список строится той же _visible_employee_ids, что проверяет право
+        открыть отчёт (/director_report). Раньше он строился отдельно — по
+        отделу из табельного номера в запросе: подставив чужой номер, можно
+        было получить список чужого отдела, а у человека без отдела — всё
+        предприятие. И тем, кому положено видеть больше своего отдела, список
+        показывал меньше, чем им разрешено открыть.
 
-        if 'emp_iin' in data:
-            emp = Employee.query.filter_by(iin=data['emp_iin']).first()
-            if emp:
-                return jsonify({
-                    'message': 'Success',
-                    'employee': [{
-                        'full_name': emp.full_name,
-                        'job': emp.job_title,
-                        'iin': emp.iin
-                    }]
-                })
+        Поиск по ИИН («emp_iin») закрыт: приложение его не вызывает, а
+        отвечал он любому вошедшему, чей это ИИН — ФИО и должность. ИИН
+        содержит дату рождения и пол, и такой ответ — это сведения о человеке
+        по его номеру.
+        """
+        data = request.get_json(silent=True) or {}
+        if 'key_suffix' not in data:
             return jsonify({'message': 'Failure'})
+        if not _is_manager():
+            return _deny()
 
-        return jsonify({'message': 'Failure'})
+        allowed = _visible_employee_ids()
+        query = Employee.query
+        if allowed is not None:
+            query = query.filter(Employee.employee_id.in_(allowed))
+        viewer = getattr(g, 'employee', None)
+        if viewer is not None:
+            query = query.filter(Employee.employee_id != viewer.employee_id)
+        # Some people exist twice (a legacy id kept alongside the tabular
+        # one), so collapse repeats to keep the picker clean.
+        names = list(dict.fromkeys(e.full_name for e in query.all()))
+        return jsonify({'fio': names})
 
     @app.route('/payslip/periods', methods=['POST'])
     @require_auth
