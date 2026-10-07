@@ -6,8 +6,11 @@ import 'package:share_plus/share_plus.dart';
 import '../requests/leave_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/load_problem.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
+import '../widgets/load_error_view.dart';
+import '../widgets/offline_notice.dart';
 import '../utils/app_theme.dart';
 
 class LeavePage extends StatefulWidget {
@@ -29,6 +32,9 @@ class _LeavePageState extends State<LeavePage> {
   bool _loading = false;
   String? _error;
 
+  /// Почему не загрузилось, если не загрузилось вовсе (и сохранённого нет).
+  LoadProblem? _problem;
+
   @override
   void initState() {
     super.initState();
@@ -39,15 +45,24 @@ class _LeavePageState extends State<LeavePage> {
     setState(() {
       _loading = true;
       _error = null;
+      _problem = null;
       _leaveData = null;
     });
 
-    final data = await getLeaves(context, employeeId: widget.employeeId);
+    LeaveData? data;
+    LoadProblem? problem;
+    try {
+      data = await getLeaves(context, employeeId: widget.employeeId);
+    } catch (e) {
+      problem = problemOfAny(e);
+    }
 
     if (!mounted) return;
     setState(() {
       _loading = false;
-      if (data == null) {
+      if (problem != null) {
+        _problem = problem;
+      } else if (data == null) {
         _error = 'leave not found'.tr;
       } else {
         _leaveData = data;
@@ -122,13 +137,19 @@ class _LeavePageState extends State<LeavePage> {
                     child: CircularProgressIndicator(color: context.accentColor),
                   ),
                 ),
+              // Связи нет, сервер не ответил или ответил ошибкой — у каждого
+              // случая свои слова. Раньше на все был ответ «данные об
+              // отпусках не найдены», и человек без интернета думал, что у
+              // него пропал отпуск.
+              if (_problem != null)
+                LoadErrorView(problem: _problem, onRetry: _fetchLeaves),
               if (_error != null)
                 Center(
                   child: Padding(
                     padding: EdgeInsets.all(Dimensions.height30),
                     child: Column(
                       children: [
-                        Icon(Icons.wifi_off, size: 56, color: context.mutedColor),
+                        Icon(Icons.event_busy, size: 56, color: context.mutedColor),
                         SizedBox(height: Dimensions.height30 / 2),
                         Text(
                           _error!,
@@ -146,6 +167,11 @@ class _LeavePageState extends State<LeavePage> {
                   ),
                 ),
               if (_leaveData != null) ...[
+                if (_leaveData!.cachedAt != null)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: Dimensions.height30 / 2),
+                    child: OfflineNotice(at: _leaveData!.cachedAt),
+                  ),
                 GestureDetector(
                   onLongPress: () {
                     Clipboard.setData(ClipboardData(text: _leaveData!.employee));
