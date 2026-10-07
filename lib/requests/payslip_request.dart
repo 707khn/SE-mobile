@@ -130,48 +130,46 @@ Future<Uint8List?> downloadPayslipXlsx(String month, String year,
 
 /// [employeeId] overrides the signed-in user — used by the admin panel to read
 /// somebody else's payslip.
-Future<PayslipData> fetchPayslip(String month, String year, {String? employeeId}) =>
-    _fetchPayslip(month, year, 0, employeeId);
-
-Future<PayslipData> _fetchPayslip(
-    String month, String year, int attempt, String? overrideId) async {
-  final employeeId = (overrideId != null && overrideId.isNotEmpty)
-      ? overrideId
-      : await _resolveEmployeeId();
-  if (employeeId == null || employeeId.isEmpty) {
+Future<PayslipData> fetchPayslip(String month, String year,
+    {String? employeeId}) async {
+  // Копию держим только своих листков. Раньше она лежала под ключом
+  // «год_месяц» без табельного номера, и листок сотрудника, открытый
+  // руководителем, ложился на место его собственного: без связи руководитель
+  // открывал свой листок — и видел чужую зарплату. Да и чужим листкам на
+  // телефоне руководителя лежать незачем.
+  final own = employeeId == null || employeeId.isEmpty;
+  final id = own ? await _resolveEmployeeId() : employeeId;
+  if (id == null || id.isEmpty) {
     throw const PayslipException(PayslipErrorKind.notFound);
   }
+  final cacheKey = own ? 'payslip_${id}_${year}_$month' : null;
 
   final http.Response response;
   try {
+    // Повторов больше нет. Они были для бесплатного хостинга, который
+    // засыпал и просыпался минуту; теперь сервер свой и не спит, а без связи
+    // человек ждал три повтора по двадцать секунд, прежде чем увидеть
+    // сохранённый листок.
     response = await http
         .post(
           Uri.parse('${AppValues.baseUrl}/payslip'),
           headers: await authHeaders(),
-          body: jsonEncode({'key_suffix': employeeId, 'month': month, 'year': year}),
+          body: jsonEncode({'key_suffix': id, 'month': month, 'year': year}),
         )
-        .timeout(const Duration(seconds: 50));
+        .timeout(const Duration(seconds: 20));
   } on TimeoutException {
-    final saved = await _cachedPayslip(month, year);
-    if (saved != null) return saved;
-    throw const PayslipException(PayslipErrorKind.timeout);
+    return _savedOr(cacheKey, PayslipErrorKind.timeout);
   } catch (_) {
-    // Render.com free tier closes connections during cold-start (~40-60 s).
-    // Retry up to 3 times (20 s apart) so the total wait covers the full wake-up window.
-    if (attempt < 3) {
-      await Future.delayed(const Duration(seconds: 20));
-      return _fetchPayslip(month, year, attempt + 1, overrideId);
-    }
-    final saved = await _cachedPayslip(month, year);
-    if (saved != null) return saved;
-    throw const PayslipException(PayslipErrorKind.network);
+    return _savedOr(cacheKey, PayslipErrorKind.network);
   }
 
   if (await handledUnauthorized(response)) {
     throw const PayslipException(PayslipErrorKind.notFound);
   }
+  // Ошибка сервера — тоже повод показать сохранённое: когда служба лежит,
+  // nginx отвечает 502, а листок за прошлый месяц от этого не изменился.
   if (response.statusCode != 200) {
-    throw const PayslipException(PayslipErrorKind.network);
+    return _savedOr(cacheKey, PayslipErrorKind.network);
   }
 
   final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -179,8 +177,16 @@ Future<PayslipData> _fetchPayslip(
     throw const PayslipException(PayslipErrorKind.notFound);
   }
 
-  await OfflineCache.save('payslip_${year}_$month', body);
+  if (cacheKey != null) await OfflineCache.save(cacheKey, body);
   return _payslipFrom(body);
+}
+
+/// Сохранённый листок или ошибка, если его нет (или он чужой — тогда
+/// копии не бывает вовсе).
+Future<PayslipData> _savedOr(String? cacheKey, PayslipErrorKind kind) async {
+  final saved = cacheKey == null ? null : await _cachedPayslip(cacheKey);
+  if (saved != null) return saved;
+  throw PayslipException(kind);
 }
 
 /// Собирает листок из ответа сервера — своего или сохранённого ранее.
@@ -218,8 +224,8 @@ PayslipData _payslipFrom(Map<String, dynamic> body) {
 
 /// Листок, полученный в прошлый раз. Свой листок человек открывает и в
 /// дороге, и в цеху, где связи нет, — пусть открывается.
-Future<PayslipData?> _cachedPayslip(String month, String year) async {
-  final saved = await OfflineCache.read('payslip_${year}_$month');
+Future<PayslipData?> _cachedPayslip(String cacheKey) async {
+  final saved = await OfflineCache.read(cacheKey);
   if (saved == null || saved['payslip'] is! Map) return null;
   try {
     return _payslipFrom(saved);
