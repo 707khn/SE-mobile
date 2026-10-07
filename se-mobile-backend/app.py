@@ -2059,7 +2059,7 @@ def register_routes(app):
         start_date = data.get('start_date', '')
         end_date = data.get('end_date', '')
 
-        emp = Employee.query.filter(Employee.full_name.contains(emp_sname)).first()
+        emp = _find_reportable(emp_sname)
         if not emp:
             # Отдельно от «проходов нет»: это разные ответы на разные вопросы,
             # а выглядели они одинаково.
@@ -3163,6 +3163,48 @@ def register_routes(app):
             db.session.delete(menu)
             db.session.commit()
         return jsonify({'message': 'Success'})
+
+
+def _find_reportable(name):
+    """Сотрудник для «Отчёта сотрудников» по ФИО из списка выбора.
+
+    Раньше брался первый попавшийся, в ком ФИО встречается хоть кусочком,
+    — по всему предприятию. Если первым оказывался однофамилец из чужого
+    отдела, начальник получал «нет доступа», хотя нужный человек был у него
+    в отделе; человек, заведённый дважды, мог открыться по пустой записи.
+
+    Теперь: сначала точное совпадение, потом вхождение — и только среди
+    тех, кого смотрящему видно. Из нескольких точных — тот, у кого есть
+    проходы, и из них с самым свежим.
+    """
+    name = (name or '').strip()
+    if not name:
+        return None
+    allowed = _visible_employee_ids()
+
+    def pick(query):
+        if allowed is not None:
+            query = query.filter(Employee.employee_id.in_(allowed))
+        found = query.all()
+        if len(found) <= 1:
+            return found[0] if found else None
+        last = dict(db.session.query(AccessRecord.employee_id,
+                                     db.func.max(AccessRecord.access_date))
+                    .filter(AccessRecord.employee_id.in_(
+                        [e.employee_id for e in found]))
+                    .group_by(AccessRecord.employee_id).all())
+        return max(found, key=lambda e: (last.get(e.employee_id) is not None,
+                                         last.get(e.employee_id) or date.min))
+
+    exact = pick(Employee.query.filter(Employee.full_name == name))
+    if exact is not None:
+        return exact
+    partial = pick(Employee.query.filter(Employee.full_name.contains(name)))
+    if partial is not None:
+        return partial
+    # Есть, но не виден — пусть /director_report ответит «нет доступа», а не
+    # «не найден»: это разные ответы.
+    return Employee.query.filter(Employee.full_name.contains(name)).first()
 
 
 def _home_access(employee_id, today):
