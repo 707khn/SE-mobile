@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../requests/home_request.dart';
 import '../utils/app_update.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
@@ -33,8 +35,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _lang = Lang.ru;
+
+  /// По строке на раздел: когда прошёл турникет, за какой месяц листок,
+  /// сколько отпуска, что в столовой. Нет связи и нет сохранённой — карточки
+  /// остаются с обычными подписями.
+  HomeSummary? _summary;
 
   /// Сборка новее установленной, если она лежит на сервере и человек её ещё
   /// не отложил.
@@ -43,8 +50,30 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initPrefs();
     _checkForUpdate();
+    _loadSummary();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Вернулся в приложение — сводка могла устареть: утром открыл, в обед
+  /// прошёл турникет, а на экране всё ещё «вход 07:52».
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadSummary();
+  }
+
+  Future<void> _loadSummary() async {
+    // У администратора нет ни проходов, ни листков, ни отпуска.
+    if (_isAdmin) return;
+    final summary = await fetchHomeSummary();
+    if (mounted && summary != null) setState(() => _summary = summary);
   }
 
   /// Раздача приложения руками — причина, по которой обязательную проверку
@@ -99,115 +128,170 @@ class _HomeScreenState extends State<HomeScreen> {
         // Language and logout live in the drawer now, so they are in the same
         // place on every section instead of only here.
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: Dimensions.width20,
-          vertical: Dimensions.height30 / 2,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildGreetingCard(),
-            if (_update != null) ...[
-              SizedBox(height: Dimensions.height30 / 1.5),
-              _buildUpdateCard(_update!),
-            ],
-            SizedBox(height: Dimensions.height30 / 1.2),
-            GridView(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              // Высота ячейки задана прямо, а не через childAspectRatio.
-              // Пропорция привязывает высоту к ширине экрана, а нужного места
-              // требует содержимое: у казахских подписей по две строки, и на
-              // телефоне с крупным системным шрифтом карточки не помещались —
-              // отсюда красная полоса «BOTTOM OVERFLOWED».
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                // The admin's few cards read better as full-width banners than
-                // as squares in a two-column grid.
-                crossAxisCount: _isAdmin ? 1 : 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                mainAxisExtent: _cardHeight(context),
-              ),
-              children: [
-                // The admin has no attendance, payslip or leave of their own,
-                // so only the two things they actually do are shown.
-                if (_isAdmin) ...[
-                  _buildActionCard(
-                    icon: Icons.admin_panel_settings,
-                    label: 'admin_panel'.tr,
-                    subtitle: 'admin_panel_subtitle'.tr,
-                    color: const Color(0xFF4527A0),
-                    onTap: () => Get.to(() => const AdminPanelScreen()),
-                  ),
-                  // The admin has no tabs, so the canteen menu is pushed as a
-                  // route; they need it to fix the menu when the technologist
-                  // cannot.
-                  _buildActionCard(
-                    icon: Icons.restaurant_menu,
-                    label: 'canteen_menu'.tr,
-                    subtitle: 'canteen_subtitle'.tr,
-                    color: const Color(0xFFC62828),
-                    onTap: () => Get.to(() => MenuScreen(job: widget.job)),
-                  ),
-                ],
-                if (!_isAdmin) ...[
-                  _buildActionCard(
-                    icon: Icons.sensor_door,
-                    label: 'tab_turnstile'.tr,
-                    subtitle: 'self_report_subtitle'.tr,
-                    color: const Color(0xFF1565C0),
-                    onTap: () => widget.onNavigate(1),
-                  ),
-                  _buildActionCard(
-                    icon: Icons.receipt_long,
-                    label: 'tab_payslip'.tr,
-                    subtitle: 'payslip_subtitle'.tr,
-                    color: AppColors.mainColor,
-                    onTap: () => widget.onNavigate(2),
-                  ),
-                  _buildActionCard(
-                    icon: Icons.beach_access,
-                    label: 'tab_leave'.tr,
-                    subtitle: 'leave_subtitle'.tr,
-                    color: const Color(0xFFE65100),
-                    onTap: () => widget.onNavigate(3),
-                  ),
-                  _buildActionCard(
-                    icon: Icons.restaurant_menu,
-                    label: 'tab_menu'.tr,
-                    subtitle: 'canteen_subtitle'.tr,
-                    color: const Color(0xFFC62828),
-                    onTap: () => widget.onNavigate(4),
-                  ),
-                ],
-                // Managers keep their team-wide screens, now inside the shell.
-                if (!_isAdmin && isAdminRole(widget.job)) ...[
-                  _buildActionCard(
-                    icon: Icons.groups,
-                    label: 'employee report'.tr,
-                    subtitle: 'employee_report_subtitle'.tr,
-                    color: const Color(0xFF6A1B9A),
-                    onTap: () => Get.to(() => MainPage2(
-                          fullName: widget.fullName,
-                          job: widget.job,
-                        )),
-                  ),
-                  _buildActionCard(
-                    icon: Icons.badge_outlined,
-                    label: 'attendance'.tr,
-                    subtitle: 'attendance_subtitle'.tr,
-                    color: const Color(0xFF00695C),
-                    onTap: () => Get.to(() => const AttendanceScreen()),
-                  ),
-                ],
+      // Потянуть вниз — обновить сводку.
+      body: RefreshIndicator(
+        onRefresh: _loadSummary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: Dimensions.width20,
+            vertical: Dimensions.height30 / 2,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildGreetingCard(),
+              if (_update != null) ...[
+                SizedBox(height: Dimensions.height30 / 1.5),
+                _buildUpdateCard(_update!),
               ],
-            ),
-            SizedBox(height: Dimensions.height30),
-          ],
+              SizedBox(height: Dimensions.height30 / 1.2),
+              GridView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                // Высота ячейки задана прямо, а не через childAspectRatio.
+                // Пропорция привязывает высоту к ширине экрана, а нужного места
+                // требует содержимое: у казахских подписей по две строки, и на
+                // телефоне с крупным системным шрифтом карточки не помещались —
+                // отсюда красная полоса «BOTTOM OVERFLOWED».
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  // The admin's few cards read better as full-width banners than
+                  // as squares in a two-column grid.
+                  crossAxisCount: _isAdmin ? 1 : 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  mainAxisExtent: _cardHeight(context),
+                ),
+                children: [
+                  // The admin has no attendance, payslip or leave of their own,
+                  // so only the two things they actually do are shown.
+                  if (_isAdmin) ...[
+                    _buildActionCard(
+                      icon: Icons.admin_panel_settings,
+                      label: 'admin_panel'.tr,
+                      subtitle: 'admin_panel_subtitle'.tr,
+                      color: const Color(0xFF4527A0),
+                      onTap: () => Get.to(() => const AdminPanelScreen()),
+                    ),
+                    // The admin has no tabs, so the canteen menu is pushed as a
+                    // route; they need it to fix the menu when the technologist
+                    // cannot.
+                    _buildActionCard(
+                      icon: Icons.restaurant_menu,
+                      label: 'canteen_menu'.tr,
+                      subtitle: 'canteen_subtitle'.tr,
+                      color: const Color(0xFFC62828),
+                      onTap: () => Get.to(() => MenuScreen(job: widget.job)),
+                    ),
+                  ],
+                  if (!_isAdmin) ...[
+                    _buildActionCard(
+                      icon: Icons.sensor_door,
+                      label: 'tab_turnstile'.tr,
+                      live: _accessLine,
+                      subtitle: 'self_report_subtitle'.tr,
+                      color: const Color(0xFF1565C0),
+                      onTap: () => widget.onNavigate(1),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.receipt_long,
+                      label: 'tab_payslip'.tr,
+                      live: _payslipLine,
+                      subtitle: 'payslip_subtitle'.tr,
+                      color: AppColors.mainColor,
+                      onTap: () => widget.onNavigate(2),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.beach_access,
+                      label: 'tab_leave'.tr,
+                      live: _leaveLine,
+                      subtitle: 'leave_subtitle'.tr,
+                      color: const Color(0xFFE65100),
+                      onTap: () => widget.onNavigate(3),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.restaurant_menu,
+                      label: 'tab_menu'.tr,
+                      live: _menuLine,
+                      subtitle: 'canteen_subtitle'.tr,
+                      color: const Color(0xFFC62828),
+                      onTap: () => widget.onNavigate(4),
+                    ),
+                  ],
+                  // Managers keep their team-wide screens, now inside the shell.
+                  if (!_isAdmin && isAdminRole(widget.job)) ...[
+                    _buildActionCard(
+                      icon: Icons.groups,
+                      label: 'drawer_staff_report'.tr,
+                      subtitle: 'employee_report_subtitle'.tr,
+                      color: const Color(0xFF6A1B9A),
+                      onTap: () => Get.to(() => MainPage2(
+                            fullName: widget.fullName,
+                            job: widget.job,
+                          )),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.badge_outlined,
+                      label: 'attendance'.tr,
+                      subtitle: 'attendance_subtitle'.tr,
+                      color: const Color(0xFF00695C),
+                      onTap: () => Get.to(() => const AttendanceScreen()),
+                    ),
+                  ],
+                ],
+              ),
+              SizedBox(height: Dimensions.height30),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  bool _isToday(DateTime day) {
+    final now = DateTime.now();
+    return day.year == now.year && day.month == now.month && day.day == now.day;
+  }
+
+  String? get _accessLine {
+    final access = _summary?.access;
+    if (access == null) return null;
+    final String times;
+    if (access.firstIn != null && access.lastOut != null) {
+      times = '${access.firstIn} – ${access.lastOut}';
+    } else if (access.firstIn != null) {
+      times = 'home_in_only'.trParams({'time': access.firstIn!});
+    } else if (access.lastOut != null) {
+      times = 'home_out_only'.trParams({'time': access.lastOut!});
+    } else {
+      return null;
+    }
+    final day = _isToday(access.date)
+        ? 'home_today'.tr
+        : DateFormat('dd.MM').format(access.date);
+    return '$day · $times';
+  }
+
+  String? get _payslipLine {
+    final month = _summary?.payslip;
+    if (month == null) return null;
+    return 'home_payslip_for'.trParams(
+        {'period': DateFormat('LLLL yyyy', Lang.dates).format(month)});
+  }
+
+  String? get _leaveLine {
+    final days = _summary?.leaveDays;
+    if (days == null) return null;
+    return 'home_leave_days'.trParams({'days': '$days'});
+  }
+
+  String? get _menuLine {
+    final summary = _summary;
+    if (summary == null) return null;
+    if (summary.menuCount == 0) return 'home_menu_none'.tr;
+    final shown = summary.dishes.take(2).toList();
+    final more = summary.menuCount - shown.length;
+    return more > 0 ? '${shown.join(', ')} +$more' : shown.join(', ');
   }
 
   /// Высота карточки быстрого доступа.
@@ -399,6 +483,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String subtitle,
     required Color color,
     required VoidCallback onTap,
+    String? live,
   }) {
     return Card(
       elevation: 3,
@@ -427,20 +512,26 @@ class _HomeScreenState extends State<HomeScreen> {
               // Flexible — страховка на случай, если расчёт высоты где-то
               // всё-таки не сойдётся: текст ужмётся с многоточием, а красной
               // полосы переполнения не появится.
-              Flexible(
-                child: Text(
-                  label,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              // Название место не делит: Flexible у обоих текстов делил его
+              // пополам, и вторая строка названия обрезалась на середине.
+              // Ужимается только пояснение.
+              Text(
+                label,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 3),
               Flexible(
+                // Живая строка — цветом раздела, чтобы отличалась от
+                // пояснения, которое стоит, пока сводки нет.
                 child: Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 11, color: context.mutedColor),
+                  live ?? subtitle,
+                  style: live == null
+                      ? TextStyle(fontSize: 11, color: context.mutedColor)
+                      : TextStyle(
+                          fontSize: 11, color: color, fontWeight: FontWeight.w600),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
