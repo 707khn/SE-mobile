@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../utils/variables.dart';
 import '../utils/api.dart';
+import '../utils/load_problem.dart';
 import '../utils/offline_cache.dart';
 
 /// Телефонный справочник предприятия целиком.
@@ -27,18 +28,19 @@ Future<Map<String, dynamic>> getDirectory() async {
       await OfflineCache.save('directory', body);
       return body;
     }
-    return await _cachedDirectory();
-  } on TimeoutException {
-    return await _cachedDirectory();
-  } catch (_) {
-    return await _cachedDirectory();
+    return await _cachedDirectory(problemForStatus(response.statusCode));
+  } catch (e) {
+    return await _cachedDirectory(problemOf(e));
   }
 }
 
 /// Справочник, полученный в прошлый раз: внутренний номер нужен как раз
 /// там, где связи нет.
-Future<Map<String, dynamic>> _cachedDirectory() async {
+///
+/// Сохранённого нет — в ответе причина: экран скажет «нет связи» или
+/// «сервер ответил ошибкой», а не одно общее «не удалось загрузить».
+Future<Map<String, dynamic>> _cachedDirectory(LoadProblem problem) async {
   final saved = await OfflineCache.read('directory');
   if (saved != null) return saved;
-  return {'message': 'Failure', 'entries': []};
+  return {'message': 'Failure', 'entries': [], problemKey: problem.name};
 }

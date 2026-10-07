@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../utils/variables.dart';
 import '../utils/api.dart';
+import '../utils/load_problem.dart';
 import '../utils/offline_cache.dart';
 
 /// Лента для сотрудника: новости сайта и одобренные объявления.
@@ -22,20 +23,21 @@ Future<Map<String, dynamic>> getNews() async {
       await OfflineCache.save('news', body);
       return body;
     }
-    return await _cachedNews();
-  } on TimeoutException {
-    return await _cachedNews();
-  } catch (_) {
-    return await _cachedNews();
+    return await _cachedNews(problemForStatus(response.statusCode));
+  } catch (e) {
+    return await _cachedNews(problemOf(e));
   }
 }
 
 /// Лента, полученная в прошлый раз. Связи нет — показываем её с пометкой,
 /// а не пустой экран с ошибкой.
-Future<Map<String, dynamic>> _cachedNews() async {
+///
+/// Сохранённого нет — в ответе причина: экран скажет «нет связи» или
+/// «сервер ответил ошибкой», а не одно общее «не удалось загрузить».
+Future<Map<String, dynamic>> _cachedNews(LoadProblem problem) async {
   final saved = await OfflineCache.read('news');
   if (saved != null) return saved;
-  return {'message': 'Failure', 'items': []};
+  return {'message': 'Failure', 'items': [], problemKey: problem.name};
 }
 
 /// Всё вместе с неодобренным — для администратора.
