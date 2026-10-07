@@ -171,3 +171,28 @@ def test_missing_or_bad_period(client, slip):
                          'year': '2026'})
     assert bad.status_code == 400
     assert bad.get_json()['error'] == 'bad_period'
+
+
+def test_payslip_names_the_previous_one(app, client, slip):
+    """«К выплате» сравнивают с предыдущим листком — не обязательно с
+    прошлым месяцем: листка за какой-то месяц может и не быть."""
+    def previous(month, year):
+        return client.post('/payslip', json={
+            'key_suffix': _WORKER, 'month': month, 'year': year,
+        }).get_json()['payslip']['previous']
+
+    # Пока листок за июль — единственный, сравнивать не с чем.
+    assert previous('07', '2026') is None
+
+    with app.app_context():
+        for month, net in ((4, 90_000.0), (5, 100_000.0)):
+            db.session.add(Payslip(
+                employee_id=_WORKER, period_month=month, period_year=2026,
+                period_display='x', total_accruals=net, total_deductions=0.0,
+                net_pay=net))
+        db.session.commit()
+
+    # Июня нет — с июлем сравнивается май.
+    assert previous('07', '2026') == {'year': 2026, 'month': 5,
+                                      'net_pay': 100_000.0}
+    assert previous('05', '2026')['month'] == 4

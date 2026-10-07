@@ -56,6 +56,11 @@ class PayslipData {
   /// без связи — время последнего удачного запроса.
   final DateTime? cachedAt;
 
+  /// Предыдущий листок: за какой месяц (первое число) и сколько было к
+  /// выплате. null — сравнивать не с чем или сервер старый.
+  final DateTime? previousPeriod;
+  final double? previousNetPay;
+
   const PayslipData({
     required this.period,
     required this.employee,
@@ -73,6 +78,8 @@ class PayslipData {
     required this.debtStart,
     required this.debtEnd,
     this.cachedAt,
+    this.previousPeriod,
+    this.previousNetPay,
   });
 }
 
@@ -192,8 +199,17 @@ Future<PayslipData> _savedOr(String? cacheKey, PayslipErrorKind kind) async {
 /// Собирает листок из ответа сервера — своего или сохранённого ранее.
 PayslipData _payslipFrom(Map<String, dynamic> body) {
   final p = body['payslip'] as Map<String, dynamic>;
+  final prev = p['previous'];
+  final hasPrev = prev is Map &&
+      prev['year'] is num &&
+      prev['month'] is num &&
+      prev['net_pay'] is num;
 
   return PayslipData(
+    previousPeriod: hasPrev
+        ? DateTime((prev['year'] as num).toInt(), (prev['month'] as num).toInt())
+        : null,
+    previousNetPay: hasPrev ? (prev['net_pay'] as num).toDouble() : null,
     cachedAt: cachedAt(body),
     period: p['period'] as String,
     employee: p['employee'] as String,
@@ -242,10 +258,11 @@ Future<PayslipData?> _cachedPayslip(String cacheKey) async {
 /// Пустой список — значит листков нет вовсе; null — сервер не ответил, и
 /// экран ведёт себя как раньше.
 Future<List<DateTime>?> fetchPayslipPeriods({String? employeeId}) async {
-  final id = (employeeId != null && employeeId.isNotEmpty)
-      ? employeeId
-      : await _resolveEmployeeId();
+  final own = employeeId == null || employeeId.isEmpty;
+  final id = own ? await _resolveEmployeeId() : employeeId;
   if (id == null || id.isEmpty) return null;
+  // Как и листки: копия — только своя.
+  Future<List<DateTime>?> saved() async => own ? _cachedPeriods(id) : null;
   try {
     final response = await http
         .post(
@@ -254,17 +271,17 @@ Future<List<DateTime>?> fetchPayslipPeriods({String? employeeId}) async {
           body: jsonEncode({'key_suffix': id}),
         )
         .timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200) return await _cachedPeriods(id);
+    if (response.statusCode != 200) return await saved();
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['message'] != 'Success' || body['periods'] is! List) {
-      return await _cachedPeriods(id);
+      return await saved();
     }
-    await OfflineCache.save('payslip_periods_$id', body);
+    if (own) await OfflineCache.save('payslip_periods_$id', body);
     return _periodsFrom(body);
   } catch (_) {
     // В цеху связи нет, а список месяцев меняется раз в месяц: сохранённый
     // подойдёт.
-    return _cachedPeriods(id);
+    return saved();
   }
 }
 

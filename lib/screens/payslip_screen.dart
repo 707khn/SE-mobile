@@ -440,10 +440,19 @@ class _PayslipPageState extends State<PayslipPage> {
                       ),
                       Icon(Icons.calendar_month, color: context.accentColor, size: 20),
                       const SizedBox(width: 8),
+                      // «Сентябрь 2026», а не «сентября 2026»: MMMM — родительный
+                      // падеж, для даты внутри фразы. И в одну строку: на
+                      // обычном телефоне шириной 360 точек «сентября»
+                      // переносилось посреди слова.
                       Expanded(
-                        child: Text(
-                          DateFormat('MMMM yyyy', Lang.dates).format(_selectedDate),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _monthTitle(_selectedDate),
+                            maxLines: 1,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
                         ),
                       ),
                       IconButton(
@@ -680,6 +689,10 @@ class _PayslipPageState extends State<PayslipPage> {
                 letterSpacing: 0.5,
               ),
             ),
+            if (ps.previousNetPay != null) ...[
+              const SizedBox(height: 6),
+              _buildChangeChip(ps),
+            ],
             if (ps.debtEnd != 0.0) ...[
               const SizedBox(height: 4),
               Text(
@@ -713,6 +726,57 @@ class _PayslipPageState extends State<PayslipPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  static String _monthTitle(DateTime month) {
+    final text = DateFormat('LLLL yyyy', Lang.dates).format(month);
+    return text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
+  }
+
+  /// Насколько «к выплате» больше или меньше, чем в предыдущем листке.
+  ///
+  /// Первое, что делают с листком, — сравнивают с прошлым: почему меньше,
+  /// откуда больше. Раньше для этого приходилось листать месяцы и помнить
+  /// цифру. Сумм здесь две — эта и разница, — и обе на экране и так видны.
+  Widget _buildChangeChip(PayslipData ps) {
+    final delta = ps.netPay - ps.previousNetPay!;
+    final month = ps.previousPeriod == null
+        ? ''
+        : DateFormat('LLLL yyyy', Lang.dates).format(ps.previousPeriod!);
+    final String text;
+    final IconData icon;
+    if (delta.abs() < 1) {
+      text = 'payslip_same_as_prev'.trParams({'period': month});
+      icon = Icons.trending_flat;
+    } else {
+      final sign = delta > 0 ? '+' : '−';
+      text = 'payslip_vs_prev'.trParams({
+        'delta': '$sign${_numberFormat.format(delta.abs())} ₸',
+        'period': month,
+      });
+      icon = delta > 0 ? Icons.trending_up : Icons.trending_down;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              style: const TextStyle(color: Colors.white, fontSize: 12.5),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
       ),
     );
   }

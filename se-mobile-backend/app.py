@@ -2245,6 +2245,7 @@ def register_routes(app):
                 'net_pay': ps.net_pay,
                 'debt_start': ps.debt_start or 0.0,
                 'debt_end': ps.debt_end or 0.0,
+                'previous': _previous_payslip(ps),
             }
         })
 
@@ -3164,6 +3165,26 @@ def register_routes(app):
             db.session.delete(menu)
             db.session.commit()
         return jsonify({'message': 'Success'})
+
+
+def _previous_payslip(ps):
+    """Предыдущий листок того же человека — чтобы сравнить «к выплате».
+
+    Предыдущий по времени, а не обязательно за прошлый месяц: листка за
+    какой-то месяц может и не быть (отпуск без содержания, выгрузку не
+    принесли), и сравнивать тогда честнее с тем, что было до него.
+    """
+    prev = (Payslip.query
+            .filter(Payslip.employee_id == ps.employee_id,
+                    db.or_(Payslip.period_year < ps.period_year,
+                           db.and_(Payslip.period_year == ps.period_year,
+                                   Payslip.period_month < ps.period_month)))
+            .order_by(Payslip.period_year.desc(), Payslip.period_month.desc())
+            .first())
+    if prev is None:
+        return None
+    return {'year': prev.period_year, 'month': prev.period_month,
+            'net_pay': prev.net_pay}
 
 
 def _home_access(employee_id, today):
