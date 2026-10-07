@@ -97,11 +97,12 @@ Future<String?> _resolveEmployeeId() async {
 /// с причиной: раньше на всё был один ответ «данные не найдены», и человек
 /// без интернета думал, что у него пропал отпуск.
 Future<LeaveData?> getLeaves(BuildContext context, {String? employeeId}) async {
-  final login = (employeeId != null && employeeId.isNotEmpty)
-      ? employeeId
-      : await _resolveEmployeeId();
+  final own = employeeId == null || employeeId.isEmpty;
+  final login = own ? await _resolveEmployeeId() : employeeId;
   if (login == null || login.isEmpty) return null;
-  final cacheKey = 'leaves_$login';
+  // Копия — только своя: отпуск сотрудника, открытый руководителем, на его
+  // телефоне оставлять незачем.
+  final cacheKey = own ? 'leaves_$login' : null;
 
   final http.Response response;
   try {
@@ -124,15 +125,15 @@ Future<LeaveData?> getLeaves(BuildContext context, {String? employeeId}) async {
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['message'] != 'Success') return null;
     final data = LeaveData.fromJson(body);
-    await OfflineCache.save(cacheKey, body);
+    if (cacheKey != null) await OfflineCache.save(cacheKey, body);
     return data;
   } catch (e) {
     return _cachedOr(cacheKey, LoadProblem.server);
   }
 }
 
-Future<LeaveData> _cachedOr(String key, LoadProblem problem) async {
-  final saved = await OfflineCache.read(key);
+Future<LeaveData> _cachedOr(String? key, LoadProblem problem) async {
+  final saved = key == null ? null : await OfflineCache.read(key);
   if (saved != null) {
     try {
       return LeaveData.fromJson(saved);

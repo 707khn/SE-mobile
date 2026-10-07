@@ -194,6 +194,7 @@ PayslipData _payslipFrom(Map<String, dynamic> body) {
   final p = body['payslip'] as Map<String, dynamic>;
 
   return PayslipData(
+
     cachedAt: cachedAt(body),
     period: p['period'] as String,
     employee: p['employee'] as String,
@@ -242,10 +243,11 @@ Future<PayslipData?> _cachedPayslip(String cacheKey) async {
 /// Пустой список — значит листков нет вовсе; null — сервер не ответил, и
 /// экран ведёт себя как раньше.
 Future<List<DateTime>?> fetchPayslipPeriods({String? employeeId}) async {
-  final id = (employeeId != null && employeeId.isNotEmpty)
-      ? employeeId
-      : await _resolveEmployeeId();
+  final own = employeeId == null || employeeId.isEmpty;
+  final id = own ? await _resolveEmployeeId() : employeeId;
   if (id == null || id.isEmpty) return null;
+  // Как и листки: копия — только своя.
+  Future<List<DateTime>?> saved() async => own ? _cachedPeriods(id) : null;
   try {
     final response = await http
         .post(
@@ -254,17 +256,17 @@ Future<List<DateTime>?> fetchPayslipPeriods({String? employeeId}) async {
           body: jsonEncode({'key_suffix': id}),
         )
         .timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200) return await _cachedPeriods(id);
+    if (response.statusCode != 200) return await saved();
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['message'] != 'Success' || body['periods'] is! List) {
-      return await _cachedPeriods(id);
+      return await saved();
     }
-    await OfflineCache.save('payslip_periods_$id', body);
+    if (own) await OfflineCache.save('payslip_periods_$id', body);
     return _periodsFrom(body);
   } catch (_) {
     // В цеху связи нет, а список месяцев меняется раз в месяц: сохранённый
     // подойдёт.
-    return _cachedPeriods(id);
+    return saved();
   }
 }
 

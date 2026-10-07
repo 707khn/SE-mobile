@@ -440,10 +440,19 @@ class _PayslipPageState extends State<PayslipPage> {
                       ),
                       Icon(Icons.calendar_month, color: context.accentColor, size: 20),
                       const SizedBox(width: 8),
+                      // «Сентябрь 2026», а не «сентября 2026»: MMMM — родительный
+                      // падеж, для даты внутри фразы. И в одну строку: на
+                      // обычном телефоне шириной 360 точек «сентября»
+                      // переносилось посреди слова.
                       Expanded(
-                        child: Text(
-                          DateFormat('MMMM yyyy', Lang.dates).format(_selectedDate),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _monthTitle(_selectedDate),
+                            maxLines: 1,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
                         ),
                       ),
                       IconButton(
@@ -715,6 +724,11 @@ class _PayslipPageState extends State<PayslipPage> {
         ),
       ),
     );
+  }
+
+  static String _monthTitle(DateTime month) {
+    final text = DateFormat('LLLL yyyy', Lang.dates).format(month);
+    return text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
   }
 
   Widget _buildExpandableSection({
