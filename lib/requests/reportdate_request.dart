@@ -4,9 +4,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
+import '../utils/access_cache.dart';
 import '../utils/access_report.dart';
 import '../utils/api.dart';
 import '../utils/load_problem.dart';
+import '../utils/offline_cache.dart';
 
 /// [employeeId] overrides the signed-in user — used by the admin panel.
 Future<AccessReport> getReportDateEntries(BuildContext context, startdate, enddate,
@@ -14,6 +16,13 @@ Future<AccessReport> getReportDateEntries(BuildContext context, startdate, endda
   final login = (employeeId != null && employeeId.isNotEmpty)
       ? employeeId
       : await SecureStorageHelper.instance.getEmployeeId();
+  // Копию держим только своих проходов: чужие (администратор смотрит
+  // сотрудника) на телефоне оставлять незачем.
+  final ownKey = (employeeId == null || employeeId.isEmpty) &&
+          login != null &&
+          login.isNotEmpty
+      ? AccessCache.key(login)
+      : null;
 
   try {
     var response = await http
@@ -39,11 +48,29 @@ Future<AccessReport> getReportDateEntries(BuildContext context, startdate, endda
           entry['door'] as String? ?? '',
         ]);
       }
+      if (ownKey != null) {
+        await OfflineCache.save(
+            ownKey,
+            AccessCache.merge(await OfflineCache.read(ownKey), responseBody,
+                '$startdate', '$enddate'));
+      }
       return AccessReport(report, coverage);
     } else {
-      return AccessReport.failedWith(problemForStatus(response.statusCode));
+      return await _savedOr(ownKey, '$startdate', '$enddate',
+          problemForStatus(response.statusCode));
     }
   } catch (e) {
-    return AccessReport.failedWith(problemOf(e));
+    return _savedOr(ownKey, '$startdate', '$enddate', problemOf(e));
   }
+}
+
+/// Без связи — проходы за период из копии, если этот период в ней есть.
+Future<AccessReport> _savedOr(
+    String? key, String from, String to, LoadProblem problem) async {
+  if (key != null) {
+    final saved = AccessCache.answer(await OfflineCache.read(key),
+        from: from, to: to);
+    if (saved != null) return saved;
+  }
+  return AccessReport.failedWith(problem);
 }
