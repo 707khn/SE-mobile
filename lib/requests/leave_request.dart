@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 import '../utils/api.dart';
+import '../utils/load_problem.dart';
+import '../utils/offline_cache.dart';
 
 class LeaveBalance {
   final String type;
@@ -41,11 +43,45 @@ class LeaveData {
   final List<LeaveBalance> balances;
   final List<LeaveRecord> history;
 
+  /// Когда данные получены с сервера. У свежих пусто, у показанных без
+  /// связи — время последнего удачного запроса.
+  final DateTime? cachedAt;
+
   LeaveData({
     required this.employee,
     required this.balances,
     required this.history,
+    this.cachedAt,
   });
+
+  /// Из ответа /leaves (или его сохранённой копии).
+  static LeaveData fromJson(Map<String, dynamic> body) {
+    final data = body['leaves'] as Map;
+    final stamp = body[OfflineCache.stampKey];
+    return LeaveData(
+      employee: '${data['employee'] ?? ''}',
+      balances: [
+        for (final b in (data['balances'] as List? ?? const []))
+          LeaveBalance(
+            type: '${b['type'] ?? ''}',
+            totalDays: (b['total_days'] as num?)?.toInt() ?? 0,
+            usedDays: (b['used_days'] as num?)?.toInt() ?? 0,
+            remainingDays: (b['remaining_days'] as num?)?.toInt() ?? 0,
+          ),
+      ],
+      history: [
+        for (final h in (data['history'] as List? ?? const []))
+          LeaveRecord(
+            type: '${h['type'] ?? ''}',
+            startDate: '${h['start_date'] ?? ''}',
+            endDate: '${h['end_date'] ?? ''}',
+            days: (h['days'] as num?)?.toInt() ?? 0,
+            status: '${h['status'] ?? ''}',
+          ),
+      ],
+      cachedAt: stamp is String ? DateTime.tryParse(stamp) : null,
+    );
+  }
 }
 
 Future<String?> _resolveEmployeeId() async {
@@ -55,53 +91,54 @@ Future<String?> _resolveEmployeeId() async {
 }
 
 /// [employeeId] overrides the signed-in user — used by the admin panel.
+///
+/// null — сервер ответил, что такого сотрудника нет. Не дозвонились до
+/// сервера — данные, полученные в прошлый раз, а если их нет — [LoadFailure]
+/// с причиной: раньше на всё был один ответ «данные не найдены», и человек
+/// без интернета думал, что у него пропал отпуск.
 Future<LeaveData?> getLeaves(BuildContext context, {String? employeeId}) async {
   final login = (employeeId != null && employeeId.isNotEmpty)
       ? employeeId
       : await _resolveEmployeeId();
   if (login == null || login.isEmpty) return null;
+  final cacheKey = 'leaves_$login';
 
+  final http.Response response;
   try {
-    var response = await http
+    response = await http
         .post(
           Uri.parse('${AppValues.baseUrl}/leaves'),
           headers: await authHeaders(),
           body: jsonEncode({'key_suffix': login}),
         )
         .timeout(const Duration(seconds: 15));
-    if (await handledUnauthorized(response)) return null;
-    if (response.statusCode == 200) {
-      var responseBody = jsonDecode(response.body);
-      if (responseBody['message'] == 'Failure') {
-        return null;
-      }
-      var data = responseBody['leaves'];
-      return LeaveData(
-        employee: data['employee'],
-        balances: (data['balances'] as List)
-            .map((b) => LeaveBalance(
-                  type: b['type'],
-                  totalDays: b['total_days'],
-                  usedDays: b['used_days'],
-                  remainingDays: b['remaining_days'],
-                ))
-            .toList(),
-        history: (data['history'] as List)
-            .map((h) => LeaveRecord(
-                  type: h['type'],
-                  startDate: h['start_date'],
-                  endDate: h['end_date'],
-                  days: h['days'],
-                  status: h['status'],
-                ))
-            .toList(),
-      );
-    } else {
-      return null;
-    }
-  } on TimeoutException {
-    return null;
   } catch (e) {
-    return null;
+    return _cachedOr(cacheKey, problemOf(e));
   }
+
+  if (await handledUnauthorized(response)) return null;
+  if (response.statusCode != 200) {
+    return _cachedOr(cacheKey, problemForStatus(response.statusCode));
+  }
+  try {
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['message'] != 'Success') return null;
+    final data = LeaveData.fromJson(body);
+    await OfflineCache.save(cacheKey, body);
+    return data;
+  } catch (e) {
+    return _cachedOr(cacheKey, LoadProblem.server);
+  }
+}
+
+Future<LeaveData> _cachedOr(String key, LoadProblem problem) async {
+  final saved = await OfflineCache.read(key);
+  if (saved != null) {
+    try {
+      return LeaveData.fromJson(saved);
+    } catch (_) {
+      // Сохранённое не читается — как будто его нет.
+    }
+  }
+  throw LoadFailure(problem);
 }
