@@ -56,11 +56,6 @@ class PayslipData {
   /// без связи — время последнего удачного запроса.
   final DateTime? cachedAt;
 
-  /// Предыдущий листок: за какой месяц (первое число) и сколько было к
-  /// выплате. null — сравнивать не с чем или сервер старый.
-  final DateTime? previousPeriod;
-  final double? previousNetPay;
-
   const PayslipData({
     required this.period,
     required this.employee,
@@ -78,8 +73,6 @@ class PayslipData {
     required this.debtStart,
     required this.debtEnd,
     this.cachedAt,
-    this.previousPeriod,
-    this.previousNetPay,
   });
 }
 
@@ -199,17 +192,9 @@ Future<PayslipData> _savedOr(String? cacheKey, PayslipErrorKind kind) async {
 /// Собирает листок из ответа сервера — своего или сохранённого ранее.
 PayslipData _payslipFrom(Map<String, dynamic> body) {
   final p = body['payslip'] as Map<String, dynamic>;
-  final prev = p['previous'];
-  final hasPrev = prev is Map &&
-      prev['year'] is num &&
-      prev['month'] is num &&
-      prev['net_pay'] is num;
 
   return PayslipData(
-    previousPeriod: hasPrev
-        ? DateTime((prev['year'] as num).toInt(), (prev['month'] as num).toInt())
-        : null,
-    previousNetPay: hasPrev ? (prev['net_pay'] as num).toDouble() : null,
+
     cachedAt: cachedAt(body),
     period: p['period'] as String,
     employee: p['employee'] as String,
