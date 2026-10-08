@@ -835,6 +835,40 @@ def require_auth(view):
     return wrapper
 
 
+def _json_body():
+    """Тело запроса словарём — всегда.
+
+    request.get_json() на пустое тело, «null» или список отдаёт не словарь,
+    и следующий же data.get(...) превращался в пятисотую ошибку: в журнале
+    сбой сервера, а на деле кривой запрос.
+    """
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+
+_ISO_DAY = re.compile(r'\d{4}-\d{2}-\d{2}')
+
+
+def _iso_date(value):
+    """«2026-10-08» → date; что угодно другое — None.
+
+    Строка сравнивалась с колонкой даты как есть: PostgreSQL на «abc»
+    отвечал ошибкой, и запрос заканчивался пятисотой. Формат — только тот,
+    что шлёт приложение: fromisoformat сам по себе принимает и «20260301»,
+    и номер недели, а это уже не дата из календаря на экране.
+    """
+    if not isinstance(value, str) or not _ISO_DAY.fullmatch(value.strip()):
+        return None
+    try:
+        return date.fromisoformat(value.strip())
+    except ValueError:
+        return None
+
+
+def _bad_period():
+    return jsonify({'message': 'Failure', 'error': 'bad_period'}), 400
+
+
 def _deny():
     return jsonify({'message': 'Failure', 'error': 'forbidden'}), 403
 
@@ -2013,7 +2047,7 @@ def register_routes(app):
     @app.route('/report', methods=['POST'])
     @require_auth
     def report():
-        data = request.get_json()
+        data = _json_body()
         key_suffix = data.get('key_suffix', '')
         if not _may_view(key_suffix):
             return _deny()
@@ -2032,12 +2066,14 @@ def register_routes(app):
     @app.route('/reportdate', methods=['POST'])
     @require_auth
     def reportdate():
-        data = request.get_json()
+        data = _json_body()
         key_suffix = data.get('key_suffix', '')
         if not _may_view(key_suffix):
             return _deny()
-        start_date = data.get('start_date', '')
-        end_date = data.get('end_date', '')
+        start_date = _iso_date(data.get('start_date'))
+        end_date = _iso_date(data.get('end_date'))
+        if start_date is None or end_date is None:
+            return _bad_period()
 
         records = AccessRecord.query.filter(
             AccessRecord.employee_id == key_suffix,
@@ -2054,10 +2090,12 @@ def register_routes(app):
     @app.route('/director_report', methods=['POST'])
     @require_auth
     def director_report():
-        data = request.get_json()
+        data = _json_body()
         emp_sname = data.get('emp_sname', '')
-        start_date = data.get('start_date', '')
-        end_date = data.get('end_date', '')
+        start_date = _iso_date(data.get('start_date'))
+        end_date = _iso_date(data.get('end_date'))
+        if start_date is None or end_date is None:
+            return _bad_period()
 
         emp = _find_reportable(emp_sname)
         if not emp:
@@ -2414,7 +2452,7 @@ def register_routes(app):
     @app.route('/leaves', methods=['POST'])
     @require_auth
     def leaves():
-        data = request.get_json()
+        data = _json_body()
         key_suffix = data.get('key_suffix', '')
         if not _may_view(key_suffix):
             return _deny()
