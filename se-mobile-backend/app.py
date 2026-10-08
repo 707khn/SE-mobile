@@ -2572,7 +2572,14 @@ def register_routes(app):
         token = _text(data, 'token')
         if not token:
             return jsonify({'message': 'Failure', 'error': 'token required'}), 400
-        FcmToken.query.filter_by(token=token).delete()
+        # Снять можно только свою подписку. Иначе любой, кто узнал чужой
+        # токен, отключил бы человеку уведомления. Без пропуска (старая сборка,
+        # проверки ещё не включены) — как раньше, по одному токену.
+        rows = FcmToken.query.filter_by(token=token)
+        viewer = getattr(g, 'employee', None)
+        if viewer is not None:
+            rows = rows.filter_by(employee_id=viewer.employee_id)
+        rows.delete()
         db.session.commit()
         return jsonify({'message': 'Success'})
 
