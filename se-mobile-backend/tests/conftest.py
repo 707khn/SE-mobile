@@ -4,8 +4,8 @@ import sys
 # Ensure the backend package is importable when running pytest from any directory
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-# По умолчанию SQLite в памяти — проверки идут быстро и нигде ничего не
-# оставляют. Но SQLite прощает то, чего PostgreSQL не прощает: длину строковых
+# По умолчанию SQLite во временном файле — проверки идут быстро и нигде
+# ничего не оставляют. Но SQLite прощает то, чего PostgreSQL не прощает: длину строковых
 # колонок он не проверяет вовсе, а внешние ключи ведёт иначе. На этом здесь уже
 # дважды ловились на боевом сервере — на длине колонки и на auth_tokens при
 # склейке сотрудников. Поэтому DATABASE_URL можно задать снаружи, и сборка
@@ -13,8 +13,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 # Пустая строка — это «не задано», а не «база по адресу ''». Сборка передаёт
 # сюда пустой DATABASE_URL для прогона на SQLite, и setdefault такую не
 # заменил бы: переменная-то есть.
+#
+# SQLite — во временном файле, а не в памяти. Базу в памяти Flask-SQLAlchemy
+# отдаёт всем потокам одним соединением, а уведомления и поход за новостями
+# идут фоновыми потоками. Запрос, закончившись, откатывал это общее
+# соединение — и вместе со своим стирал незаписанные строки фонового потока:
+# из двух новостей сайта в ленту попадала одна, в меню оказывалось четыре
+# блюда вместо трёх. Раз в двадцать прогонов, и никогда на PostgreSQL, где у
+# каждого потока своё соединение. С файлом — так же, как там.
 if not os.environ.get('DATABASE_URL', '').strip():
-    os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+    import atexit
+    import shutil
+    import tempfile
+    _db_dir = tempfile.mkdtemp(prefix='se-mobile-tests-')
+    atexit.register(shutil.rmtree, _db_dir, ignore_errors=True)
+    os.environ['DATABASE_URL'] = f'sqlite:///{_db_dir}/tests.db'
 # Выгрузка расчётных листков теперь отказывает при незаданном секрете, а не
 # пропускает всех. На боевом сервере его ставит setup.sh; здесь — тоже, иначе
 # тесты проверяли бы поведение, которого в работе не бывает.
@@ -104,26 +117,3 @@ def no_internet(monkeypatch):
         if thread.name == 'news-refresh':
             thread.join(timeout=15)
     app_module._news_checked_at = None
-
-
-@pytest.fixture(autouse=True)
-def notifications_settle():
-    """Дождаться уведомлений, отправленных проверкой, прежде чем идти дальше.
-
-    Уведомления уходят фоновым потоком, а база в проверках — SQLite в
-    памяти, и Flask-SQLAlchemy отдаёт её всем потокам одним соединением.
-    Уведомление «меню выложено» из одной проверки доходило до базы посреди
-    следующей и откатывало её незаписанное удаление: в меню на тот же день
-    оказывалось четыре блюда вместо трёх. Раз в двадцать прогонов, и никогда
-    на боевом PostgreSQL, где у каждого потока своё соединение.
-    """
-    import time
-    import app as app_module
-
-    yield
-    queue = app_module._notify_queue
-    if queue is None:
-        return
-    deadline = time.monotonic() + 15
-    while queue.unfinished_tasks and time.monotonic() < deadline:
-        time.sleep(0.02)

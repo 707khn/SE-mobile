@@ -84,8 +84,7 @@ def admin(app, remove_employee, monkeypatch):
     ответ 500, а не исключение в проверке."""
     monkeypatch.setenv('TURNSTILE_SECRET', 'проверка')
     monkeypatch.setitem(app.config, 'PROPAGATE_EXCEPTIONS', False)
-    # Уведомления о меню и проходах уходят в фоновом потоке, а в проверках
-    # база SQLite одна на всех: поток лез бы в неё посреди следующих тестов.
+    # Уведомления о меню и проходах здесь ни к чему: проверяем разбор полей.
     monkeypatch.setattr(app_module, '_notify_later', lambda *a, **k: None)
     with app.app_context():
         remove_employee(_ADMIN)
