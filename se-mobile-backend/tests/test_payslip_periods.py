@@ -20,14 +20,26 @@ def _post(client, path, body):
                        content_type='application/json')
 
 
-def test_periods_are_newest_first(client):
-    body = _post(client, '/payslip/periods', {'key_suffix': _SARSEKEN}).get_json()
-    assert body['message'] == 'Success'
-    periods = body['periods']
-    assert periods, 'у техника-программиста листки есть с сидеров'
+def test_periods_are_newest_first(app, client, remove_employee):
+    worker = '0000009101'
+    with app.app_context():
+        remove_employee(worker)
+        db.session.add(Employee(employee_id=worker,
+                                full_name='Листков Тест Тестович',
+                                job_title='Слесарь'))
+        # Вперемешку, чтобы порядок наводил сервер, а не вставка.
+        for year, month in ((2025, 11), (2026, 2), (2025, 12), (2026, 1)):
+            db.session.add(Payslip(employee_id=worker, period_month=month,
+                                   period_year=year, period_display='x',
+                                   total_accruals=1.0, total_deductions=0.0,
+                                   net_pay=1.0))
+        db.session.commit()
 
-    keys = [(p['year'], p['month']) for p in periods]
-    assert keys == sorted(keys, reverse=True), 'свежие должны идти первыми'
+    body = _post(client, '/payslip/periods', {'key_suffix': worker}).get_json()
+    assert body['message'] == 'Success'
+    keys = [(p['year'], p['month']) for p in body['periods']]
+    assert keys == [(2026, 2), (2026, 1), (2025, 12), (2025, 11)], \
+        'свежие должны идти первыми'
     # По первому месяцу экран и открывается — значит, дубликаты в списке
     # недопустимы: месяц в нём должен быть один раз.
     assert len(keys) == len(set(keys))
