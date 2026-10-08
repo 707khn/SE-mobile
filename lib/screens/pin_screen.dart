@@ -303,16 +303,24 @@ class _PinScreenState extends State<PinScreen> {
     }
   }
 
+  /// Старый код при смене — под тем же счётчиком, что и при входе.
+  ///
+  /// Раньше здесь ошибаться можно было сколько угодно. Кто взял в руки
+  /// открытый телефон, мог перебрать все десять тысяч сочетаний и узнать
+  /// код — а его нередко ставят тот же, что на карте или на самом телефоне.
   Future<void> _checkOld(String entered) async {
-    final saved = await SecureStorageHelper.instance.getPin();
+    final secure = SecureStorageHelper.instance;
+    final saved = await secure.getPin();
     if (!mounted) return;
     if (entered == saved) {
+      await secure.resetPinFails();
+      if (!mounted) return;
       setState(() {
         _oldConfirmed = true;
         _entered = '';
       });
     } else {
-      _reject('pin_wrong'.tr);
+      await _wrongCode();
     }
   }
 
@@ -332,7 +340,12 @@ class _PinScreenState extends State<PinScreen> {
       return;
     }
 
-    final fails = await secure.bumpPinFails();
+    await _wrongCode();
+  }
+
+  /// Неверный код: ещё одна ошибка в счёт, а пятая — выход.
+  Future<void> _wrongCode() async {
+    final fails = await SecureStorageHelper.instance.bumpPinFails();
     if (!mounted) return;
     if (fails >= _maxFails) {
       // Стираем всё и отправляем на обычный вход. Снаружи это выглядит как

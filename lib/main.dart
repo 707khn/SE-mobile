@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -35,6 +36,12 @@ void main() {
   // ловить ошибки без зоны нельзя, и именно ради этого всё затевалось.
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Экран не поворачивается: приложение свёрстано под телефон в руке, и
+    // лёжа набок, например, клавиатура кода не помещалась по высоте — ноль
+    // и «стереть» уходили за край. Android держит то же самое в манифесте,
+    // чтобы экран не повернулся и до старта Flutter.
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
     // Ошибку, из-за которой приложение упало у человека в цехе, иначе не
     // узнать: телефон к отладчику не подключишь. Записываем на месте, читаем
