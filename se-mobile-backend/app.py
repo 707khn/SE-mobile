@@ -1,5 +1,7 @@
+import hmac
 import os
 import logging
+import math
 import re
 import secrets
 import threading
@@ -846,6 +848,21 @@ def _json_body():
     return data if isinstance(data, dict) else {}
 
 
+def _text(data, key):
+    """Строковое поле тела запроса, без пробелов по краям; иначе — «».
+
+    Поля ждали строку и сразу звали .strip(): число, список или true вместо
+    неё превращались в пятисотую ошибку. Номер, присланный числом, — тот же
+    номер, поэтому целое переводим в строку; остальное считаем пустым.
+    """
+    value = data.get(key)
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    return ''
+
+
 _ISO_DAY = re.compile(r'\d{4}-\d{2}-\d{2}')
 
 
@@ -863,6 +880,44 @@ def _iso_date(value):
         return date.fromisoformat(value.strip())
     except ValueError:
         return None
+
+
+def _menu_items(raw):
+    """Блюда из тела запроса — списком полей MenuItem, или None, если кривые.
+
+    Строка без категории или названия пропускается, как и раньше. Цена,
+    которая не число, — это отказ, а не молча пустая цена: технолог должна
+    увидеть, что ошиблась.
+    """
+    if not isinstance(raw, list):
+        return None
+    items = []
+    for item in raw:
+        if not isinstance(item, dict):
+            return None
+        category = _text(item, 'category')
+        name = _text(item, 'name')
+        if not category or not name:
+            continue
+        price = item.get('price')
+        if price is not None:
+            if isinstance(price, bool):
+                return None
+            try:
+                price = float(price)
+            except (TypeError, ValueError):
+                return None
+            # «nan» float() пропускает, а в ответе он сломал бы JSON.
+            if not math.isfinite(price):
+                return None
+        portion = item.get('portion')
+        if isinstance(portion, float):
+            portion = f'{portion:g}'
+        else:
+            portion = _text(item, 'portion')
+        items.append({'category': category, 'name': name, 'price': price,
+                      'portion': portion or None})
+    return items
 
 
 def _bad_period():
@@ -1746,9 +1801,9 @@ def register_routes(app):
 
     @app.route('/login', methods=['POST'])
     def login():
-        data = request.get_json(silent=True) or {}
-        login_id = (data.get('login') or '').strip()
-        password  = (data.get('password') or '').strip()
+        data = _json_body()
+        login_id = _text(data, 'login')
+        password  = _text(data, 'password')
 
         try:
             employee_id = _authenticate(login_id, password)
@@ -1860,9 +1915,9 @@ def register_routes(app):
         if viewer is None:
             return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
 
-        data = request.get_json(silent=True) or {}
-        old_password = (data.get('old_password') or '').strip()
-        new_password = (data.get('new_password') or '').strip()
+        data = _json_body()
+        old_password = _text(data, 'old_password')
+        new_password = _text(data, 'new_password')
 
         account = UserAccount.query.filter_by(
             employee_id=viewer.employee_id, is_active=True).first()
@@ -2048,7 +2103,7 @@ def register_routes(app):
     @require_auth
     def report():
         data = _json_body()
-        key_suffix = data.get('key_suffix', '')
+        key_suffix = _text(data, 'key_suffix')
         if not _may_view(key_suffix):
             return _deny()
 
@@ -2067,7 +2122,7 @@ def register_routes(app):
     @require_auth
     def reportdate():
         data = _json_body()
-        key_suffix = data.get('key_suffix', '')
+        key_suffix = _text(data, 'key_suffix')
         if not _may_view(key_suffix):
             return _deny()
         start_date = _iso_date(data.get('start_date'))
@@ -2091,7 +2146,7 @@ def register_routes(app):
     @require_auth
     def director_report():
         data = _json_body()
-        emp_sname = data.get('emp_sname', '')
+        emp_sname = _text(data, 'emp_sname')
         start_date = _iso_date(data.get('start_date'))
         end_date = _iso_date(data.get('end_date'))
         if start_date is None or end_date is None:
@@ -2170,7 +2225,7 @@ def register_routes(app):
         содержит дату рождения и пол, и такой ответ — это сведения о человеке
         по его номеру.
         """
-        data = request.get_json(silent=True) or {}
+        data = _json_body()
         if 'key_suffix' not in data:
             return jsonify({'message': 'Failure'})
         if not _is_manager():
@@ -2202,8 +2257,8 @@ def register_routes(app):
         Список месяцев решает обе задачи сразу: приложение открывается на
         самом свежем листке, а в выборе месяца видно, где что-то есть.
         """
-        data = request.get_json(silent=True) or {}
-        key_suffix = (data.get('key_suffix') or '').strip()
+        data = _json_body()
+        key_suffix = _text(data, 'key_suffix')
         if not key_suffix:
             viewer = getattr(g, 'employee', None)
             key_suffix = viewer.employee_id if viewer is not None else ''
@@ -2223,8 +2278,8 @@ def register_routes(app):
         Общий для /payslip и /payslip/xlsx: файл не должен открываться
         там, где не открывается сам листок.
         """
-        data = request.get_json(silent=True) or {}
-        key_suffix = data.get('key_suffix', '')
+        data = _json_body()
+        key_suffix = _text(data, 'key_suffix')
         if not _may_view(key_suffix):
             return None, _deny()
         # Месяц и год приходят снаружи. int('август') — это ValueError и
@@ -2453,7 +2508,7 @@ def register_routes(app):
     @require_auth
     def leaves():
         data = _json_body()
-        key_suffix = data.get('key_suffix', '')
+        key_suffix = _text(data, 'key_suffix')
         if not _may_view(key_suffix):
             return _deny()
 
@@ -2491,9 +2546,9 @@ def register_routes(app):
     @app.route('/api/fcm-token', methods=['POST'])
     @require_auth
     def register_fcm_token():
-        data = request.get_json() or {}
-        employee_id = data.get('employee_id', '').strip()
-        token = data.get('token', '').strip()
+        data = _json_body()
+        employee_id = _text(data, 'employee_id')
+        token = _text(data, 'token')
         if not employee_id or not token:
             return jsonify({'message': 'Failure', 'error': 'employee_id and token required'}), 400
         # Подписаться можно только на свои уведомления: иначе чужой телефон
@@ -2514,8 +2569,8 @@ def register_routes(app):
     @app.route('/api/fcm-token', methods=['DELETE'])
     @require_auth
     def unregister_fcm_token():
-        data = request.get_json() or {}
-        token = data.get('token', '').strip()
+        data = _json_body()
+        token = _text(data, 'token')
         if not token:
             return jsonify({'message': 'Failure', 'error': 'token required'}), 400
         FcmToken.query.filter_by(token=token).delete()
@@ -2526,21 +2581,24 @@ def register_routes(app):
 
     @app.route('/api/turnstile', methods=['POST'])
     def turnstile_event():
-        data = request.get_json() or {}
-        secret = data.get('secret', '')
+        data = _json_body()
+        secret = _text(data, 'secret')
         expected = os.environ.get('TURNSTILE_SECRET', '')
         # Отказ в безопасную сторону: пустой секрет раньше отключал проверку
         # целиком, и кто угодно мог слать поддельные проходы. Теперь пустой
         # TURNSTILE_SECRET значит «настроить забыли», а не «пускать всех».
-        if not expected or secret != expected:
+        # compare_digest — чтобы по времени ответа нельзя было подбирать
+        # секрет по букве.
+        if not expected or not hmac.compare_digest(secret.encode(),
+                                                   expected.encode()):
             if not expected:
                 logging.error('TURNSTILE_SECRET не задан — события турникета '
                               'отклоняются. Проверьте /etc/se-mobile.env')
             return jsonify({'message': 'Failure', 'error': 'Unauthorized'}), 403
 
-        employee_id = data.get('employee_id', '').strip()
-        direction = data.get('direction', '').strip()  # 'in' | 'out'
-        ts_raw = data.get('timestamp')
+        employee_id = _text(data, 'employee_id')
+        direction = _text(data, 'direction')  # 'in' | 'out'
+        ts_raw = _text(data, 'timestamp')
 
         if not employee_id or direction not in ('in', 'out'):
             return jsonify({'message': 'Failure', 'error': 'employee_id and direction required'}), 400
@@ -2679,8 +2737,8 @@ def register_routes(app):
         Сумм здесь нет: главный экран показывают через плечо, а зарплата — не
         то, что должен увидеть сосед. Только месяц, за который листок есть.
         """
-        data = request.get_json(silent=True) or {}
-        key_suffix = (data.get('key_suffix') or '').strip()
+        data = _json_body()
+        key_suffix = _text(data, 'key_suffix')
         if not key_suffix:
             viewer = getattr(g, 'employee', None)
             key_suffix = viewer.employee_id if viewer is not None else ''
@@ -2720,13 +2778,17 @@ def register_routes(app):
     def save_menu():
         if not _may_edit_menu():
             return _deny()
-        data = request.get_json() or {}
-        date_str = data.get('date', '')
-        items_data = data.get('items', [])
+        data = _json_body()
+        date_str = _text(data, 'date')
         try:
             menu_date = date.fromisoformat(date_str)
         except (ValueError, TypeError):
             return jsonify({'message': 'Failure', 'error': 'Invalid or missing date'}), 400
+        # Блюда разбираем до того, как стереть старые: раньше кривая цена
+        # роняла запрос уже после удаления, и день оставался без меню.
+        items = _menu_items(data.get('items', []))
+        if items is None:
+            return jsonify({'message': 'Failure', 'error': 'bad_items'}), 400
 
         menu = MenuDate.query.filter_by(date=menu_date).first()
         # Правка уже выложенного дня — не повод для уведомления: технолог
@@ -2739,20 +2801,8 @@ def register_routes(app):
             db.session.add(menu)
             db.session.flush()
 
-        for item in items_data:
-            category = str(item.get('category', '')).strip()
-            name = str(item.get('name', '')).strip()
-            price = item.get('price')
-            if not category or not name:
-                continue
-            db.session.add(MenuItem(
-                menu_date_id=menu.id,
-                category=category,
-                name=name,
-                price=float(price) if price is not None else None,
-                portion=(str(item.get('portion')).strip()
-                         if item.get('portion') else None),
-            ))
+        for item in items:
+            db.session.add(MenuItem(menu_date_id=menu.id, **item))
 
         db.session.commit()
         if was_new:
@@ -2980,9 +3030,9 @@ def register_routes(app):
         """Объявление, набранное администратором прямо в приложении."""
         if not _is_admin_account():
             return _deny()
-        data = request.get_json(silent=True) or {}
-        title = (data.get('title') or '').strip()
-        summary = (data.get('summary') or '').strip()
+        data = _json_body()
+        title = _text(data, 'title')
+        summary = _text(data, 'summary')
         if not title:
             return jsonify({'message': 'Failure', 'error': 'title_required'}), 400
 
@@ -2991,7 +3041,7 @@ def register_routes(app):
             source='announcement',
             title=title[:500],
             summary=summary,
-            author=(data.get('author') or (viewer.full_name if viewer else ''))[:255] or None,
+            author=(_text(data, 'author') or (viewer.full_name if viewer else ''))[:255] or None,
             published_at=datetime.utcnow(),
             # Набрал администратор — значит уже одобрено, второй раз не спрашиваем.
             is_published=True,
@@ -3015,16 +3065,16 @@ def register_routes(app):
             db.session.commit()
             return jsonify({'message': 'Success'})
 
-        data = request.get_json(silent=True) or {}
+        data = _json_body()
         # Запоминаем до правки: уведомление шлём только на переходе
         # «в очереди» → «в ленте», иначе правка опечатки разбудит всех заново.
         was_published = item.is_published
         if 'is_published' in data:
             item.is_published = bool(data['is_published'])
-        if (data.get('title') or '').strip():
-            item.title = data['title'].strip()[:500]
+        if _text(data, 'title'):
+            item.title = _text(data, 'title')[:500]
         if 'summary' in data:
-            item.summary = (data.get('summary') or '').strip()
+            item.summary = _text(data, 'summary')
         db.session.commit()
 
         if item.is_published and not was_published:
@@ -3043,9 +3093,9 @@ def register_routes(app):
 
         Присланное **не публикуется**: ждёт одобрения в админ-панели.
         """
-        data = request.get_json(silent=True) or {}
-        employee_id = _authenticate((data.get('login') or '').strip(),
-                                    (data.get('password') or '').strip())
+        data = _json_body()
+        employee_id = _authenticate(_text(data, 'login'),
+                                    _text(data, 'password'))
         if not employee_id:
             return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
         uploader = Employee.query.get(employee_id)
@@ -3053,20 +3103,21 @@ def register_routes(app):
             return jsonify({'message': 'Присылать объявления может администратор',
                             'error': True}), 403
 
-        title = (data.get('title') or '').strip()
+        title = _text(data, 'title')
         if not title:
             return jsonify({'message': 'Пустая тема письма', 'error': True}), 400
 
         # Письмо узнаём по Message-ID: рассылку читают повторно, и одно и то
         # же письмо не должно попасть в очередь дважды.
-        external = (data.get('message_id') or '').strip()[:500] or None
+        external = _text(data, 'message_id')[:500] or None
         if external and NewsItem.query.filter_by(external_id=external).first():
             return jsonify({'message': 'Уже принято', 'duplicate': True})
 
         published = None
-        if data.get('sent_at'):
+        if _text(data, 'sent_at'):
             try:
-                published = datetime.fromisoformat(data['sent_at'].replace('Z', '+00:00'))
+                published = datetime.fromisoformat(
+                    _text(data, 'sent_at').replace('Z', '+00:00'))
                 if published.tzinfo is not None:
                     published = published.astimezone(timezone.utc).replace(tzinfo=None)
             except ValueError:
@@ -3076,8 +3127,8 @@ def register_routes(app):
             source='announcement',
             external_id=external,
             title=title[:500],
-            summary=(data.get('summary') or '').strip(),
-            author=(data.get('author') or '').strip()[:255] or None,
+            summary=_text(data, 'summary'),
+            author=_text(data, 'author')[:255] or None,
             published_at=published or datetime.utcnow(),
             is_published=False,
         )

@@ -19,6 +19,16 @@ def _columns(name):
     return {c['name'] for c in sa.inspect(db.engine).get_columns(name)}
 
 
+def _fresh_connections():
+    """Как после перезапуска сервера: пул — заново.
+
+    SQLite помнит схему в каждом соединении. Соединение из пула, не
+    заметившее DROP COLUMN, отвечало «такая колонка уже есть» на её
+    возвращение. На сервере миграция идёт при запуске, на свежих соединениях.
+    """
+    db.engine.dispose()
+
+
 def test_every_model_column_reaches_the_database(app):
     """Не про одну колонку, а про все: список больше не ведётся руками."""
     with app.app_context():
@@ -32,6 +42,7 @@ def test_dropped_column_comes_back(app):
         with db.engine.begin() as conn:
             conn.execute(sa.text(
                 'ALTER TABLE user_accounts DROP COLUMN failed_attempts'))
+        _fresh_connections()
         assert 'failed_attempts' not in _columns('user_accounts')
 
         app_module._migrate_schema()
@@ -50,6 +61,7 @@ def test_login_survives_an_old_table(app, client):
         with db.engine.begin() as conn:
             conn.execute(sa.text(
                 'ALTER TABLE user_accounts DROP COLUMN failed_attempts'))
+        _fresh_connections()
         app_module._migrate_schema()
 
     response = client.post('/login', json={'login': '2114', 'password': '2114'})
