@@ -172,7 +172,19 @@ Future<PayslipData> fetchPayslip(String month, String year,
     return _savedOr(cacheKey, PayslipErrorKind.network);
   }
 
-  final body = jsonDecode(response.body) as Map<String, dynamic>;
+  // 200, а внутри не JSON: так отвечает страница входа в гостевой Wi-Fi.
+  // Раньше разбор здесь падал, и вместо сохранённого листка человек видел
+  // «ошибку сети» — хотя листок за прошлый месяц лежал у него в телефоне.
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(response.body);
+  } on FormatException {
+    return _savedOr(cacheKey, PayslipErrorKind.network);
+  }
+  if (decoded is! Map<String, dynamic>) {
+    return _savedOr(cacheKey, PayslipErrorKind.network);
+  }
+  final body = decoded;
   if (body['message'] != 'Success') {
     throw const PayslipException(PayslipErrorKind.notFound);
   }
