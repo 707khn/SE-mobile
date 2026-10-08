@@ -1,11 +1,9 @@
 """Integration tests for the Flask API (se-mobile-backend/app.py).
 
-The app fixture in conftest.py boots the app with an in-memory SQLite DB and
-runs auto-seeding, which inserts employees '001', '002', '003' with attendance
-records (Jan–Feb 2024) and payslips (Jan–Feb 2024 for '001'/'002', Jan 2024
-for '003').  '001' is Сарсекенов, and the July payslip book gave him his real
-personnel number: his record, and everything on it, now lives under
-_SARSEKEN below — '001' itself is gone.
+The app fixture in conftest.py boots the app with a fresh SQLite DB and runs
+the seeders. They create people, not money: payslips and turnstile passes are
+not in the source any more (see _seed_legacy_from_data). Tests that need them
+make their own with the `staff` fixture below — invented ones.
 
 Tests that upload the XML fixture create employees '0000001874' and
 '0000002031' which do not exist in the seed data.
@@ -23,6 +21,41 @@ import pytest
 import app as app_module
 
 _TEST_XML = os.path.join(os.path.dirname(__file__), '..', 'test_payslip.xml')
+
+
+# Вымышленный сотрудник с проходами и листком за январь 2024: сидеры теперь
+# заводят людей без денег и без проходов.
+_WORKER = 'API00001'
+_WORKER_SURNAME = 'Проходов'
+
+
+@pytest.fixture
+def staff(app, remove_employee):
+    from datetime import date as _date
+    from models import (db, AccessRecord, Employee, Payslip, PayslipAccrual,
+                        PayslipDeduction)
+    with app.app_context():
+        remove_employee(_WORKER)
+        db.session.add(Employee(employee_id=_WORKER,
+                                full_name=f'{_WORKER_SURNAME} Тест Тестович',
+                                job_title='Слесарь'))
+        db.session.flush()
+        for day, time, event in ((15, '08:55', 'Вход'), (15, '17:05', 'Выход'),
+                                 (16, '08:50', 'Вход')):
+            db.session.add(AccessRecord(
+                employee_id=_WORKER, access_date=_date(2024, 1, day),
+                access_time=time, event_type=event, door_location='Проходная'))
+        ps = Payslip(employee_id=_WORKER, period_month=1, period_year=2024,
+                     period_display='Январь 2024', total_accruals=100_000.0,
+                     total_deductions=20_000.0, net_pay=80_000.0)
+        db.session.add(ps)
+        db.session.flush()
+        db.session.add(PayslipAccrual(payslip_id=ps.id, name='Оклад',
+                                      amount=100_000.0))
+        db.session.add(PayslipDeduction(payslip_id=ps.id, name='ИПН',
+                                        amount=20_000.0))
+        db.session.commit()
+    yield _WORKER
 
 
 # ---------------------------------------------------------------------------
@@ -83,8 +116,8 @@ def test_login_failure(client):
 # /report
 # ---------------------------------------------------------------------------
 
-def test_report_success(client):
-    r = _post(client, '/report', {'key_suffix': _SARSEKEN})
+def test_report_success(client, staff):
+    r = _post(client, '/report', {'key_suffix': staff})
     body = r.get_json()
     assert body['message'] == 'Success'
     assert len(body['report']) > 0
@@ -107,9 +140,9 @@ def test_report_empty_is_not_a_failure(client):
 # /reportdate
 # ---------------------------------------------------------------------------
 
-def test_reportdate_success(client):
+def test_reportdate_success(client, staff):
     r = _post(client, '/reportdate', {
-        'key_suffix': _SARSEKEN,
+        'key_suffix': staff,
         'start_date': '2024-01-01',
         'end_date': '2024-01-31',
     })
@@ -118,7 +151,7 @@ def test_reportdate_success(client):
     assert len(body['report']) > 0
 
 
-def test_reportdate_no_records(client):
+def test_reportdate_no_records(client, staff):
     """Период без проходов у того, у кого проходы есть.
 
     Здесь экран и должен сказать «за эти дни проходов нет» — в отличие от
@@ -126,7 +159,7 @@ def test_reportdate_no_records(client):
     загрузки. Различить их можно только по coverage.
     """
     body = _post(client, '/reportdate', {
-        'key_suffix': _SARSEKEN,
+        'key_suffix': staff,
         'start_date': '2000-01-01',
         'end_date': '2000-01-31',
     }).get_json()
@@ -168,7 +201,7 @@ def test_uploading_passes_refreshes_the_coverage(app, client):
         app_module._access_loaded_until['checked_at'] = None
 
 
-def test_reportdate_after_the_last_upload(client):
+def test_reportdate_after_the_last_upload(client, staff):
     """Период позже последней выгрузки — главный случай.
 
     Выгрузку из СКУД приносят раз в месяц: 22 сентября проходы в базе были
@@ -176,7 +209,7 @@ def test_reportdate_after_the_last_upload(client):
     пусты у всех подряд, и без объяснения это выглядит как поломка.
     """
     body = _post(client, '/reportdate', {
-        'key_suffix': _SARSEKEN,
+        'key_suffix': staff,
         'start_date': '2099-01-01',
         'end_date': '2099-01-31',
     }).get_json()
@@ -192,10 +225,9 @@ def test_reportdate_after_the_last_upload(client):
 # /director_report
 # ---------------------------------------------------------------------------
 
-def test_director_report_success(client):
+def test_director_report_success(client, staff):
     r = _post(client, '/director_report', {
-        # Сотрудник 002 из сидеров. Прежняя фамилия из них давно ушла.
-        'emp_sname': 'Касымов',
+        'emp_sname': _WORKER_SURNAME,
         'start_date': '2024-01-01',
         'end_date': '2024-01-31',
     })
@@ -237,8 +269,8 @@ def test_get_sname_by_iin_is_closed(client):
 # /payslip
 # ---------------------------------------------------------------------------
 
-def test_payslip_success(client):
-    r = _post(client, '/payslip', {'key_suffix': _SARSEKEN, 'month': '1', 'year': '2024'})
+def test_payslip_success(client, staff):
+    r = _post(client, '/payslip', {'key_suffix': staff, 'month': '1', 'year': '2024'})
     body = r.get_json()
     assert body['message'] == 'Success'
     ps = body['payslip']

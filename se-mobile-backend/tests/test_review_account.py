@@ -6,6 +6,8 @@
 убирает всё — и что экран «Свежесть данных» от этого не врёт.
 """
 
+import pytest
+
 import app as app_module
 import review_account
 from models import AccessRecord, Payslip, UserAccount, db
@@ -24,7 +26,39 @@ def _freshness(app):
                 for s in app_module._data_freshness()}
 
 
-def test_reviewer_can_log_in_and_see_a_payslip(app, client, capsys):
+_STAFF = 'REV00001'
+
+
+@pytest.fixture
+def plant_data(app, remove_employee):
+    """Чьи-то листки и проходы, как на живой базе.
+
+    Проверяющий подстраивается под них: его листки — в последних трёх
+    месяцах, за которые листки есть, проходы — кончая последним днём
+    выгрузки. В исходниках своих листков больше нет, и без этой записи
+    база пуста, а «свежесть» сдвигать было бы не с чего.
+    """
+    from datetime import date
+    from models import Employee
+    with app.app_context():
+        remove_employee(_STAFF)
+        db.session.add(Employee(employee_id=_STAFF,
+                                full_name='Живой Тест Тестович',
+                                job_title='Слесарь'))
+        db.session.add(Payslip(employee_id=_STAFF, period_month=7,
+                               period_year=2026, period_display='Июль 2026',
+                               total_accruals=1.0, total_deductions=0.0,
+                               net_pay=1.0))
+        db.session.add(AccessRecord(employee_id=_STAFF,
+                                    access_date=date(2026, 8, 20),
+                                    access_time='08:00', event_type='Вход',
+                                    door_location='Проходная'))
+        db.session.commit()
+    yield
+
+
+def test_reviewer_can_log_in_and_see_a_payslip(app, client, capsys,
+                                               plant_data):
     before = _freshness(app)
     try:
         assert review_account.main([], application=app) == 0

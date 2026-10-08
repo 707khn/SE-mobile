@@ -50,6 +50,7 @@ app.*.map.json
 # Список сотрудников (employees_*.csv) остаётся: это ФИО, должность и
 # подразделение — то же, что висит на стене, — и на нём держатся проверки.
 se-mobile-backend/data/payslips_*.json
+se-mobile-backend/data/legacy_seed.json
 se-mobile-backend/data/access_*.csv
 se-mobile-backend/data/*.xls
 se-mobile-backend/data/*.xlsx
