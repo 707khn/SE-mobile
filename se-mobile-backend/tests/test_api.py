@@ -389,6 +389,33 @@ def test_fcm_delete(client):
     assert r.get_json()['message'] == 'Success'
 
 
+def test_fcm_delete_takes_only_your_own(app, client, remove_employee):
+    """Чужую подписку не снять, даже зная её токен."""
+    from models import db, Employee, FcmToken
+    with app.app_context():
+        for employee_id in ('FCM00001', 'FCM00002'):
+            remove_employee(employee_id)
+            db.session.add(Employee(employee_id=employee_id,
+                                    full_name='Пуш Тест Тестович',
+                                    job_title='Слесарь'))
+        db.session.add(FcmToken(employee_id='FCM00001', token='fcm-own-token'))
+        db.session.commit()
+        stranger = app_module._issue_token('FCM00002')
+        owner = app_module._issue_token('FCM00001')
+
+    def delete(token):
+        return client.delete('/api/fcm-token', json={'token': 'fcm-own-token'},
+                             headers={'Authorization': f'Bearer {token}'})
+
+    assert delete(stranger).status_code == 200
+    with app.app_context():
+        assert FcmToken.query.filter_by(token='fcm-own-token').count() == 1
+
+    assert delete(owner).status_code == 200
+    with app.app_context():
+        assert FcmToken.query.filter_by(token='fcm-own-token').count() == 0
+
+
 # ---------------------------------------------------------------------------
 # /api/menu
 # ---------------------------------------------------------------------------

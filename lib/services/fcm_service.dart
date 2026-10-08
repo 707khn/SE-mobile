@@ -101,21 +101,36 @@ class FcmService {
   /// Иначе после смены пользователя на этом телефоне продолжали бы
   /// появляться уведомления прежнего: о его листке, его проходах. Токен
   /// заодно сбрасывается, и следующий вошедший получит новый.
+  ///
+  /// Сам токен сбрасывается и тогда, когда сервер не ответил: без связи
+  /// раньше дело до сброса не доходило, и уведомления прежнего продолжали
+  /// приходить, пока сервер помнил его токен. Сброшенный токен Firebase
+  /// больше не доставляет, что бы ни помнил сервер.
+  ///
+  /// Каждый шаг ограничен по времени: без связи getToken может ждать долго,
+  /// а человек нажал «Выйти» и смотрит на экран.
   static Future<void> unregisterToken() async {
     if (!_ready) return;
+    await _refresh?.cancel();
+    _refresh = null;
     try {
-      await _refresh?.cancel();
-      _refresh = null;
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token == null) return;
-      await http
-          .delete(
-            Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
-            headers: await authHeaders(),
-            body: jsonEncode({'token': token}),
-          )
-          .timeout(const Duration(seconds: 8));
-      await FirebaseMessaging.instance.deleteToken();
+      final token = await FirebaseMessaging.instance
+          .getToken()
+          .timeout(const Duration(seconds: 5));
+      if (token != null) {
+        await http
+            .delete(
+              Uri.parse('${AppValues.baseUrl}/api/fcm-token'),
+              headers: await authHeaders(),
+              body: jsonEncode({'token': token}),
+            )
+            .timeout(const Duration(seconds: 8));
+      }
+    } catch (_) {}
+    try {
+      await FirebaseMessaging.instance
+          .deleteToken()
+          .timeout(const Duration(seconds: 5));
     } catch (_) {}
   }
 }
