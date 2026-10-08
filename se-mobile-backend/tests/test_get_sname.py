@@ -46,3 +46,37 @@ def test_manager_sees_own_department_whatever_number_is_sent(
 def test_ordinary_employee_gets_no_list(app, client, remove_employee):
     tokens = _setup(app, remove_employee)
     assert _names(client, tokens[_MINE], _MINE).status_code == 403
+
+
+
+def test_report_finds_the_visible_namesake(app, client, remove_employee):
+    """Похожее ФИО из чужого отдела не заслоняет своего сотрудника.
+
+    Чужой заведён раньше — прежний поиск «первый, в ком встречается»
+    находил его и отвечал начальнику «нет доступа».
+    """
+    with app.app_context():
+        for employee_id, name, dept in (
+                ('SNAME0010', 'Петров Тест Старший', 'Отдел Б'),
+                ('SNAME0011', 'Петров Тест', 'Отдел А'),
+                ('SNAME0012', 'Петров Начальник', 'Отдел А')):
+            remove_employee(employee_id)
+            db.session.add(Employee(
+                employee_id=employee_id, full_name=name,
+                job_title='Начальник отдела' if 'Начальник' in name
+                else 'Инженер', department=dept))
+            db.session.commit()
+        token = app_module._issue_token('SNAME0012')
+
+    def report(name):
+        return client.post('/director_report', json={
+            'emp_sname': name, 'start_date': '2026-01-01',
+            'end_date': '2026-01-31'},
+            headers={'Authorization': f'Bearer {token}'})
+
+    r = report('Петров Тест')
+    assert r.status_code == 200
+    assert r.get_json()['message'] == 'Success'
+
+    # Чужого, которого не видно вовсе, — «нет доступа», а не «не найден».
+    assert report('Петров Тест Старший').status_code == 403
