@@ -104,3 +104,26 @@ def no_internet(monkeypatch):
         if thread.name == 'news-refresh':
             thread.join(timeout=15)
     app_module._news_checked_at = None
+
+
+@pytest.fixture(autouse=True)
+def notifications_settle():
+    """Дождаться уведомлений, отправленных проверкой, прежде чем идти дальше.
+
+    Уведомления уходят фоновым потоком, а база в проверках — SQLite в
+    памяти, и Flask-SQLAlchemy отдаёт её всем потокам одним соединением.
+    Уведомление «меню выложено» из одной проверки доходило до базы посреди
+    следующей и откатывало её незаписанное удаление: в меню на тот же день
+    оказывалось четыре блюда вместо трёх. Раз в двадцать прогонов, и никогда
+    на боевом PostgreSQL, где у каждого потока своё соединение.
+    """
+    import time
+    import app as app_module
+
+    yield
+    queue = app_module._notify_queue
+    if queue is None:
+        return
+    deadline = time.monotonic() + 15
+    while queue.unfinished_tasks and time.monotonic() < deadline:
+        time.sleep(0.02)
