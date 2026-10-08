@@ -46,6 +46,9 @@ Future<Map<String, dynamic>> getMenuForDate(String date) async {
     if (response.statusCode == 200) {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       await OfflineCache.save('menu_$date', body);
+      // Две недели вокруг сегодняшнего — с запасом на меню, выложенное
+      // вперёд; старее никто не открывает.
+      await OfflineCache.trim('menu_', keep: 14);
       return body;
     }
     return await _cachedMenu(date, problemForStatus(response.statusCode));
