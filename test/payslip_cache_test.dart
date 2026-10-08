@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:se_mobile/requests/payslip_request.dart';
+
+import 'support/fake_server.dart';
 
 /// Сохранённые листки. Сервер в тестовой среде отвечает ошибкой на любой
 /// запрос — как nginx, когда служба лежит.
@@ -66,5 +69,34 @@ void main() {
       }
     });
     expect(error, isA<PayslipException>());
+  });
+
+  testWidgets('ответ 200, но не JSON — тоже из копии', (tester) async {
+    // Так отвечает страница входа в гостевой Wi-Fi: всё «в порядке», а
+    // внутри HTML. Раньше разбор падал, и вместо сохранённого листка
+    // человек видел «ошибку сети».
+    SharedPreferences.setMockInitialValues({
+      'offline_payslip_OWN0001_2026_07': jsonEncode(slip('Свой Тест')),
+    });
+    final data = await tester.runAsync(() => HttpOverrides.runWithHttpOverrides(
+        () => fetchPayslip('07', '2026'),
+        FakeServer(200, '<html><body>Войдите в сеть</body></html>')));
+    expect(data!.employee, 'Свой Тест');
+  });
+
+  testWidgets('ответ 200, но не JSON и копии нет — ошибка сети, не падение',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    Object? error;
+    await tester.runAsync(() async {
+      try {
+        await HttpOverrides.runWithHttpOverrides(
+            () => fetchPayslip('07', '2026'), FakeServer(200, '[1, 2]'));
+      } catch (e) {
+        error = e;
+      }
+    });
+    expect(error, isA<PayslipException>());
+    expect((error as PayslipException).kind, PayslipErrorKind.network);
   });
 }

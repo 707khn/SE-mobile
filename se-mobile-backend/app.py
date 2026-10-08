@@ -1091,13 +1091,22 @@ _news_status = {'checked_at': None, 'source': '', 'kind': '',
 _news_feed_url = ''
 
 
+# Потолок ответа чужого сайта. Страница новостей весит сотни килобайт; без
+# потолка ошибка на той стороне — ссылка на видео вместо ленты, бесконечная
+# выдача — читалась бы в память целиком, и так в каждом из трёх процессов.
+_FETCH_LIMIT = 5 * 1024 * 1024
+
+
 def _fetch(url, timeout=8):
     import urllib.request
     request_ = urllib.request.Request(
         url, headers={'User-Agent': 'SE-mobile/1.0',
                       'Accept': 'application/rss+xml, application/xml, text/html'})
     with urllib.request.urlopen(request_, timeout=timeout) as response:
-        return response.read(), response.geturl()
+        data = response.read(_FETCH_LIMIT + 1)
+        if len(data) > _FETCH_LIMIT:
+            raise ValueError(f'{url}: ответ больше {_FETCH_LIMIT // 2**20} МБ')
+        return data, response.geturl()
 
 
 def _load_site_news(page_url):

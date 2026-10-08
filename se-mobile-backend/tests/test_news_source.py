@@ -8,6 +8,10 @@ import app as app_module
 from parser_news_feed import feed_links, looks_like_feed, parse_news_feed
 from parser_news_html import parse_news_html
 
+# Настоящий поход за страницей. Проверки по умолчанию подменяют его «нет
+# интернета» (conftest.no_internet), а здесь нужен он сам — берём до подмены.
+_real_fetch = app_module._fetch
+
 _FEED = textwrap.dedent("""\
     <?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0"><channel>
@@ -243,3 +247,55 @@ def test_the_feed_does_not_make_anyone_wait(client, monkeypatch):
     assert answer.status_code == 200
     assert spent < 1.5, f'человек ждал {spent:.1f} с чужого сайта'
     _wait_for_news_refresh()
+
+
+def test_huge_answer_is_refused_not_read_into_memory(monkeypatch):
+    """Чужой сайт может отдать что угодно — читаем не больше потолка."""
+    import urllib.request
+
+    class _Endless:
+        def __init__(self):
+            self.asked = None
+
+        def read(self, size=-1):
+            self.asked = size
+            return b'x' * (size if size > 0 else 10)
+
+        def geturl(self):
+            return 'https://se-btrz.com/news/'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    answer = _Endless()
+    monkeypatch.setattr(urllib.request, 'urlopen',
+                        lambda request, timeout=None: answer)
+    with pytest.raises(ValueError):
+        _real_fetch('https://se-btrz.com/news/')
+    assert 0 < answer.asked <= app_module._FETCH_LIMIT + 1, \
+        'читать надо с пределом, а не всё подряд'
+
+
+def test_normal_answer_still_comes_through(monkeypatch):
+    import urllib.request
+
+    class _Page:
+        def read(self, size=-1):
+            return _PAGE
+
+        def geturl(self):
+            return 'https://se-btrz.com/news/'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(urllib.request, 'urlopen',
+                        lambda request, timeout=None: _Page())
+    assert _real_fetch('https://se-btrz.com/news/') == (
+        _PAGE, 'https://se-btrz.com/news/')
