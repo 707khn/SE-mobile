@@ -382,7 +382,7 @@ class _LeavePageState extends State<LeavePage> {
 
   Widget _buildTotalChip(int used, int total) {
     final remaining = total - used;
-    final color = remaining > 0 ? AppColors.mainColor : AppColors.niceRed;
+    final color = context.readable(remaining > 0 ? AppColors.mainColor : AppColors.niceRed);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -401,7 +401,7 @@ class _LeavePageState extends State<LeavePage> {
     final progress = balance.totalDays > 0 ? balance.usedDays / balance.totalDays : 0.0;
     final isExhausted = balance.remainingDays <= 0;
     final isLow = balance.remainingDays > 0 && balance.remainingDays <= 3;
-    final color = isExhausted ? AppColors.niceRed : AppColors.mainColor;
+    final color = context.readable(isExhausted ? AppColors.niceRed : AppColors.mainColor);
 
     return GestureDetector(
       onLongPress: () {
@@ -441,7 +441,7 @@ class _LeavePageState extends State<LeavePage> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade800,
+                        color: context.readable(Colors.orange.shade800),
                       ),
                     ),
                   )
@@ -454,10 +454,10 @@ class _LeavePageState extends State<LeavePage> {
                     ),
                     child: Text(
                       '0 ${'days_short'.tr}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.niceRed,
+                        color: context.readable(AppColors.niceRed),
                       ),
                     ),
                   ),
@@ -523,13 +523,13 @@ class _LeavePageState extends State<LeavePage> {
                 : isUnpaid
                     ? Icons.work_off_outlined
                     : Icons.beach_access;
-    final iconColor = isSick ? AppColors.niceRed : AppColors.mainColor;
+    final iconColor = context.readable(isSick ? AppColors.niceRed : AppColors.mainColor);
 
     final isApproved = record.status.toLowerCase().contains('утвержд') ||
         record.status.toLowerCase().contains('бекіт') ||
         record.status.toLowerCase().contains('закр') ||
         record.status.toLowerCase().contains('жабы');
-    final statusColor = isApproved ? AppColors.mainColor : Colors.orange.shade800;
+    final statusColor = context.readable(isApproved ? AppColors.mainColor : Colors.orange.shade800);
     final statusBg = isApproved
         ? AppColors.mainColor.withOpacity(0.12)
         : Colors.orange.withOpacity(0.12);

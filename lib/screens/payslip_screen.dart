@@ -603,7 +603,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             title: 'accruals'.tr,
                             items: _payslip!.accruals,
                             total: _payslip!.totalAccruals,
-                            color: Colors.green.shade700,
+                            color: context.readable(Colors.green.shade700),
                             initiallyExpanded: true,
                           ),
                           SizedBox(height: Dimensions.height30 / 2),
@@ -613,7 +613,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             title: 'deductions'.tr,
                             items: _payslip!.deductions,
                             total: _payslip!.totalDeductions,
-                            color: AppColors.niceRed,
+                            color: context.readable(AppColors.niceRed),
                             initiallyExpanded: true,
                           ),
 
@@ -626,7 +626,7 @@ class _PayslipPageState extends State<PayslipPage> {
                             _buildSimpleExpandable(
                               title: 'payslip_benefits'.tr,
                               items: _payslip!.benefits,
-                              color: Colors.blue.shade700,
+                              color: context.readable(Colors.blue.shade700),
                             ),
                           ],
                           if (_payslip!.reference.isNotEmpty) ...[
@@ -917,7 +917,7 @@ class _PayslipPageState extends State<PayslipPage> {
 
   Widget _buildPaidSection() {
     final items = _payslip!.paid;
-    const color = AppColors.mainColor;
+    final color = context.readable(AppColors.mainColor);
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -929,7 +929,7 @@ class _PayslipPageState extends State<PayslipPage> {
         title: Row(
           children: [
             Flexible(child: Text('payslip_paid'.tr,
-                style: const TextStyle(
+                style: TextStyle(
                     fontWeight: FontWeight.bold, fontSize: 15, color: color))),
             const SizedBox(width: 8),
             Container(
@@ -939,14 +939,14 @@ class _PayslipPageState extends State<PayslipPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text('${items.length}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 11, fontWeight: FontWeight.bold, color: color)),
             ),
           ],
         ),
         trailing: Text(
           '${_numberFormat.format(_payslip!.totalPaid)} ₸',
-          style: const TextStyle(
+          style: TextStyle(
               fontWeight: FontWeight.bold, fontSize: 13, color: color),
         ),
         children: [

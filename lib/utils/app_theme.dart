@@ -250,6 +250,16 @@ extension AppThemeColors on BuildContext {
   /// Фирменный зелёный, осветлённый в тёмной теме.
   Color get accentColor => _t.colorScheme.primary;
 
+  /// Цвет раздела, который можно прочесть на карточке.
+  ///
+  /// У разделов свои цвета — синий турникет, красное меню, фиолетовый отчёт.
+  /// Подобраны они под светлую тему, и на тёмной карточке фиолетовый давал
+  /// контраст 1,6, а красный и синий — 2,9 при нужных 4,5: подписи и иконки
+  /// почти сливались с фоном. В тёмной теме цвет осветляется, пока не станет
+  /// читаемым; оттенок остаётся тем же. В светлой — как есть.
+  Color readable(Color color) =>
+      isDark ? readableOn(color, cardSurface) : color;
+
   /// Тень под карточкой. В темноте тени не видно, поэтому там её и нет —
   /// вместо неё карточку отделяет собственный цвет поверхности.
   List<BoxShadow> get cardShadow => isDark
@@ -261,4 +271,26 @@ extension AppThemeColors on BuildContext {
             offset: const Offset(0, 2),
           ),
         ];
+}
+
+
+/// Контраст двух цветов по WCAG: от 1 (одинаковые) до 21 (чёрный на белом).
+double contrastRatio(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  final hi = la > lb ? la : lb;
+  final lo = la > lb ? lb : la;
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/// [color], осветлённый по HSL ровно настолько, чтобы на [background]
+/// читаться с контрастом не ниже [min]. Уже читаемый не меняется.
+Color readableOn(Color color, Color background, {double min = 4.5}) {
+  if (contrastRatio(color, background) >= min) return color;
+  final hsl = HSLColor.fromColor(color);
+  for (var l = hsl.lightness; l <= 1.0; l += 0.02) {
+    final candidate = hsl.withLightness(l > 1 ? 1 : l).toColor();
+    if (contrastRatio(candidate, background) >= min) return candidate;
+  }
+  return Colors.white;
 }
