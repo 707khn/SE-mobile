@@ -80,6 +80,11 @@ class SkeletonList extends StatelessWidget {
             vertical: Dimensions.height30 / 3,
           ),
       itemCount: rows,
+      // Высота — по строкам, а не «сколько дадут»: в меню заглушка стоит
+      // внутри прокрутки, где высоты не дают вовсе. Без этого вместо серых
+      // полосок было пусто, а в журнал ошибок «О программе» при каждом
+      // открытии меню ложилась ошибка раскладки.
+      shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemBuilder: (_, index) => Padding(
         padding: const EdgeInsets.only(bottom: 10),

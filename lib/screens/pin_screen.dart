@@ -131,19 +131,42 @@ class _PinScreenState extends State<PinScreen> {
               ),
           ],
         ),
+        // Когда места хватает — как раньше: подсказка посередине, цифры
+        // внизу. Когда нет (крупный шрифт на маленьком телефоне, да ещё
+        // пояснение «зачем код» сверху) — экран прокручивается, а не
+        // обрезает нижний ряд клавиатуры.
         body: SafeArea(
-          child: Column(
-            children: [
-              if (widget.mode == PinMode.create && _first == null) _why(),
-              Expanded(child: _prompt()),
-              _keypad(),
-              if (_unlocking)
-                TextButton(
-                  onPressed: _busy ? null : _forgot,
-                  child: Text('pin_forgot'.tr),
+          child: LayoutBuilder(
+            builder: (context, box) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: box.maxHeight),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (widget.mode == PinMode.create && _first == null)
+                      _why()
+                    else
+                      const SizedBox.shrink(),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          vertical: Dimensions.height30 / 2),
+                      child: _prompt(),
+                    ),
+                    Column(
+                      children: [
+                        _keypad(),
+                        if (_unlocking)
+                          TextButton(
+                            onPressed: _busy ? null : _forgot,
+                            child: Text('pin_forgot'.tr),
+                          ),
+                        SizedBox(height: Dimensions.height30 / 2),
+                      ],
+                    ),
+                  ],
                 ),
-              SizedBox(height: Dimensions.height30 / 2),
-            ],
+              ),
+            ),
           ),
         ),
       ),
