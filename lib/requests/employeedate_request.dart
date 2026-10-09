@@ -1,23 +1,24 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../utils/variables.dart';
 import '../utils/access_report.dart';
 import '../utils/api.dart';
 import '../utils/load_problem.dart';
 
-Future<AccessReport> getEmployeeDate(BuildContext context, startdate, enddate) async {
-  final prefs = await SharedPreferences.getInstance();
-  final emp_sname = prefs.getString('emp_sname');
-
+/// Проходы сотрудника [name] за дни с [startdate] по [enddate].
+///
+/// Имя передаётся явно. Прежде оно бралось из настроек — «последний
+/// выбранный», — и выгрузка отдела не могла запросить остальных.
+Future<AccessReport> getEmployeeDate(
+    BuildContext context, startdate, enddate, {required String name}) async {
   try {
     var response = await http
         .post(
           Uri.parse('${AppValues.baseUrl}/director_report'),
           headers: await authHeaders(),
-          body: jsonEncode({'emp_sname': emp_sname, 'start_date': startdate, 'end_date': enddate}),
+          body: jsonEncode({'emp_sname': name, 'start_date': startdate, 'end_date': enddate}),
         )
         .timeout(const Duration(seconds: 15));
     if (await handledUnauthorized(response)) return AccessReport.empty;

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:open_file/open_file.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/employeedate_request.dart';
 import 'package:se_mobile/requests/get_all_employees.dart';
@@ -17,6 +15,7 @@ import 'package:se_mobile/utils/secure_storage_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../functions/export_share.dart';
 import '../functions/generate_csv.dart';
 import '../requests/reportdate_request.dart';
 import '../utils/colors.dart';
@@ -49,8 +48,16 @@ class _MainPage2State extends State<MainPage2> {
   late DateTime endDate;
   bool _loadingReport = false;
   List<List<String>> reportsEntries = [["", "", "", ""]];
-  List<List<List<String>>> reportsEntriesForMsg = [];
   List<String> employees = [];
+
+  /// Чьи проходы и за какие дни сейчас на экране.
+  String? _shownName;
+  String? _shownKey;
+
+  /// Номер последнего запроса: ответ на прежний, пришедший позже, на экран
+  /// уже не попадает.
+  int _loadSeq = 0;
+  bool _exporting = false;
   static String _lang = "";
   String? _login;
   late SharedPreferences prefs;
@@ -98,6 +105,113 @@ class _MainPage2State extends State<MainPage2> {
         employees = savedEmployees;
       }
     });
+    // Список вернулся с прошлого раза — показываем последнего в нём, а не
+    // «выберите сотрудника» под уже выбранными.
+    _showLast();
+  }
+
+  String _day(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+
+  /// На экране — проходы последнего в списке за выбранные сейчас дни.
+  ///
+  /// Прежде показанное менялось только при добавлении человека. После смены
+  /// дат над проходами стояли новые дни, а сами проходы были за прежние;
+  /// после удаления из списка под фамилией одного показывались проходы
+  /// другого.
+  Future<void> _showLast() async {
+    if (!mounted) return;
+    if (employees.isEmpty) {
+      _loadSeq++;
+      setState(() {
+        _loadingReport = false;
+        _problem = null;
+        _shownName = null;
+        _shownKey = null;
+        reportsEntries = [["", "", "", ""]];
+      });
+      return;
+    }
+    if (startDate.isAfter(endDate)) return;
+    final name = employees.last;
+    final start = _day(startDate);
+    final end = _day(endDate);
+    final key = '$name|$start|$end';
+    if (key == _shownKey) {
+      // Вернулись к тому, что уже на экране, пока грузилось другое: то,
+      // другое, показывать уже незачем.
+      if (_loadingReport) {
+        _loadSeq++;
+        setState(() => _loadingReport = false);
+      }
+      return;
+    }
+    final seq = ++_loadSeq;
+    setState(() => _loadingReport = true);
+    final data = await getEmployeeDate(context, start, end, name: name);
+    if (!mounted || seq != _loadSeq) return;
+    setState(() {
+      _loadingReport = false;
+      _problem = data.problem;
+      reportsEntries = data.entries;
+      _shownName = name;
+      // Не загрузилось — повтор по кнопке должен спросить снова.
+      _shownKey = data.isFailure ? null : key;
+    });
+  }
+
+  /// Выгрузка отдела: проходы каждого в списке — заново, за выбранные дни.
+  ///
+  /// Раньше в файл шло то, что накопилось на экране: фамилии — из
+  /// сохранённого списка, проходы — из загруженных в этот раз. После
+  /// повторного входа на экран фамилии были прежние, а проходы в памяти —
+  /// только у добавленных заново, и проходы одного человека подписывались
+  /// фамилией другого. А добавленные до смены дат шли в файл за прежние
+  /// дни.
+  Future<void> _export(String value) async {
+    if (_exporting || employees.isEmpty) return;
+    if (startDate.isAfter(endDate)) {
+      showExportMessage(context, 'export_bad_period'.tr);
+      return;
+    }
+    setState(() => _exporting = true);
+    final names = List<String>.of(employees);
+    final start = _day(startDate);
+    final end = _day(endDate);
+    final reports = <List<List<String>>>[];
+    String? failed;
+    LoadProblem? problem;
+    // По четыре за раз: и не ждать каждого по очереди, и не обрушить на
+    // сервер весь отдел одним махом.
+    for (var i = 0; i < names.length && failed == null; i += 4) {
+      if (!mounted) return;
+      final part = names.skip(i).take(4).toList();
+      final answers = await Future.wait([
+        for (final name in part)
+          getEmployeeDate(context, start, end, name: name),
+      ]);
+      for (var j = 0; j < answers.length; j++) {
+        if (answers[j].isFailure) {
+          failed = part[j];
+          problem = answers[j].problem;
+          break;
+        }
+        reports.add(answers[j].entries);
+      }
+    }
+    if (!mounted) return;
+    setState(() => _exporting = false);
+    // Файл без чьих-то проходов выглядел бы так, будто их нет: лучше
+    // никакого.
+    if (failed != null) {
+      showExportMessage(context,
+          '${'export_load_failed'.tr} $failed. ${problemMessage(problem)}');
+      return;
+    }
+    if (value == 'send report exc') {
+      await generateExcelEmp(names, reports, context);
+    } else if (value == 'send report csv') {
+      await generateTableEmp(names, reports, context);
+    }
   }
 
   bool get _hasData =>
@@ -113,24 +227,7 @@ class _MainPage2State extends State<MainPage2> {
       reportsEntries[0][0] == 'no';
 
   /// Повтор по кнопке на экране ошибки: тот же сотрудник, те же даты.
-  Future<void> _retryEmployeeReport() async {
-    setState(() => _loadingReport = true);
-    final data = await getEmployeeDate(
-      context,
-      DateFormat('yyyy-MM-dd').format(startDate),
-      DateFormat('yyyy-MM-dd').format(endDate),
-    );
-    if (!mounted) return;
-    setState(() {
-      _loadingReport = false;
-      _problem = data.problem;
-      reportsEntries = data.entries;
-      // Строка выгрузки этого сотрудника — последняя: заменяем неудачную.
-      if (reportsEntriesForMsg.isNotEmpty) {
-        reportsEntriesForMsg[reportsEntriesForMsg.length - 1] = data.entries;
-      }
-    });
-  }
+  Future<void> _retryEmployeeReport() => _showLast();
 
   @override
   Widget build(BuildContext context) {
@@ -159,19 +256,20 @@ class _MainPage2State extends State<MainPage2> {
         centerTitle: true,
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.share),
+            icon: _exporting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.share),
+            enabled: employees.isNotEmpty && !_exporting,
             tooltip: 'send_report_tooltip'.tr,
             itemBuilder: (_) => [
               PopupMenuItem(value: 'send report exc', child: Text('send report exc'.tr)),
               PopupMenuItem(value: 'send report csv', child: Text('send report csv'.tr)),
             ],
-            onSelected: (value) {
-              if (value == 'send report exc') {
-                generateExcelEmp(reportsEntriesForMsg, context);
-              } else if (value == 'send report csv') {
-                generateTableEmp(reportsEntriesForMsg, context);
-              }
-            },
+            onSelected: _export,
           ),
         ],
       ),
@@ -189,37 +287,15 @@ class _MainPage2State extends State<MainPage2> {
                 alignment: WrapAlignment.center,
                 children: [
                   TextButton.icon(
-                    onPressed: () async {
-                      final directory = await getExternalStorageDirectories();
-                      if (directory == null || directory.isEmpty) return;
-                      try {
-                        OpenFile.open("${directory[0].path}/saved_report.xlsx");
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('url_error'.tr)),
-                          );
-                        }
-                      }
-                    },
+                    onPressed: () =>
+                        openLatestExport(context, 'report', 'xlsx'),
                     icon: const Icon(Icons.table_chart_outlined, size: 16),
                     label: SmallText(content: "see last Excel".tr),
                   ),
                   const SizedBox(width: 8),
                   TextButton.icon(
-                    onPressed: () async {
-                      final directory = await getExternalStorageDirectories();
-                      if (directory == null || directory.isEmpty) return;
-                      try {
-                        OpenFile.open("${directory[0].path}/saved_report.csv");
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('url_error'.tr)),
-                          );
-                        }
-                      }
-                    },
+                    onPressed: () =>
+                        openLatestExport(context, 'report', 'csv'),
                     icon: const Icon(Icons.description_outlined, size: 16),
                     label: SmallText(content: "see last CSV".tr),
                   ),
@@ -245,6 +321,7 @@ class _MainPage2State extends State<MainPage2> {
                             startDate = selected;
                             _dateError = false;
                           });
+                          _showLast();
                         }
                       },
                       child: Container(
@@ -309,6 +386,7 @@ class _MainPage2State extends State<MainPage2> {
                             endDate = selected;
                             _dateError = false;
                           });
+                          _showLast();
                         }
                       },
                       child: Container(
@@ -347,16 +425,19 @@ class _MainPage2State extends State<MainPage2> {
                     _buildPresetChip('today'.tr, () {
                       final now = DateTime.now();
                       setState(() { startDate = now; endDate = now; _dateError = false; });
+                      _showLast();
                     }),
                     const SizedBox(width: 6),
                     _buildPresetChip('last_7_days'.tr, () {
                       final now = DateTime.now();
                       setState(() { startDate = now.subtract(const Duration(days: 6)); endDate = now; _dateError = false; });
+                      _showLast();
                     }),
                     const SizedBox(width: 6),
                     _buildPresetChip('this_month'.tr, () {
                       final now = DateTime.now();
                       setState(() { startDate = DateTime(now.year, now.month, 1); endDate = now; _dateError = false; });
+                      _showLast();
                     }),
                     const SizedBox(width: 6),
                     _buildPresetChip('last_month'.tr, () {
@@ -364,47 +445,59 @@ class _MainPage2State extends State<MainPage2> {
                       final first = DateTime(now.year, now.month - 1, 1);
                       final last = DateTime(now.year, now.month, 0);
                       setState(() { startDate = first; endDate = last; _dateError = false; });
+                      _showLast();
                     }),
                   ],
                 ),
               ),
               const SizedBox(height: 12.0),
-              Row(
+              // Заголовок, число выбранных и «Очистить всё» в строку не
+              // помещались и на обычном телефоне: кнопка уходила за край.
+              // Не помещаются — кнопка встаёт под заголовком.
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  BigText(content: "choose employee".tr, fontWeight: FontWeight.bold),
-                  if (employees.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.mainColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: BigText(
+                            content: "choose employee".tr,
+                            fontWeight: FontWeight.bold,
+                            textAlign: TextAlign.start),
                       ),
-                      child: Text(
-                        '${employees.length}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: context.accentColor,
+                      if (employees.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.mainColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${employees.length}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: context.accentColor,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const Spacer(),
+                      ],
+                    ],
+                  ),
+                  if (employees.isNotEmpty)
                     TextButton.icon(
                       onPressed: () {
-                        setState(() {
-                          employees.clear();
-                          reportsEntriesForMsg.clear();
-                          reportsEntries = [["", "", "", ""]];
-                        });
+                        employees.clear();
                         prefs.setStringList("emp_snames", []);
-                        prefs.setString("emp_sname", "");
+                        _showLast();
                       },
                       icon: const Icon(Icons.clear_all, size: 16),
                       label: Text('clear_all'.tr, style: const TextStyle(fontSize: 12)),
                       style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
                     ),
-                  ],
                 ],
               ),
               const SizedBox(height: 8.0),
@@ -490,29 +583,21 @@ class _MainPage2State extends State<MainPage2> {
                                             startDate = endDate;
                                             endDate = tmp;
                                           }
+                                          // Дважды один и тот же — это два
+                                          // одинаковых листа в выгрузке:
+                                          // переносим его в конец списка.
+                                          employees.remove(employee);
                                           employees.add(employee);
                                           prefs.setStringList("emp_snames", employees);
-                                          prefs.setString("emp_sname", employee);
-                                          setState(() => _loadingReport = true);
-                                          final data = await getEmployeeDate(
-                                            context,
-                                            DateFormat('yyyy-MM-dd').format(startDate),
-                                            DateFormat('yyyy-MM-dd').format(endDate),
-                                          );
-                                          reportsEntries = data.entries;
-                                          _problem = data.problem;
-                                          reportsEntriesForMsg.add(data.entries);
-                                          if (mounted) {
-                                            setState(() {
-                                              _loadingReport = false;
-                                              searchText = '';
-                                              filteredEmployees = [];
-                                              _filterText = '';
-                                            });
-                                            _filterController.clear();
-                                          }
+                                          setState(() {
+                                            searchText = '';
+                                            filteredEmployees = [];
+                                            _filterText = '';
+                                          });
+                                          _filterController.clear();
                                           employeeController.clear();
                                           Navigator.pop(context);
+                                          _showLast();
                                         },
                                       );
                                     }).toList(),
@@ -564,25 +649,9 @@ class _MainPage2State extends State<MainPage2> {
                       ),
                       onDismissed: (_) {
                         final removedName = employees[index];
-                        final removedData = index < reportsEntriesForMsg.length
-                            ? reportsEntriesForMsg[index]
-                            : null;
-                        setState(() {
-                          employees.removeAt(index);
-                          if (index < reportsEntriesForMsg.length) {
-                            reportsEntriesForMsg.removeAt(index);
-                          }
-                          prefs.setStringList("emp_snames", employees);
-                          if (employees.isNotEmpty) {
-                            prefs.setString("emp_sname", employees.last);
-                            if (reportsEntriesForMsg.isNotEmpty) {
-                              reportsEntries = reportsEntriesForMsg.last;
-                            }
-                          } else {
-                            prefs.setString("emp_sname", "");
-                            reportsEntries = [["", "", "", ""]];
-                          }
-                        });
+                        setState(() => employees.removeAt(index));
+                        prefs.setStringList("emp_snames", employees);
+                        _showLast();
                         ScaffoldMessenger.of(context).clearSnackBars();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -592,17 +661,13 @@ class _MainPage2State extends State<MainPage2> {
                             action: SnackBarAction(
                               label: 'undo'.tr,
                               onPressed: () {
-                                setState(() {
-                                  employees.insert(index, removedName);
-                                  if (removedData != null) {
-                                    reportsEntriesForMsg.insert(index, removedData);
-                                  }
-                                  prefs.setStringList("emp_snames", employees);
-                                  prefs.setString("emp_sname", employees.last);
-                                  if (reportsEntriesForMsg.isNotEmpty) {
-                                    reportsEntries = reportsEntriesForMsg.last;
-                                  }
-                                });
+                                if (!mounted || employees.contains(removedName)) {
+                                  return;
+                                }
+                                setState(() => employees.insert(
+                                    index.clamp(0, employees.length), removedName));
+                                prefs.setStringList("emp_snames", employees);
+                                _showLast();
                               },
                             ),
                           ),
@@ -679,7 +744,7 @@ class _MainPage2State extends State<MainPage2> {
                         Icon(Icons.person_outline, size: 16, color: context.accentColor),
                         const SizedBox(width: 6),
                         Text(
-                          '${'viewing_employee'.tr} ${employees.last}',
+                          '${'viewing_employee'.tr} ${_shownName ?? employees.last}',
                           style: TextStyle(
                             fontSize: 13,
                             color: context.accentColor,

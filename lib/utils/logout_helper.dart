@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../functions/export_file.dart';
 import '../screens/start_screen.dart';
 import '../services/fcm_service.dart';
 import '../variables.dart';
@@ -48,6 +49,11 @@ Future<void> forceLogout({String? message}) async {
   await SecureStorageHelper.instance.clearCredentials();
   final prefs = await SharedPreferences.getInstance();
   await prefs.clear();
+  try {
+    await clearExports(await exportDirectory());
+  } catch (_) {
+    // Папки нет или она недоступна — стирать нечего.
+  }
   reportsEntries = [["", "", "", ""]];
   // The login form's controllers are static, so whatever the previous user
   // typed would still be sitting in the fields on the way back out.

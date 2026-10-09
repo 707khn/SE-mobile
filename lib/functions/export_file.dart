@@ -1,19 +1,116 @@
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
+
 /// Как называется выгруженный файл.
 ///
 /// Раньше и отчёт по себе, и отчёт по отделу сохранялись под одним именем —
 /// `saved_report.xlsx`. Вторая выгрузка затирала первую, а сравнивают их как
 /// раз между собой: «посмотри, что было в июле и что в августе».
-String exportFileName(String? who, String stampedExtension) {
+String exportFileName(String? who, String stampedExtension, {DateTime? at}) {
   final safe = fileSafe(who);
-  return '${safe}_${exportStamp()}.$stampedExtension';
+  return '${safe}_${exportStamp(at: at)}.$stampedExtension';
 }
 
-/// Отметка времени для имени файла.
-String exportStamp() {
-  final now = DateTime.now();
+/// Отметка времени для имени файла — с секундами.
+///
+/// До минуты было мало: начальник выгружает июль, меняет даты и тут же
+/// выгружает август — в ту же минуту, под тем же именем, и август молча
+/// затирал июль.
+String exportStamp({DateTime? at}) {
+  final now = at ?? DateTime.now();
   String two(int v) => v.toString().padLeft(2, '0');
   return '${now.year}-${two(now.month)}-${two(now.day)}_'
-      '${two(now.hour)}${two(now.minute)}';
+      '${two(now.hour)}${two(now.minute)}${two(now.second)}';
+}
+
+/// Сколько выгрузок одного вида держать на телефоне.
+///
+/// Каждая выгрузка ложится отдельным файлом — их сравнивают между собой, —
+/// но прежде они не убирались никогда: у начальника, который выгружает отдел
+/// каждую неделю, за год копилась сотня файлов с чужими проходами.
+const int keepExports = 10;
+
+/// Где лежат выгрузки.
+///
+/// На Android — папка приложения в памяти телефона, как и прежде: там уже
+/// лежат сделанные выгрузки. На iPhone такой папки нет, и прежний вызов
+/// бросал исключение — там это документы приложения.
+Future<Directory> exportDirectory() async {
+  if (Platform.isAndroid) {
+    final dirs = await getExternalStorageDirectories();
+    if (dirs != null && dirs.isNotEmpty) return dirs.first;
+  }
+  return getApplicationDocumentsDirectory();
+}
+
+/// Записывает выгрузку в [dir] и убирает лишние старые того же вида.
+///
+/// Вид — это чья выгрузка ([who]) и в каком формате ([extension]): свой отчёт
+/// и отчёт по отделу, Excel и CSV считаются порознь.
+Future<File> saveExport(
+    Directory dir, String? who, String extension, List<int> bytes,
+    {DateTime? at}) async {
+  await dir.create(recursive: true);
+  final file =
+      File('${dir.path}/${exportFileName(who, extension, at: at)}');
+  await file.writeAsBytes(bytes, flush: true);
+  for (final old in _exports(dir, who, extension).skip(keepExports)) {
+    try {
+      await old.delete();
+    } catch (_) {
+      // Не удалилось сейчас — удалится при следующей выгрузке.
+    }
+  }
+  return file;
+}
+
+/// Последняя выгрузка этого вида; `null`, если выгрузок не было.
+///
+/// Кнопки «Просмотреть последний файл» открывали `saved_report.xlsx` — так
+/// файл назывался, пока в имени не появились человек и дата. После этого
+/// файла с таким именем не стало, и кнопки молча не делали ничего.
+File? latestExport(Directory dir, String? who, String extension) {
+  final all = _exports(dir, who, extension);
+  return all.isEmpty ? null : all.first;
+}
+
+/// Стирает все выгрузки — при выходе.
+///
+/// Выход и так стирает с телефона всё, что принадлежало вошедшему. Файлы с
+/// проходами — тоже его, а у начальника в них ещё и проходы всего отдела:
+/// телефон, отданный другому, не должен их хранить.
+Future<void> clearExports(Directory dir) async {
+  if (!await dir.exists()) return;
+  final ours = RegExp(r'(_\d{4}-\d{2}-\d{2}_\d{4}(\d{2})?|^saved_report)'
+      r'\.(xlsx|csv)$');
+  await for (final entity in dir.list()) {
+    if (entity is File && ours.hasMatch(entity.path.split('/').last)) {
+      try {
+        await entity.delete();
+      } catch (_) {
+        // Не удалилось — значит, не удалилось: выход важнее.
+      }
+    }
+  }
+}
+
+/// Выгрузки этого вида в [dir], новые первыми.
+List<File> _exports(Directory dir, String? who, String extension) {
+  if (!dir.existsSync()) return const <File>[];
+  final pattern = RegExp('^${RegExp.escape(fileSafe(who))}_'
+      '(\\d{4}-\\d{2}-\\d{2}_\\d{4}(?:\\d{2})?)\\.'
+      '${RegExp.escape(extension)}\$');
+  final found = <(String, File)>[];
+  for (final entity in dir.listSync()) {
+    if (entity is! File) continue;
+    final match = pattern.firstMatch(entity.path.split('/').last);
+    // Отметки прежних выгрузок — без секунд: дополняем нулями, чтобы
+    // сравнивать их с новыми знак в знак.
+    if (match != null) found.add((match.group(1)!.padRight(17, '0'), entity));
+  }
+  found.sort((a, b) => b.$1.compareTo(a.$1));
+  return [for (final (_, file) in found) file];
 }
 
 /// Имя, пригодное для файловой системы.

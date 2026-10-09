@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:open_file/open_file.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/report_request.dart';
 import 'package:se_mobile/requests/reportdate_request.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../functions/export_share.dart';
 import '../functions/generate_csv.dart';
 import '../utils/access_report.dart';
 import '../utils/search_fold.dart';
@@ -117,8 +116,11 @@ class _MainPage1State extends State<MainPage1> {
                 PopupMenuItem(value: 'send report csv', child: Text('send report csv'.tr)),
               ],
               onSelected: (value) {
-                if (value == 'send report exc') generateExcel(reportsEntries, context);
-                else if (value == 'send report csv') generateTable(reportsEntries, context);
+                if (value == 'send report exc') {
+                  generateExcel(widget.fullName, reportsEntries, context);
+                } else if (value == 'send report csv') {
+                  generateTable(widget.fullName, reportsEntries, context);
+                }
               },
             ),
           ),
@@ -132,6 +134,7 @@ class _MainPage1State extends State<MainPage1> {
       body: MainMenu1(
           recordCount: _recordCount,
           dateRange: _dateRange,
+          fullName: widget.fullName,
           employeeId: widget.employeeId),
     );
   }
@@ -143,9 +146,12 @@ class MainMenu1 extends StatefulWidget {
       {Key? key,
       required this.recordCount,
       required this.dateRange,
+      this.fullName,
       this.employeeId})
       : super(key: key);
 
+  /// Чьи это проходы — по нему ищется последняя выгрузка.
+  final String? fullName;
   final String? employeeId;
   final ValueNotifier<int> recordCount;
   final ValueNotifier<String> dateRange;
@@ -336,37 +342,15 @@ class _MainMenu1State extends State<MainMenu1> {
               alignment: WrapAlignment.center,
               children: [
                 TextButton.icon(
-                  onPressed: () async {
-                    final directory = await getExternalStorageDirectories();
-                    if (directory == null || directory.isEmpty) return;
-                    try {
-                      OpenFile.open("${directory[0].path}/saved_report.xlsx");
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('url_error'.tr)),
-                        );
-                      }
-                    }
-                  },
+                  onPressed: () =>
+                      openLatestExport(context, widget.fullName, 'xlsx'),
                   icon: const Icon(Icons.table_chart_outlined, size: 16),
                   label: SmallText(content: "see last Excel".tr),
                 ),
                 const SizedBox(width: 8),
                 TextButton.icon(
-                  onPressed: () async {
-                    final directory = await getExternalStorageDirectories();
-                    if (directory == null || directory.isEmpty) return;
-                    try {
-                      OpenFile.open("${directory[0].path}/saved_report.csv");
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('url_error'.tr)),
-                        );
-                      }
-                    }
-                  },
+                  onPressed: () =>
+                      openLatestExport(context, widget.fullName, 'csv'),
                   icon: const Icon(Icons.description_outlined, size: 16),
                   label: SmallText(content: "see last CSV".tr),
                 ),
