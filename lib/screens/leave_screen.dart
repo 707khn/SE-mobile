@@ -271,8 +271,12 @@ class _LeavePageState extends State<LeavePage> {
                 }),
                 Row(
                   children: [
-                    BigText(content: 'leave_balances'.tr, fontWeight: FontWeight.bold),
-                    const Spacer(),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: BigText(content: 'leave_balances'.tr, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                     if (_leaveData!.balances.isNotEmpty) ...[
                       _buildTotalChip(
                         _leaveData!.balances.fold(0, (s, b) => s + b.usedDays),
@@ -299,7 +303,7 @@ class _LeavePageState extends State<LeavePage> {
                 SizedBox(height: Dimensions.height30 / 2),
                 Row(
                   children: [
-                    BigText(content: 'leave_history'.tr, fontWeight: FontWeight.bold),
+                    Flexible(child: BigText(content: 'leave_history'.tr, fontWeight: FontWeight.bold)),
                     if (_leaveData!.history.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       Container(
@@ -473,25 +477,27 @@ class _LeavePageState extends State<LeavePage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('${'used_days'.tr}: ${balance.usedDays}',
-                    style: const TextStyle(fontSize: 13, color: Colors.black54)),
-                Text(
+                Flexible(child: Text('${'used_days'.tr}: ${balance.usedDays}',
+                    style: TextStyle(fontSize: 13, color: context.mutedColor))),
+                Flexible(child: Text(
                   '${'remaining_days'.tr}: ${balance.remainingDays}',
+                  textAlign: TextAlign.end,
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color),
-                ),
+                )),
               ],
             ),
             SizedBox(height: Dimensions.height30 / 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('${'total_days'.tr}: ${balance.totalDays}',
-                    style: const TextStyle(fontSize: 12, color: Colors.black38)),
+                Flexible(child: Text('${'total_days'.tr}: ${balance.totalDays}',
+                    style: TextStyle(fontSize: 12, color: context.mutedColor))),
                 if (balance.totalDays > 0)
-                  Text(
+                  Flexible(child: Text(
                     '${(progress * 100).toStringAsFixed(0)}% ${'used_days'.tr.toLowerCase()}',
+                    textAlign: TextAlign.end,
                     style: TextStyle(fontSize: 11, color: color.withOpacity(0.6)),
-                  ),
+                  )),
               ],
             ),
           ],
@@ -536,7 +542,11 @@ class _LeavePageState extends State<LeavePage> {
           '${_fmtDate(record.startDate)} — ${_fmtDate(record.endDate)}  (${record.days} ${'days_short'.tr})',
           style: const TextStyle(fontSize: 13),
         ),
+        // Ширина значка ограничена: длинный статус из 1С («Утверждён и
+        // оплачен») занимал всю строку, и ListTile вместо записи об отпуске
+        // не рисовал ничего.
         trailing: Container(
+          constraints: const BoxConstraints(maxWidth: 120),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: statusBg,
@@ -551,9 +561,13 @@ class _LeavePageState extends State<LeavePage> {
                 color: statusColor,
               ),
               const SizedBox(width: 3),
-              Text(
-                record.status,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+              Flexible(
+                child: Text(
+                  record.status,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+                ),
               ),
             ],
           ),

@@ -182,8 +182,11 @@ class _MainPage2State extends State<MainPage2> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              // Две кнопки в строку не помещались даже на обычном телефоне:
+              // «Просмотреть последний файл Excel» и «…CSV» шире 360 точек, и
+              // вторая уходила за край. Не помещаются — встают одна под другой.
+              Wrap(
+                alignment: WrapAlignment.center,
                 children: [
                   TextButton.icon(
                     onPressed: () async {
@@ -258,13 +261,13 @@ class _MainPage2State extends State<MainPage2> {
                             Icon(Icons.calendar_today, size: 16,
                                 color: _dateError ? Colors.red.shade700 : context.mutedColor),
                             const SizedBox(width: 6),
-                            Text(
+                            Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(
                               '${startDate.day.toString().padLeft(2, '0')}.${startDate.month.toString().padLeft(2, '0')}.${startDate.year}',
                               style: TextStyle(
                                 fontSize: 15.0,
                                 color: _dateError ? Colors.red.shade700 : null,
                               ),
-                            ),
+                            ))),
                           ],
                         ),
                       ),
@@ -322,13 +325,13 @@ class _MainPage2State extends State<MainPage2> {
                             Icon(Icons.calendar_today, size: 16,
                                 color: _dateError ? Colors.red.shade700 : context.mutedColor),
                             const SizedBox(width: 6),
-                            Text(
+                            Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(
                               '${endDate.day.toString().padLeft(2, '0')}.${endDate.month.toString().padLeft(2, '0')}.${endDate.year}',
                               style: TextStyle(
                                 fontSize: 15.0,
                                 color: _dateError ? Colors.red.shade700 : null,
                               ),
-                            ),
+                            ))),
                           ],
                         ),
                       ),
