@@ -11,12 +11,20 @@ import 'dart:io';
 ///     await HttpOverrides.runWithHttpOverrides(
 ///         () => fetchSomething(), FakeServer(200, '<html>…'));
 class FakeServer extends HttpOverrides {
-  FakeServer(this.status, this.body,
-      {this.contentType = 'text/html; charset=utf-8'});
+  FakeServer(int status, String body,
+      {this.contentType = 'text/html; charset=utf-8'})
+      : answer = ((_, __, ___) => (status, body));
 
-  final int status;
-  final String body;
+  /// Сервер, который отвечает по запросу: метод, адрес и тело запроса —
+  /// код и тело ответа. Нужен, когда ответ зависит от того, о ком спросили.
+  FakeServer.routed(this.answer,
+      {this.contentType = 'application/json; charset=utf-8'});
+
+  final (int, String) Function(String method, Uri url, String body) answer;
   final String contentType;
+
+  /// Тела запросов — по порядку.
+  final List<String> requests = [];
 
   @override
   HttpClient createHttpClient(SecurityContext? context) => _Client(this);
@@ -28,36 +36,50 @@ class _Client implements HttpClient {
 
   @override
   Future<HttpClientRequest> openUrl(String method, Uri url) async =>
-      _Request(server);
+      _Request(server, method, url);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
 class _Request implements HttpClientRequest {
-  _Request(this.server);
+  _Request(this.server, this.method, this.uri);
   final FakeServer server;
+
+  @override
+  final String method;
+
+  @override
+  final Uri uri;
+
+  final List<int> _sent = [];
 
   @override
   final HttpHeaders headers = _Headers({});
 
   @override
-  Future<void> addStream(Stream<List<int>> stream) => stream.drain<void>();
+  Future<void> addStream(Stream<List<int>> stream) =>
+      stream.forEach(_sent.addAll);
 
   @override
-  Future<HttpClientResponse> close() async => _Response(server);
+  Future<HttpClientResponse> close() async {
+    final body = utf8.decode(_sent, allowMalformed: true);
+    server.requests.add(body);
+    final (status, answer) = server.answer(method, uri, body);
+    return _Response(status, answer, server.contentType);
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
 class _Response extends StreamView<List<int>> implements HttpClientResponse {
-  _Response(this.server)
-      : super(Stream<List<int>>.value(utf8.encode(server.body)));
-  final FakeServer server;
+  _Response(this.statusCode, String body, this.contentType)
+      : super(Stream<List<int>>.value(utf8.encode(body)));
+  final String contentType;
 
   @override
-  int get statusCode => server.status;
+  final int statusCode;
 
   @override
   int get contentLength => -1;
@@ -73,7 +95,7 @@ class _Response extends StreamView<List<int>> implements HttpClientResponse {
 
   @override
   HttpHeaders get headers => _Headers({
-        'content-type': [server.contentType],
+        'content-type': [contentType],
       });
 
   @override

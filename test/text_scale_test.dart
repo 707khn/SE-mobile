@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
@@ -20,30 +19,7 @@ import 'package:se_mobile/utils/lang.dart';
 import 'package:se_mobile/utils/localization.dart';
 
 import 'support/fake_server.dart';
-
-/// Крупный шрифт на маленьком телефоне.
-///
-/// На складе и в столовой шрифт в телефоне часто увеличивают; приложение
-/// пускает его до 1,3 (см. main.dart). На 320×568 при этом клавиатура кода
-/// наезжала на кружки и уходила за край, строка выбора месяца в листке не
-/// помещалась, а заглушка загрузки меню не рисовалась вовсе и писала ошибку
-/// в журнал «О программе» при каждом открытии.
-///
-/// Шрифт — настоящий Roboto из Flutter, которым запущены проверки: тестовый
-/// по умолчанию рисует каждую букву квадратом, и ширина текста выходит
-/// ложной.
-Future<void> _realFonts() async {
-  final root = Platform.environment['FLUTTER_ROOT'] ?? '';
-  final dir = '$root/bin/cache/artifacts/material_fonts';
-  final roboto = FontLoader('Roboto');
-  for (final name in ['Roboto-Regular.ttf', 'Roboto-Medium.ttf', 'Roboto-Bold.ttf']) {
-    final file = File('$dir/$name');
-    if (file.existsSync()) {
-      roboto.addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
-    }
-  }
-  await roboto.load();
-}
+import 'support/real_fonts.dart';
 
 /// Один ответ на все запросы, с полями для каждого экрана — длинные ФИО,
 /// должности и названия, крупные суммы.
@@ -80,8 +56,15 @@ final _body = {
   'coverage': {'employee_has_any': true, 'employee_until': '2026-10-09', 'loaded_until': '2026-10-09'},
 };
 
+/// Крупный шрифт на маленьком телефоне.
+///
+/// На складе и в столовой шрифт в телефоне часто увеличивают; приложение
+/// пускает его до 1,3 (см. main.dart). На 320×568 при этом клавиатура кода
+/// наезжала на кружки и уходила за край, строка выбора месяца в листке не
+/// помещалась, а заглушка загрузки меню не рисовалась вовсе и писала ошибку
+/// в журнал «О программе» при каждом открытии.
 void main() {
-  setUpAll(_realFonts);
+  setUpAll(realFonts);
 
   final screens = <String, Widget Function()>{
     'создание кода': () => const PinScreen(mode: PinMode.create),
