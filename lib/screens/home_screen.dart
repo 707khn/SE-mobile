@@ -485,6 +485,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required VoidCallback onTap,
     String? live,
   }) {
+    final tone = context.readable(color);
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -503,10 +504,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Container(
                 padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: tone.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: color, size: 26),
+                child: Icon(icon, color: tone, size: 26),
               ),
               const SizedBox(height: 8),
               // Flexible — страховка на случай, если расчёт высоты где-то
@@ -531,7 +532,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   style: live == null
                       ? TextStyle(fontSize: 11, color: context.mutedColor)
                       : TextStyle(
-                          fontSize: 11, color: color, fontWeight: FontWeight.w600),
+                          fontSize: 11, color: tone, fontWeight: FontWeight.w600),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
