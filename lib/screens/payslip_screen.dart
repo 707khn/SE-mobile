@@ -714,16 +714,29 @@ class _PayslipPageState extends State<PayslipPage> {
               ),
             ),
             const SizedBox(height: 6),
+            // Две суммы в строку: с крупным шрифтом на узком телефоне они
+            // не помещались — ужимаются, а не уходят за край.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '▲ ${_numberFormat.format(ps.totalAccruals)} ₸',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '▲ ${_numberFormat.format(ps.totalAccruals)} ₸',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
                 ),
-                Text(
-                  '▼ ${_numberFormat.format(ps.totalDeductions)} ₸',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '▼ ${_numberFormat.format(ps.totalDeductions)} ₸',
+                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -756,9 +769,9 @@ class _PayslipPageState extends State<PayslipPage> {
             horizontal: Dimensions.width20, vertical: 4),
         title: Row(
           children: [
-            Text(title,
+            Flexible(child: Text(title,
                 style: TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+                    fontWeight: FontWeight.bold, fontSize: 15, color: color))),
             const SizedBox(width: 8),
             if (items.isNotEmpty)
               Container(
@@ -915,9 +928,9 @@ class _PayslipPageState extends State<PayslipPage> {
             EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
         title: Row(
           children: [
-            const Text('Выплачено',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+            Flexible(child: Text('payslip_paid'.tr,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15, color: color))),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),

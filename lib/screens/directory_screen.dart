@@ -289,8 +289,14 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
           children: [
             Icon(icon, size: 15, color: context.accentColor),
             const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(fontSize: 13, color: context.accentColor)),
+            // Длинная почта или два номера через запятую шире экрана —
+            // обрезаем на виду; по нажатию всё равно уходит полный адрес.
+            Flexible(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: context.accentColor)),
+            ),
           ],
         ),
       ),
