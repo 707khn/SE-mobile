@@ -205,29 +205,33 @@ class AdminEmployeeScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: context.cardShadow,
       ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(9),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            shape: BoxShape.circle,
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          leading: Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 22),
           ),
-          child: Icon(icon, color: color, size: 22),
-        ),
-        title: Text(label,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        subtitle: Text(
-          empty ? 'no_data'.tr : '${'records_count'.tr}: $count',
-          style: TextStyle(
-            fontSize: 12,
-            color: empty ? context.mutedColor.withOpacity(0.7) : context.mutedColor,
+          title: Text(label,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          subtitle: Text(
+            empty ? 'no_data'.tr : '${'records_count'.tr}: $count',
+            style: TextStyle(
+              fontSize: 12,
+              color: empty ? context.mutedColor.withOpacity(0.7) : context.mutedColor,
+            ),
           ),
+          trailing: const Icon(Icons.chevron_right, size: 20),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
         ),
-        trailing: const Icon(Icons.chevron_right, size: 20),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
       ),
     );
   }
