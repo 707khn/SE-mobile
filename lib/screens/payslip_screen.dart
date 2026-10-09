@@ -464,7 +464,14 @@ class _PayslipPageState extends State<PayslipPage> {
                         ),
                         onPressed: (_loading || !_hasNextMonth) ? null : _goToNextMonth,
                       ),
+                      // Отступы у кнопки — поуже обычных: на телефоне шириной
+                      // 320 точек с крупным шрифтом строка не помещалась, и
+                      // место отнималось у названия месяца.
                       TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: const Size(0, 40),
+                        ),
                         onPressed: _loading ? null : _pickMonth,
                         child: Text('choose period'.tr, style: const TextStyle(fontSize: 12)),
                       ),
