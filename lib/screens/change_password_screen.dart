@@ -9,6 +9,7 @@ import '../utils/logout_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import 'pin_screen.dart';
 import '../utils/app_theme.dart';
+import '../utils/login_lock.dart';
 import '../widgets/load_error_view.dart';
 
 /// Экран «придумайте пароль».
@@ -75,7 +76,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       _error = null;
     });
 
-    final (result, problem) = await changePassword(
+    final (result, problem, retryAfter) = await changePassword(
       oldPassword: _oldController.text.trim(),
       newPassword: fresh,
     );
@@ -109,6 +110,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         break;
       case PasswordChangeResult.tooSimple:
         setState(() => _error = 'password_too_simple'.tr);
+        break;
+      case PasswordChangeResult.locked:
+        final minutes = lockMinutes(retryAfter);
+        setState(() => _error = minutes == null
+            ? 'login_locked_soon'.tr
+            : 'login_locked_wait'.trParams({'minutes': '$minutes'}));
         break;
       case PasswordChangeResult.noAccount:
       case PasswordChangeResult.networkError:

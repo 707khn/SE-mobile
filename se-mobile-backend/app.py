@@ -1922,7 +1922,23 @@ def register_routes(app):
             employee_id=viewer.employee_id, is_active=True).first()
         if account is None:
             return jsonify({'message': 'Failure', 'error': 'no_account'}), 404
+        # Тот же замок, что на входе, и тот же счётчик. Без него старый
+        # пароль здесь можно было перебирать сколько угодно: хватало чужого
+        # телефона, оставленного открытым, — а подобрав пароль, сменить его
+        # и забрать учётную запись насовсем.
+        now = datetime.utcnow()
+        if account.locked_until is not None and account.locked_until > now:
+            return jsonify({'message': 'Failure', 'error': 'locked',
+                            'retry_after': max(1, int(
+                                (account.locked_until - now).total_seconds()))}), 429
         if not check_password_hash(account.password_hash, old_password):
+            account.failed_attempts = (account.failed_attempts or 0) + 1
+            delay = _lock_delay(account.failed_attempts)
+            if delay is not None:
+                account.locked_until = now + delay
+                logging.warning('Смена пароля %r закрыта на %s после %d неудач',
+                                account.login, delay, account.failed_attempts)
+            db.session.commit()
             return jsonify({'message': 'Failure', 'error': 'wrong_password'}), 403
 
         problem = _password_problem(new_password, account.login)
