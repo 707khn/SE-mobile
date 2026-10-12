@@ -40,10 +40,19 @@
             <data android:mimeType="*/*" />
         </intent>
     </queries>
+   <!-- Резервная копия выключена. В данных приложения лежат сохранённые
+        листки и проходы, а копия уходила бы в облако Google. Кроме того,
+        пропуск и код хранятся ключом из Keystore, а ключ в копию не
+        попадает: на новом телефоне восстановленное хранилище не
+        расшифровывается, и приложение падает при запуске, а не просит
+        войти. allowBackup — до Android 12, dataExtractionRules — после. -->
    <application
         android:label="SE Mobile"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"
