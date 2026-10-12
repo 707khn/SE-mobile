@@ -5,28 +5,15 @@ import 'package:intl/intl.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/employeedate_request.dart';
 import 'package:se_mobile/requests/get_all_employees.dart';
-import 'package:se_mobile/screens/leave_screen.dart';
-import 'package:se_mobile/screens/attendance_screen.dart';
-import 'package:se_mobile/screens/menu_screen.dart';
-import 'package:se_mobile/screens/payslip_screen.dart';
-import 'package:se_mobile/screens/start_screen.dart';
-import 'package:se_mobile/utils/logout_helper.dart';
-import 'package:se_mobile/utils/secure_storage_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../functions/export_share.dart';
 import '../functions/generate_csv.dart';
-import '../requests/reportdate_request.dart';
 import '../utils/colors.dart';
-import '../utils/lang.dart';
 import '../utils/search_fold.dart';
-import '../utils/dimensions.dart';
-import '../utils/variables.dart';
 import '../widgets/access_log_list.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
-import '../widgets/icon_button_drawer.dart';
 import '../utils/app_theme.dart';
 import '../utils/load_problem.dart';
 import '../widgets/load_error_view.dart';
@@ -62,8 +49,6 @@ class _MainPage2State extends State<MainPage2> {
   /// уже не попадает.
   int _loadSeq = 0;
   bool _exporting = false;
-  static String _lang = "";
-  String? _login;
   late SharedPreferences prefs;
 
   String searchText = '';
@@ -72,7 +57,6 @@ class _MainPage2State extends State<MainPage2> {
   bool _dateError = false;
   LoadProblem? _problem;
   List<String>? _employeesCache;
-  bool _employeesCacheLoading = false;
   String _filterText = '';
   final _filterController = TextEditingController();
 
@@ -97,15 +81,9 @@ class _MainPage2State extends State<MainPage2> {
 
   Future<void> _initPrefs() async {
     prefs = await SharedPreferences.getInstance();
-    // Умолчания здесь нет намеренно. Прежде этот экран при пустой настройке
-    // записывал «KZ», а main.dart считал умолчанием русский, — и язык
-    // зависел от того, какой экран открыли первым.
     final savedEmployees = prefs.getStringList("emp_snames");
-    final login = await SecureStorageHelper.instance.getLogin();
     if (!mounted) return;
     setState(() {
-      _lang = Lang.code(prefs.getString(AppValues.LANG));
-      _login = login;
       if (savedEmployees != null && savedEmployees.isNotEmpty) {
         employees = savedEmployees;
       }
@@ -876,17 +854,6 @@ class _MainPage2State extends State<MainPage2> {
       ),
     );
   }
-
-  _changeLanguage() async {
-    Navigator.pop(context);
-    final prefs = await SharedPreferences.getInstance();
-    final next = Lang.isKazakh(_lang) ? Lang.ru : Lang.kk;
-    await prefs.setString(AppValues.LANG, next);
-    Get.updateLocale(Locale(next));
-    if (mounted) setState(() => _lang = next);
-  }
-
-  _exit() => confirmAndLogout(context);
 
   @override
   void dispose() {

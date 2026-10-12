@@ -11,7 +11,6 @@ import '../functions/export_share.dart';
 import '../functions/generate_csv.dart';
 import '../utils/access_report.dart';
 import '../utils/search_fold.dart';
-import '../utils/colors.dart';
 import '../utils/lang.dart';
 import '../utils/dimensions.dart';
 import '../utils/variables.dart';
@@ -640,49 +639,6 @@ class _MainMenu1State extends State<MainMenu1> {
   }
 
 
-  Widget _buildEventSummary(List<List<String>> data) {
-    final counts = <String, int>{};
-    for (final e in data) {
-      if (e.length > 2 && e[2].isNotEmpty) {
-        counts[e[2]] = (counts[e[2]] ?? 0) + 1;
-      }
-    }
-    if (counts.isEmpty) return const SizedBox.shrink();
-    final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: sorted.map((entry) {
-          final lower = entry.key.toLowerCase();
-          final isEntry = lower.contains('вход') || lower.contains('кіру') || lower.contains('entry');
-          final isExit = lower.contains('выход') || lower.contains('шығу') || lower.contains('exit');
-          final chipColor = isEntry
-              ? Colors.green.shade700
-              : isExit
-                  ? AppColors.niceRed
-                  : AppColors.mainColor;
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Chip(
-              avatar: Icon(
-                isEntry ? Icons.login : isExit ? Icons.logout : Icons.event_note,
-                size: 14,
-                color: chipColor,
-              ),
-              label: Text('${entry.key}: ${entry.value}',
-                  style: TextStyle(fontSize: 11, color: chipColor)),
-              backgroundColor: chipColor.withOpacity(0.08),
-              side: BorderSide(color: chipColor.withOpacity(0.3)),
-              padding: EdgeInsets.zero,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
   Widget _buildPresetChip(String label, VoidCallback onTap) {
     return ActionChip(
       // No inline style: the chip theme governs size and colour.
@@ -695,39 +651,5 @@ class _MainMenu1State extends State<MainMenu1> {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
     );
   }
-
-  Widget _buildWorkSummary(List<List<String>> data) {
-    DateTime? first;
-    DateTime? last;
-    for (final e in data) {
-      if (e.length < 2 || e[0].isEmpty || e[1].isEmpty) continue;
-      try {
-        final dt = DateTime.parse('${e[0]} ${e[1]}');
-        if (first == null || dt.isBefore(first)) first = dt;
-        if (last == null || dt.isAfter(last)) last = dt;
-      } catch (_) {}
-    }
-    if (first == null || last == null || first == last) return const SizedBox.shrink();
-    final span = last.difference(first);
-    final h = span.inHours;
-    final m = span.inMinutes % 60;
-    final timeStr = h > 0 ? '${h}h ${m}m' : '${m}m';
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 2),
-      child: Row(
-        children: [
-          Icon(Icons.access_time_filled, size: 13, color: context.accentColor),
-          const SizedBox(width: 4),
-          Text(
-            '${_fmtTime(first)} — ${_fmtTime(last)}  ($timeStr)',
-            style: TextStyle(fontSize: 12, color: context.accentColor),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _fmtTime(DateTime dt) =>
-      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
 }
