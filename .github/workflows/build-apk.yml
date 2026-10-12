@@ -28,9 +28,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # actions: write — чтобы убирать прежние сборки (шаг ниже).
+    # contents: write — выкладывать сборку в Releases; actions: write —
+    # убирать старые файлы сборок.
     permissions:
-      contents: read
+      contents: write
       actions: write
 
     steps:
@@ -190,13 +191,27 @@ jobs:
               && echo "удалена сборка $id" || echo "не удалось удалить $id"
           done
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: se-mobile-release-apk
-          path: se-mobile-*.apk
-          retention-days: 7
-          overwrite: true
+      # APK кладём в Releases, а не в файлы сборки: файлы сборки у закрытого
+      # репозитория упираются в маленькую квоту, а она пересчитывается раз в
+      # 6–12 часов, — 12 октября выкладка встала на полдня, хотя место уже
+      # освободили. Файлы релизов в эту квоту не входят. Релиз — на каждую
+      # версию: v1.16.16-49 для 1.16.16+49. Перезапуск той же сборки
+      # заменяет файл, а не падает.
+      - name: Выложить APK в Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
+          TAG="v${PUB/+/-}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "se-mobile-$PUB.apk" --clobber
+          else
+            gh release create "$TAG" "se-mobile-$PUB.apk" \
+              --target "$GITHUB_SHA" --title "SE Mobile $PUB" \
+              --notes "Сборка из $GITHUB_SHA. APK — раздать сотрудникам (deploy/README.md), AAB — для Google Play."
+          fi
+          echo "### APK $PUB: https://github.com/${{ github.repository }}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
 
       # Для Google Play — отдельная сборка: своё имя пакета (com.sebtrz.mobile)
       # и без своей проверки обновлений — Play обновляет сам и не разрешает
@@ -218,13 +233,23 @@ jobs:
 
       # Этот файл загружают в Play Console: «Рабочая версия» или
       # «Закрытое тестирование» → «Создать выпуск».
-      - name: Upload AAB для Google Play
-        uses: actions/upload-artifact@v4
-        with:
-          name: se-mobile-play-aab
-          path: se-mobile-play-*.aab
-          retention-days: 30
-          overwrite: true
+      - name: Выложить AAB в Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" se-mobile-play-*.aab --clobber
+
+      # Старые релизы — после десятого: вернуться на пару версий назад
+      # можно, а сотня APK по 35 МБ никому не нужна.
+      - name: Убрать старые релизы
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
+          while read -r tag; do
+            gh release delete "$tag" --yes --cleanup-tag && echo "удалён релиз $tag"
+          done
 
       # Отладочная сборка — последней и необязательной: запасной путь и
       # способ отличить «не работает вообще» от «не работает только release».

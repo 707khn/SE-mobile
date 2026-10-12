@@ -11,7 +11,7 @@
 | Своя проверка обновлений в сборке для Play выключена — правила Play её запрещают | `lib/utils/store.dart`, `lib/utils/app_update.dart` |
 | Нет разрешений, которые Play отклоняет: доступ ко всем файлам, список приложений, установка пакетов | `android/app/src/main/AndroidManifest.xml` |
 | Целевая версия Android — 36, её задаёт Flutter 3.47; Play требует не ниже прошлогодней | `flutter.targetSdkVersion` |
-| CI после каждого слияния в `main` собирает `.aab` и проверяет, что Play его пропустит | `.github/workflows/build-apk.yml`, артефакт `se-mobile-play-aab` |
+| CI после каждого слияния в `main` собирает `.aab` и проверяет, что Play его пропустит | `.github/workflows/build-apk.yml`, файл `se-mobile-play-…aab` в Releases |
 | Та же сборка — в каждом PR, который трогает Android | `.github/workflows/android-check.yml` |
 | Политика конфиденциальности | `https://api.se-btrz.com/privacy` |
 | Учётная запись для проверяющих | `se-mobile-backend/review_account.py` |
@@ -133,8 +133,8 @@ sudo bash -c 'set -a; . /etc/se-mobile.env; set +a; \
 
 ## 6. Первый выпуск
 
-1. Скачать `.aab`: GitHub → Actions → последний «Build Android APK» на `main`
-   → Artifacts → **se-mobile-play-aab** (zip, внутри `se-mobile-play-<версия>.aab`).
+1. Скачать `.aab`: GitHub → **Releases** → верхний релиз (`v<версия>-<номер>`)
+   → `se-mobile-play-<версия>.aab`.
 2. Play Console → **Тестирование → Закрытое тестирование** (или сразу
    «Рабочая версия», если аккаунт организации) → «Создать выпуск».
 3. Подпись: «**Использовать ключ, созданный Google**» (Play App Signing).
@@ -148,7 +148,7 @@ sudo bash -c 'set -a; . /etc/se-mobile.env; set +a; \
 
 Поднять версию (`pubspec.yaml` и `lib/utils/app_version.dart`, номер сборки
 после `+` — обязательно больше прежнего), слить в `main`, скачать новый
-`se-mobile-play-aab` и загрузить его как новый выпуск. Тот же номер сборки
+`.aab` из верхнего релиза в Releases и загрузить его как новый выпуск. Тот же номер сборки
 уходит и в `.apk` для сервера — расходиться им незачем.
 
 ## Когда подключат Firebase
