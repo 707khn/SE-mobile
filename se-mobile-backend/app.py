@@ -2382,7 +2382,10 @@ def register_routes(app):
         # Иначе этот путь заводит сотрудников и грузит расчётные листки
         # вообще без спроса.
         provided = request.headers.get('X-Admin-Token', '')
-        if not admin_token or provided != admin_token:
+        # Сравнение за одно и то же время, как у секрета турникета: по
+        # обычному `!=` секрет можно подбирать знак за знаком по задержке.
+        if not admin_token or not hmac.compare_digest(
+                provided.encode(), admin_token.encode()):
             if not admin_token:
                 logging.error('ADMIN_TOKEN не задан — загрузка расчётных листков '
                               'отклоняется. Проверьте /etc/se-mobile.env')
