@@ -256,58 +256,62 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         borderRadius: BorderRadius.circular(10),
         boxShadow: context.cardShadow,
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: e.hasLogin
-              ? AppColors.mainColor.withOpacity(0.15)
-              : context.hairlineColor,
-          child: Text(
-            initials.toUpperCase(),
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: e.hasLogin ? context.accentColor : context.mutedColor,
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          leading: CircleAvatar(
+            backgroundColor: e.hasLogin
+                ? AppColors.mainColor.withOpacity(0.15)
+                : context.hairlineColor,
+            child: Text(
+              initials.toUpperCase(),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: e.hasLogin ? context.accentColor : context.mutedColor,
+              ),
             ),
           ),
-        ),
-        title: Text(e.fullName, style: const TextStyle(fontSize: 13)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(e.jobTitle,
-                style: TextStyle(fontSize: 12, color: context.mutedColor)),
-            const SizedBox(height: 2),
-            Wrap(
-              spacing: 6,
-              runSpacing: 2,
-              children: [
-                if (e.hasLogin)
-                  _badge('${'login'.tr}: ${e.login}', AppColors.mainColor),
-                if (e.payslipCount > 0)
-                  _badge('${'payslip'.tr}: ${e.payslipCount}',
-                      Colors.blue.shade700),
-                if (e.accessCount > 0)
-                  _badge('${'tab_turnstile'.tr}: ${e.accessCount}',
-                      Colors.orange.shade800),
-              ],
-            ),
-          ],
-        ),
-        isThreeLine: true,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Сбросить пароль можно только тому, у кого есть учётная запись.
-            if (e.hasLogin)
-              IconButton(
-                icon: const Icon(Icons.lock_reset, size: 20),
-                tooltip: 'password_reset'.tr,
-                onPressed: () => _confirmReset(e),
+          title: Text(e.fullName, style: const TextStyle(fontSize: 13)),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(e.jobTitle,
+                  style: TextStyle(fontSize: 12, color: context.mutedColor)),
+              const SizedBox(height: 2),
+              Wrap(
+                spacing: 6,
+                runSpacing: 2,
+                children: [
+                  if (e.hasLogin)
+                    _badge('${'login'.tr}: ${e.login}', AppColors.mainColor),
+                  if (e.payslipCount > 0)
+                    _badge('${'payslip'.tr}: ${e.payslipCount}',
+                        Colors.blue.shade700),
+                  if (e.accessCount > 0)
+                    _badge('${'tab_turnstile'.tr}: ${e.accessCount}',
+                        Colors.orange.shade800),
+                ],
               ),
-            const Icon(Icons.chevron_right, size: 20),
-          ],
+            ],
+          ),
+          isThreeLine: true,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Сбросить пароль можно только тому, у кого есть учётная запись.
+              if (e.hasLogin)
+                IconButton(
+                  icon: const Icon(Icons.lock_reset, size: 20),
+                  tooltip: 'password_reset'.tr,
+                  onPressed: () => _confirmReset(e),
+                ),
+              const Icon(Icons.chevron_right, size: 20),
+            ],
+          ),
+          onTap: () => Get.to(() => AdminEmployeeScreen(employee: e)),
         ),
-        onTap: () => Get.to(() => AdminEmployeeScreen(employee: e)),
       ),
     );
   }

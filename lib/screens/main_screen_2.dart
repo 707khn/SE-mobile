@@ -42,7 +42,11 @@ class MainPage2 extends StatefulWidget {
 }
 
 class _MainPage2State extends State<MainPage2> {
-  static TextEditingController employeeController = TextEditingController();
+  // Своё у каждого открытия экрана. Было общим на все (static): каждое
+  // открытие вешало на него слушателя, закрытие не снимало, и со второго
+  // раза каждая буква в поиске будила закрытый экран — ошибкой в журнал
+  // «О программе» на каждое нажатие и закрытыми экранами в памяти.
+  final employeeController = TextEditingController();
 
   late DateTime startDate;
   late DateTime endDate;
@@ -98,6 +102,7 @@ class _MainPage2State extends State<MainPage2> {
     // зависел от того, какой экран открыли первым.
     final savedEmployees = prefs.getStringList("emp_snames");
     final login = await SecureStorageHelper.instance.getLogin();
+    if (!mounted) return;
     setState(() {
       _lang = Lang.code(prefs.getString(AppValues.LANG));
       _login = login;
@@ -886,6 +891,7 @@ class _MainPage2State extends State<MainPage2> {
   @override
   void dispose() {
     _filterController.dispose();
+    employeeController.dispose();
     super.dispose();
   }
 

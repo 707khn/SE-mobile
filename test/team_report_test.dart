@@ -121,4 +121,28 @@ void main() {
     expect(asked['emp_sname'], _second);
     expect(asked['start_date'], day);
   });
+
+  testWidgets('второй раз открытый отчёт — поиск без ошибок в журнале',
+      (tester) async {
+    // Поле поиска было общим на все открытия экрана, и каждое открытие
+    // вешало на него своего слушателя, а закрытие не снимало. Со второго
+    // открытия каждая буква в поиске будила закрытый экран — и в журнал
+    // «О программе» падала ошибка на каждое нажатие.
+    final server = await open(tester);
+    await HttpOverrides.runWithHttpOverrides(() async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(GetMaterialApp(
+        translations: LocaleString(),
+        locale: const Locale('ru'),
+        theme: ThemeData(fontFamily: 'Roboto'),
+        home: const MainPage2(fullName: 'Начальников Тест', job: 'Начальник'),
+      ));
+      await _settle(tester);
+      await tester.tap(find.widgetWithText(ElevatedButton, 'search'.tr));
+      await _settle(tester);
+      await tester.enterText(find.byType(TextField).last, 'Тес');
+      await _settle(tester);
+    }, server);
+    expect(tester.takeException(), isNull);
+  });
 }

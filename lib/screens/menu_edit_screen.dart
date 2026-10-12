@@ -9,6 +9,8 @@ import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
 import '../utils/app_theme.dart';
+import '../utils/load_problem.dart';
+import '../widgets/load_error_view.dart';
 
 /// Canteen menu editor, available to the canteen technologist.
 ///
@@ -44,6 +46,16 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
   bool _saving = false;
   bool _dirty = false;
 
+  /// Меню дня с сервера не пришло. Тогда править нечего: сохранение
+  /// заменяет день целиком, и пустой список вместо неполученного стёр бы всё
+  /// меню этого дня, стоило добавить одно блюдо.
+  bool _failed = false;
+  LoadProblem? _problem;
+
+  /// Номер последней загрузки: ответ за прежний день, пришедший позже, на
+  /// экран уже не попадает.
+  int _loadSeq = 0;
+
   @override
   void initState() {
     super.initState();
@@ -54,12 +66,15 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
   String get _dateKey => DateFormat('yyyy-MM-dd').format(_date);
 
   Future<void> _load() async {
+    final seq = ++_loadSeq;
     setState(() => _loading = true);
-    final result = await getMenuForDate(_dateKey);
-    if (!mounted) return;
+    final result = await getMenuForDate(_dateKey, offline: false);
+    if (!mounted || seq != _loadSeq) return;
     setState(() {
       _loading = false;
       _dirty = false;
+      _failed = result['message'] != 'Success';
+      _problem = problemIn(result);
       _items
         ..clear()
         ..addAll(((result['items'] as List<dynamic>?) ?? []).map((raw) {
@@ -308,11 +323,15 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
               ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _editItem(),
-          icon: const Icon(Icons.add),
-          label: Text('add_item'.tr),
-        ),
+        // Пока меню дня не получено, добавлять некуда: блюдо легло бы в
+        // пустой список, и сохранение заменило бы им всё меню дня.
+        floatingActionButton: _loading || _failed
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: () => _editItem(),
+                icon: const Icon(Icons.add),
+                label: Text('add_item'.tr),
+              ),
         body: Column(
           children: [
             _buildDateBar(),
@@ -337,6 +356,8 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
               child: _loading
                   ? Center(
                       child: CircularProgressIndicator(color: context.accentColor))
+                  : _failed
+                      ? LoadErrorView(problem: _problem, onRetry: _load)
                   : _items.isEmpty
                       ? _buildEmpty()
                       : _buildList(),
@@ -436,27 +457,34 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
           borderRadius: BorderRadius.circular(10),
           boxShadow: context.cardShadow,
         ),
-        child: ListTile(
-          title: Text(item.name, style: const TextStyle(fontSize: 15)),
-          subtitle: _subtitleFor(item),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: Icon(Icons.edit_outlined,
-                    size: 20, color: context.mutedColor),
-                tooltip: 'menu_edit_dish'.tr,
-                onPressed: () => _editItem(existing: item),
-              ),
-              IconButton(
-                icon: Icon(Icons.delete_outline,
-                    size: 20, color: Colors.red.shade400),
-                tooltip: 'remove_item'.tr,
-                onPressed: () => _removeItem(item),
-              ),
-            ],
+        // Отклик на нажатие рисуется на ближайшем Material, а им был экран
+        // под карточкой: цветная карточка его закрывала, и касание блюда не
+        // было видно.
+        child: Material(
+          type: MaterialType.transparency,
+          child: ListTile(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            title: Text(item.name, style: const TextStyle(fontSize: 15)),
+            subtitle: _subtitleFor(item),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.edit_outlined,
+                      size: 20, color: context.mutedColor),
+                  tooltip: 'menu_edit_dish'.tr,
+                  onPressed: () => _editItem(existing: item),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete_outline,
+                      size: 20, color: Colors.red.shade400),
+                  tooltip: 'remove_item'.tr,
+                  onPressed: () => _removeItem(item),
+                ),
+              ],
+            ),
+            onTap: () => _editItem(existing: item),
           ),
-          onTap: () => _editItem(existing: item),
         ),
       ),
     );

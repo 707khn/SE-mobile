@@ -32,7 +32,14 @@ Future<bool> saveMenuForDate(String date, List<Map<String, dynamic>> items) asyn
   }
 }
 
-Future<Map<String, dynamic>> getMenuForDate(String date) async {
+/// Меню за [date].
+///
+/// Не загрузилось — отдаёт меню, сохранённое в прошлый раз, если [offline].
+/// Редактору меню копия не годится: он сохраняет день целиком, и правка
+/// старой копии затёрла бы на сервере всё, что поменяли после неё, а пустой
+/// день вместо неполученного — всё меню этого дня.
+Future<Map<String, dynamic>> getMenuForDate(String date,
+    {bool offline = true}) async {
   try {
     final response = await http
         .get(
@@ -51,17 +58,18 @@ Future<Map<String, dynamic>> getMenuForDate(String date) async {
       await OfflineCache.trim('menu_', keep: 14);
       return body;
     }
-    return await _cachedMenu(date, problemForStatus(response.statusCode));
+    return await _cachedMenu(date, problemForStatus(response.statusCode),
+        offline: offline);
   } catch (e) {
-    return await _cachedMenu(date, problemOf(e));
+    return await _cachedMenu(date, problemOf(e), offline: offline);
   }
 }
 
 /// Меню за этот день, полученное в прошлый раз. В столовой связь ловит хуже
 /// всего, а меню нужно именно там.
-Future<Map<String, dynamic>> _cachedMenu(
-    String date, LoadProblem problem) async {
-  final saved = await OfflineCache.read('menu_$date');
+Future<Map<String, dynamic>> _cachedMenu(String date, LoadProblem problem,
+    {required bool offline}) async {
+  final saved = offline ? await OfflineCache.read('menu_$date') : null;
   if (saved != null) return saved;
   return {'message': 'Failure', 'items': [], problemKey: problem.name};
 }
