@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import '../requests/news_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/dimensions.dart';
+import '../utils/load_problem.dart';
 import '../widgets/custom_text.dart';
+import '../widgets/load_error_view.dart';
 
 /// Очередь объявлений и управление лентой — для администратора.
 ///
@@ -24,6 +26,24 @@ class _NewsAdminScreenState extends State<NewsAdminScreen> {
   List<Map<String, dynamic>> _items = [];
   int _pending = 0;
 
+  /// Очередь не загрузилась. Раньше экран писал «пока новостей нет» — и
+  /// администратор не знал, что объявления ждут его, а не кончились.
+  bool _failed = false;
+  LoadProblem? _problem;
+
+  /// Набранное объявление живёт, пока не опубликовано. Прежде оно жило в
+  /// окне: не ушло на сервер — и текст пропадал вместе с окном, писать
+  /// заново.
+  final _draftTitle = TextEditingController();
+  final _draftText = TextEditingController();
+
+  @override
+  void dispose() {
+    _draftTitle.dispose();
+    _draftText.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +55,8 @@ class _NewsAdminScreenState extends State<NewsAdminScreen> {
     final body = await getNewsQueue();
     if (!mounted) return;
     setState(() {
+      _failed = body['message'] == 'Failure';
+      _problem = problemIn(body);
       _items = ((body['items'] as List?) ?? [])
           .map((e) => e as Map<String, dynamic>)
           .toList();
@@ -44,8 +66,8 @@ class _NewsAdminScreenState extends State<NewsAdminScreen> {
   }
 
   Future<void> _compose() async {
-    final titleController = TextEditingController();
-    final textController = TextEditingController();
+    final titleController = _draftTitle;
+    final textController = _draftText;
     final saved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -73,22 +95,32 @@ class _NewsAdminScreenState extends State<NewsAdminScreen> {
           TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: Text('cancel'.tr)),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text('publish'.tr)),
+          // Без заголовка публиковать нечего: прежде окно закрывалось и
+          // молча выбрасывало набранный текст.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: titleController,
+            builder: (context, title, _) => TextButton(
+                onPressed: title.text.trim().isEmpty
+                    ? null
+                    : () => Navigator.pop(context, true),
+                child: Text('publish'.tr)),
+          ),
         ],
       ),
     );
     if (saved != true) return;
-    if (titleController.text.trim().isEmpty) return;
     final ok = await createAnnouncement(
         titleController.text.trim(), textController.text.trim());
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('news_save_failed'.tr)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('news_save_failed'.tr),
+        action: SnackBarAction(label: 'try_again'.tr, onPressed: _compose),
+      ));
       return;
     }
+    titleController.clear();
+    textController.clear();
     _load();
   }
 
@@ -150,6 +182,8 @@ class _NewsAdminScreenState extends State<NewsAdminScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _failed
+              ? LoadErrorView(problem: _problem, onRetry: _load)
           : Column(
               children: [
                 if (_pending > 0)
