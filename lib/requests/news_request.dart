@@ -53,9 +53,19 @@ Future<Map<String, dynamic>> getNewsQueue() async {
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
-    return {'message': 'Failure', 'items': [], 'pending': 0};
-  } catch (_) {
-    return {'message': 'Failure', 'items': [], 'pending': 0};
+    return {
+      'message': 'Failure',
+      'items': [],
+      'pending': 0,
+      problemKey: problemForStatus(response.statusCode).name,
+    };
+  } catch (e) {
+    return {
+      'message': 'Failure',
+      'items': [],
+      'pending': 0,
+      problemKey: problemOf(e).name,
+    };
   }
 }
 

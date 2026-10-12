@@ -446,9 +446,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const Icon(Icons.calendar_today,
                         size: 13, color: Colors.white60),
                     const SizedBox(width: 5),
-                    Text(
-                      '$dayName, $dateStr',
-                      style: const TextStyle(color: Colors.white60, fontSize: 12),
+                    // «Понедельник» и «Воскресенье» длиннее прочих дней: на
+                    // узком телефоне с крупным шрифтом строка уходила за
+                    // край. Теперь переносится.
+                    Flexible(
+                      child: Text(
+                        '$dayName, $dateStr',
+                        style: const TextStyle(color: Colors.white60, fontSize: 12),
+                      ),
                     ),
                   ],
                 ),
