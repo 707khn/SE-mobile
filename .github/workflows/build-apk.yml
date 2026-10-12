@@ -28,6 +28,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # actions: write — чтобы убирать прежние сборки (шаг ниже).
+    permissions:
+      contents: read
+      actions: write
 
     steps:
       - name: Checkout code
@@ -168,6 +172,24 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk "se-mobile-$PUB.apk"
           ls -lh "se-mobile-$PUB.apk"
 
+      # Прежние сборки — долой. Хранилище файлов у закрытого репозитория
+      # маленькое, а одна сборка весит около 185 МБ (APK, AAB и отладочный
+      # APK). 12 октября их накопилось 66, на 4 ГБ, и выгрузка встала:
+      # «Artifact storage quota has been hit». Нужна же всегда только
+      # последняя — её и раздают. Убираем всё, что выгружено не этим
+      # запуском. Не удалилось — не беда: сборка важнее уборки.
+      - name: Убрать прежние сборки
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.workflow_run.id != ${{ github.run_id }}) | .id' |
+          while read -r id; do
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id" >/dev/null \
+              && echo "удалена сборка $id" || echo "не удалось удалить $id"
+          done
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -217,7 +239,8 @@ jobs:
         with:
           name: se-mobile-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 7
+          # Самая тяжёлая (85 МБ) и нужная реже всех: хватит суток.
+          retention-days: 1
           overwrite: true
 
   emulator:
