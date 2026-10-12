@@ -1,3 +1,4 @@
+import hashlib
 import hmac
 import os
 import logging
@@ -714,12 +715,52 @@ def _is_system_admin(job_title):
     return 'администратор системы' in (job_title or '').lower()
 
 
+def _token_key(raw):
+    """Под каким ключом пропуск лежит в базе: SHA-256, а не он сам.
+
+    Пропуск — это доступ к листкам без пароля. Лежи он в базе как есть,
+    утёкшая база или её резервная копия открывала бы листки каждого, кто
+    сейчас вошёл. По хешу пропуск не восстановить, а случайных байт в нём
+    32 — подбирать нечего, поэтому соль не нужна.
+    """
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _hash_stored_tokens():
+    """Переписывает пропуска, лежащие в базе как есть, на их хеши.
+
+    Пропуска, выданные до этого, хранились открыто. Переписываем, а не
+    гасим: иначе обновление сервера выкинуло бы из приложения всех разом.
+    Хеш — 64 знака, сам пропуск — 43: так их и различаем. Gunicorn
+    запускает несколько процессов, и каждый доходит сюда; строку, которую
+    уже переписал соседний, просто пропускаем.
+    """
+    legacy = [row.token for row in AuthToken.query.with_entities(AuthToken.token)
+              if len(row.token) != 64]
+    for raw in legacy:
+        try:
+            row = db.session.get(AuthToken, raw)
+            if row is None:
+                continue
+            db.session.add(AuthToken(
+                token=_token_key(raw), employee_id=row.employee_id,
+                created_at=row.created_at, last_used_at=row.last_used_at,
+                expires_at=row.expires_at))
+            db.session.delete(row)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    if legacy:
+        logging.info('Пропуска переписаны на хеши: %d', len(legacy))
+
+
 def _issue_token(employee_id):
     """Выдаёт новый пропуск. Старые не трогает: у человека может быть
-    и телефон, и планшет."""
+    и телефон, и планшет. В базу ложится хеш, а пропуск уходит телефону."""
     now = datetime.utcnow()
+    raw = secrets.token_urlsafe(32)
     token = AuthToken(
-        token=secrets.token_urlsafe(32),
+        token=_token_key(raw),
         employee_id=employee_id,
         created_at=now,
         last_used_at=now,
@@ -729,7 +770,7 @@ def _issue_token(employee_id):
     # Заодно подчищаем протухшие, чтобы таблица не росла бесконечно.
     AuthToken.query.filter(AuthToken.expires_at < now).delete()
     db.session.commit()
-    return token.token
+    return raw
 
 
 def _bearer_token():
@@ -744,7 +785,7 @@ def _resolve_token(raw):
     """Пропуск → сотрудник, или None. Заодно сдвигает срок годности."""
     if not raw:
         return None
-    row = db.session.get(AuthToken, raw)
+    row = db.session.get(AuthToken, _token_key(raw))
     if row is None:
         return None
     now = datetime.utcnow()
@@ -1424,6 +1465,11 @@ def create_app():
         except Exception as e:
             db.session.rollback()
             logging.error(f'_migrate_schema failed (non-fatal): {e}', exc_info=True)
+        try:
+            _hash_stored_tokens()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f'_hash_stored_tokens failed (non-fatal): {e}', exc_info=True)
 
         # Сеем под замком. Gunicorn держит три процесса, и каждый при старте
         # доходит сюда; журнал applied_seeds спасает, только если первый успел
@@ -2108,7 +2154,7 @@ def register_routes(app):
         """Гасит пропуск этого устройства. Остальные устройства не трогает."""
         raw = _bearer_token()
         if raw:
-            row = db.session.get(AuthToken, raw)
+            row = db.session.get(AuthToken, _token_key(raw))
             if row is not None:
                 db.session.delete(row)
                 db.session.commit()

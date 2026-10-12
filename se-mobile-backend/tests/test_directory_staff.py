@@ -215,4 +215,5 @@ def test_merge_moves_a_live_token(app):
 
         assert app_module._absorb_employee('D999', keep.employee_id) is not None
         assert db.session.get(Employee, 'D999') is None
-        assert db.session.get(AuthToken, token).employee_id == keep.employee_id
+        assert db.session.get(
+            AuthToken, app_module._token_key(token)).employee_id == keep.employee_id
