@@ -4,10 +4,10 @@
 /// понимают, какая сборка стоит у сотрудника. Совпадение проверяет сборка:
 /// «помнить про два места» здесь уже не сработало бы, а разошедшиеся номера
 /// означают, что в поддержке смотрят не на ту версию.
-const String kAppVersion = '1.16.15';
+const String kAppVersion = '1.16.16';
 
 /// Номер сборки (часть после «+» в pubspec.yaml).
-const String kAppBuild = '48';
+const String kAppBuild = '49';
 
 /// «1.0.0 (сборка 1)» — то, что видит пользователь.
 String appVersionLabel() => '$kAppVersion ($kAppBuild)';
