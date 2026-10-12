@@ -472,3 +472,15 @@ def test_menu_default_date(client):
     r = client.get('/api/menu')
     assert r.status_code == 200
     assert 'date' in r.get_json()
+
+
+@pytest.mark.parametrize('token', ['', 'не-тот', os.environ['ADMIN_TOKEN'] + 'x',
+                                   os.environ['ADMIN_TOKEN'][:-1]])
+def test_upload_xml_wrong_token_is_refused(client, token):
+    with open(_TEST_XML, 'rb') as f:
+        content = f.read()
+    r = client.post('/api/admin/upload-payslip-xml',
+                    data={'file': (io.BytesIO(content), 'test_payslip.xml')},
+                    content_type='multipart/form-data',
+                    headers={'X-Admin-Token': token})
+    assert r.status_code == 403
