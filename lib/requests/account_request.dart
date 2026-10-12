@@ -17,10 +17,15 @@ enum PasswordChangeResult {
   tooSimple,
   noAccount,
   networkError,
+
+  /// Слишком много неверных старых паролей подряд: смена, как и вход,
+  /// закрыта на время.
+  locked,
 }
 
-/// Результат смены пароля и — если до ответа не дошло — почему.
-typedef PasswordChange = (PasswordChangeResult, LoadProblem?);
+/// Результат смены пароля, почему до ответа не дошло и — при замке —
+/// через сколько секунд можно снова.
+typedef PasswordChange = (PasswordChangeResult, LoadProblem?, int?);
 
 Future<PasswordChange> changePassword({
   required String oldPassword,
@@ -40,7 +45,7 @@ Future<PasswordChange> changePassword({
 
     if (response.statusCode == 401) {
       await returnToLogin();
-      return (PasswordChangeResult.networkError, null);
+      return (PasswordChangeResult.networkError, null, null);
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -48,27 +53,34 @@ Future<PasswordChange> changePassword({
       // Сервер погасил все пропуска и выдал новый — сохраняем, иначе
       // следующий же запрос улетит с недействительным.
       await SecureStorageHelper.instance.saveToken((body['token'] as String?) ?? '');
-      return (PasswordChangeResult.ok, null);
+      return (PasswordChangeResult.ok, null, null);
     }
     switch (body['error']) {
       case 'wrong_password':
-        return (PasswordChangeResult.wrongOldPassword, null);
+        return (PasswordChangeResult.wrongOldPassword, null, null);
       case 'too_short':
-        return (PasswordChangeResult.tooShort, null);
+        return (PasswordChangeResult.tooShort, null, null);
       case 'same_as_login':
-        return (PasswordChangeResult.sameAsLogin, null);
+        return (PasswordChangeResult.sameAsLogin, null, null);
       case 'too_simple':
-        return (PasswordChangeResult.tooSimple, null);
+        return (PasswordChangeResult.tooSimple, null, null);
       case 'no_account':
-        return (PasswordChangeResult.noAccount, LoadProblem.server);
+        return (PasswordChangeResult.noAccount, LoadProblem.server, null);
+      case 'locked':
+        return (
+          PasswordChangeResult.locked,
+          null,
+          (body['retry_after'] as num?)?.toInt()
+        );
       default:
         return (
           PasswordChangeResult.networkError,
-          problemForStatus(response.statusCode)
+          problemForStatus(response.statusCode),
+          null
         );
     }
   } catch (e) {
-    return (PasswordChangeResult.networkError, problemOf(e));
+    return (PasswordChangeResult.networkError, problemOf(e), null);
   }
 }
 
