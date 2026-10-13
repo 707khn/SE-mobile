@@ -22,7 +22,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Нужна ли сборка вообще. В pubspec.yaml почти в каждом PR приложения
+  # меняется только номер версии, а он сборку сломать не может; ради одной
+  # этой строки здесь шли десять минут сборки. За первые двенадцать дней
+  # октября проверка съела ~360 минут из 2000 бесплатных в месяц на весь
+  # репозиторий — кончатся они, встанут и сборка APK, и присмотр за сервером.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Всё, кроме pubspec.yaml, из списка путей выше.
+          other=$(git diff --name-only "$BASE"...HEAD | grep -E \
+            '^(android/|pubspec\.lock$|\.github/workflows/(android-check|build-apk)\.yml$|\.github/scripts/check-play-bundle\.sh$)' || true)
+          # В pubspec.yaml — всё, кроме строки version:.
+          pubspec=$(git diff -U0 "$BASE"...HEAD -- pubspec.yaml \
+            | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vE '^[+-]version:' || true)
+          if [ -z "$other" ] && [ -z "$pubspec" ]; then
+            echo "Поменялся только номер версии — сборку пропускаем."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
