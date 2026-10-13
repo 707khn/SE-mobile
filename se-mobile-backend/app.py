@@ -2693,6 +2693,19 @@ def register_routes(app):
         else:
             ts = _plant_now()
 
+        # Повтор того же прохода — не новый проход. СКУД, не дождавшись
+        # ответа (оборвалась связь, сервер ответил медленно), шлёт событие ещё
+        # раз; раньше оно ложилось второй строкой, и человеку приходило второе
+        # «вход в 08:01». Узнаём повтор по времени самого турникета: у
+        # событий без него время наше, и совпасть оно не может.
+        if ts_raw:
+            same = TurnstileEvent.query.filter_by(
+                employee_id=employee_id, direction=direction,
+                timestamp=ts).first()
+            if same is not None:
+                return jsonify({'message': 'Success', 'id': same.id,
+                                'duplicate': True})
+
         event = TurnstileEvent(employee_id=employee_id, direction=direction, timestamp=ts)
         db.session.add(event)
         db.session.commit()
