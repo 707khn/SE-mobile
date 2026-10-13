@@ -251,23 +251,6 @@ jobs:
             gh release delete "$tag" --yes --cleanup-tag && echo "удалён релиз $tag"
           done
 
-      # Отладочная сборка — последней и необязательной: запасной путь и
-      # способ отличить «не работает вообще» от «не работает только release».
-      # Если на неё не хватит места, рабочие файлы уже выгружены.
-      - name: Build debug APK
-        continue-on-error: true
-        run: flutter build apk --debug
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: se-mobile-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          # Самая тяжёлая (85 МБ) и нужная реже всех: хватит суток.
-          retention-days: 1
-          overwrite: true
-
   emulator:
     # Только по отдельной просьбе: проверка на эмуляторе идёт дольше самой
     # сборки, а apk от неё не зависит.
@@ -316,6 +299,7 @@ jobs:
 
       - name: Upload screenshot
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: emulator-screenshot
