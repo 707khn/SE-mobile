@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../requests/admin_request.dart';
 import '../utils/colors.dart';
+import '../utils/initials.dart';
 import '../utils/dimensions.dart';
 import '../widgets/custom_text.dart';
 import 'leave_screen.dart';
@@ -72,15 +73,7 @@ class AdminEmployeeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final initials = employee.fullName.trim().isEmpty
-        ? '?'
-        : employee.fullName
-            .trim()
-            .split(RegExp(r'\s+'))
-            .take(2)
-            .map((w) => w[0])
-            .join()
-            .toUpperCase();
+    final initials = initialsOf(employee.fullName);
 
     return Container(
       width: double.infinity,

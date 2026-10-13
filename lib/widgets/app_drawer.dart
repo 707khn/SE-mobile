@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
@@ -15,6 +14,7 @@ import '../utils/colors.dart';
 import '../utils/shell_tab.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
+import '../utils/open_external.dart';
 import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import 'icon_button_drawer.dart';
@@ -421,8 +421,6 @@ class _AppDrawerState extends State<AppDrawer> {
     ));
   }
 
-  Future<void> _open(String url) async {
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-  }
+  Future<void> _open(String url) => openExternal(context, url);
 
 }

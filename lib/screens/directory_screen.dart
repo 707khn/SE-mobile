@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../requests/directory_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/dimensions.dart';
 import '../utils/offline_cache.dart';
+import '../utils/open_external.dart';
 import '../utils/search_fold.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/offline_notice.dart';
@@ -96,14 +96,11 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
     // иначе часть телефонов отказывается его принимать.
     final cleaned = number.replaceAll(RegExp(r'[^\d+]'), '');
     if (cleaned.isEmpty) return;
-    await launchUrl(Uri.parse('tel:$cleaned'),
-        mode: LaunchMode.externalApplication);
+    await openExternal(context, 'tel:$cleaned');
   }
 
-  Future<void> _mail(String address) async {
-    await launchUrl(Uri.parse('mailto:$address'),
-        mode: LaunchMode.externalApplication);
-  }
+  Future<void> _mail(String address) =>
+      openExternal(context, 'mailto:$address');
 
   @override
   Widget build(BuildContext context) {
@@ -257,15 +254,15 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (entry.extension.isNotEmpty)
-                  _chip(Icons.dialpad, entry.extension,
-                      () => _dial(entry.extension)),
-                if (entry.mobile.isNotEmpty)
-                  _chip(Icons.phone_outlined, entry.mobile,
-                      () => _dial(entry.mobile)),
-                if (entry.email.isNotEmpty)
-                  _chip(Icons.mail_outline, entry.email,
-                      () => _mail(entry.email)),
+                // Каждый номер — своей кнопкой. Два телефона из одной
+                // ячейки раньше стояли на одной и набирались одним числом
+                // в двадцать две цифры.
+                for (final number in _each(entry.extension))
+                  _chip(Icons.dialpad, number, () => _dial(number)),
+                for (final number in _each(entry.mobile))
+                  _chip(Icons.phone_outlined, number, () => _dial(number)),
+                for (final address in _each(entry.email))
+                  _chip(Icons.mail_outline, address, () => _mail(address)),
               ],
             ),
           ],
@@ -289,8 +286,8 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
           children: [
             Icon(icon, size: 15, color: context.accentColor),
             const SizedBox(width: 6),
-            // Длинная почта или два номера через запятую шире экрана —
-            // обрезаем на виду; по нажатию всё равно уходит полный адрес.
+            // Длинная почта шире экрана — обрезаем на виду; по нажатию всё
+            // равно уходит полный адрес.
             Flexible(
               child: Text(label,
                   maxLines: 1,
@@ -303,6 +300,13 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
     );
   }
 }
+
+/// Номера или адреса из одного поля справочника — по одному. Несколько в
+/// одном поле сервер разделяет запятой.
+List<String> _each(String field) => [
+      for (final part in field.split(RegExp(r'[,;]')))
+        if (part.trim().isNotEmpty) part.trim(),
+    ];
 
 class _Entry {
   _Entry({

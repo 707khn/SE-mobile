@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../requests/news_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
 import '../utils/offline_cache.dart';
+import '../utils/open_external.dart';
 import '../widgets/offline_notice.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
@@ -69,7 +69,7 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Future<void> _open(String url) async {
     if (url.isEmpty) return;
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    await openExternal(context, url);
   }
 
   @override

@@ -13,15 +13,20 @@ import 'dart:io';
 class FakeServer extends HttpOverrides {
   FakeServer(int status, String body,
       {this.contentType = 'text/html; charset=utf-8'})
-      : answer = ((_, __, ___) => (status, body));
+      : answer = ((_, __, ___) => (status, body)),
+        delay = null;
 
   /// Сервер, который отвечает по запросу: метод, адрес и тело запроса —
   /// код и тело ответа. Нужен, когда ответ зависит от того, о ком спросили.
   FakeServer.routed(this.answer,
-      {this.contentType = 'application/json; charset=utf-8'});
+      {this.contentType = 'application/json; charset=utf-8', this.delay});
 
   final (int, String) Function(String method, Uri url, String body) answer;
   final String contentType;
+
+  /// Сколько тянуть с ответом на этот запрос — чтобы ответы приходили не в
+  /// том порядке, в каком ушли запросы. null — отвечать сразу.
+  final Duration? Function(Uri url)? delay;
 
   /// Тела запросов — по порядку.
   final List<String> requests = [];
@@ -65,6 +70,8 @@ class _Request implements HttpClientRequest {
   Future<HttpClientResponse> close() async {
     final body = utf8.decode(_sent, allowMalformed: true);
     server.requests.add(body);
+    final wait = server.delay?.call(uri);
+    if (wait != null) await Future.delayed(wait);
     final (status, answer) = server.answer(method, uri, body);
     return _Response(status, answer, server.contentType);
   }

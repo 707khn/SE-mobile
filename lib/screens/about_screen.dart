@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/app_theme.dart';
 import '../utils/app_update.dart';
@@ -10,6 +9,7 @@ import '../utils/app_version.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/error_log.dart';
+import '../utils/open_external.dart';
 import '../utils/variables.dart';
 
 /// «О программе»: версия, адрес сервера и последние ошибки.
@@ -88,9 +88,8 @@ class _AboutScreenState extends State<AboutScreen> {
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: ElevatedButton.icon(
-                              onPressed: () => launchUrl(
-                                  Uri.parse(_update!.url),
-                                  mode: LaunchMode.externalApplication),
+                              onPressed: () =>
+                                  openExternal(context, _update!.url),
                               icon: const Icon(Icons.system_update_outlined,
                                   size: 18),
                               label: Text(

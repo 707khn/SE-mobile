@@ -38,6 +38,11 @@ class _MenuScreenState extends State<MenuScreen> {
   List<dynamic> _items = [];
   DateTime? _cachedAt;
 
+  /// Номер последней загрузки. Стрелки работают и пока день грузится, и в
+  /// столовой, где связь то есть, то нет, ответ за среду мог прийти позже
+  /// ответа за четверг — и под «четвергом» стояло меню среды.
+  int _loadSeq = 0;
+
   @override
   void initState() {
     super.initState();
@@ -45,10 +50,11 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _loadMenu() async {
+    final seq = ++_loadSeq;
     setState(() { _loading = true; _error = false; });
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final result = await getMenuForDate(dateStr);
-    if (!mounted) return;
+    if (!mounted || seq != _loadSeq) return;
     setState(() {
       _loading = false;
       _cachedAt = cachedAt(result);

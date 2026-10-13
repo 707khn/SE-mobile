@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../requests/home_request.dart';
 import '../utils/app_update.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
+import '../utils/open_external.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
 import '../utils/variables.dart';
@@ -347,8 +347,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Row(
                   children: [
                     ElevatedButton(
-                      onPressed: () => launchUrl(Uri.parse(update.url),
-                          mode: LaunchMode.externalApplication),
+                      onPressed: () => openExternal(context, update.url),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 6),

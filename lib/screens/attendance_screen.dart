@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../requests/attendance_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
+import '../utils/initials.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
@@ -26,6 +27,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   LoadProblem? _problem;
   List<_EmployeeDay> _rows = [];
 
+  /// Номер последней загрузки: стрелки работают и пока день грузится, и
+  /// ответ за прежний день, пришедший позже, иначе лёг бы под новую дату.
+  int _loadSeq = 0;
+
   @override
   void initState() {
     super.initState();
@@ -33,13 +38,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _load() async {
+    final seq = ++_loadSeq;
     setState(() {
       _loading = true;
       _error = false;
     });
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final result = await getAttendanceForDate(dateStr);
-    if (!mounted) return;
+    if (!mounted || seq != _loadSeq) return;
     setState(() {
       _loading = false;
       if (result['message'] == 'Success') {
@@ -207,7 +213,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               radius: 20,
               backgroundColor: AppColors.mainColor.withOpacity(0.15),
               child: Text(
-                _initials(row.name),
+                initialsOf(row.name),
                 style: TextStyle(
                     color: context.accentColor,
                     fontWeight: FontWeight.bold,
@@ -273,12 +279,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Widget _buildError() => LoadErrorView(problem: _problem, onRetry: _load);
-
-  String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
-  }
 }
 
 class _EmployeeDay {
