@@ -522,6 +522,22 @@ def locked_for(login):
     return int(left) if left > 0 else 0
 
 
+def _credentials_refused(login):
+    """Ответ на неверные логин и пароль у загрузок и объявлений.
+
+    Различаем «не тот пароль» и «слишком много попыток», как на входе:
+    технолог, которому пишут «неверный пароль», вводит верный снова и снова
+    и только продлевает себе замок.
+    """
+    seconds = locked_for(login)
+    if seconds:
+        minutes = max(1, -(-seconds // 60))
+        return jsonify({'message': f'Слишком много неверных попыток. '
+                                   f'Попробуйте через {minutes} мин.',
+                        'error': 'locked', 'retry_after': seconds}), 429
+    return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
+
+
 # Часовой пояс предприятия. Казахстан с 1 марта 2024 года живёт в одном
 # поясе, UTC+5, — Семей в том числе.
 #
@@ -2905,7 +2921,7 @@ def register_routes(app):
         password = (request.form.get('password') or '').strip()
         employee_id = _authenticate(login, password)
         if not employee_id:
-            return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
+            return _credentials_refused(login)
 
         uploader = Employee.query.get(employee_id)
         job = (uploader.job_title if uploader else '').lower()
@@ -3181,7 +3197,7 @@ def register_routes(app):
         employee_id = _authenticate(_text(data, 'login'),
                                     _text(data, 'password'))
         if not employee_id:
-            return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
+            return _credentials_refused(_text(data, 'login'))
         uploader = Employee.query.get(employee_id)
         if not _is_system_admin(uploader.job_title if uploader else ''):
             return jsonify({'message': 'Присылать объявления может администратор',
@@ -3258,7 +3274,7 @@ def register_routes(app):
         password = (request.form.get('password') or '').strip()
         employee_id = _authenticate(login, password)
         if not employee_id:
-            return jsonify({'message': 'Неверный логин или пароль', 'error': True}), 401
+            return _credentials_refused(login)
 
         uploader = Employee.query.get(employee_id)
         if not _is_system_admin(uploader.job_title if uploader else ''):
