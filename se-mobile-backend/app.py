@@ -22,7 +22,8 @@ from models import (db, Employee, AccessRecord, Payslip,
                     AuthMiss)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
-from parser_directory_excel import parse_directory_excel
+from parser_directory_excel import (parse_directory_excel, split_phones,
+                                    split_emails, join_contacts)
 from parser_news_feed import parse_news_feed, looks_like_feed, feed_links
 from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
@@ -770,6 +771,30 @@ def _hash_stored_tokens():
         logging.info('Пропуска переписаны на хеши: %d', len(legacy))
 
 
+def _split_directory_contacts():
+    """Разделяет номера в справочнике, загруженном до того, как их стали
+    разделять запятой.
+
+    В таком справочнике два телефона из одной ячейки стоят через пробел, и
+    приложение набирало их одним числом. Новая загрузка разделяет сама; эта —
+    чтобы не ждать её. Повторный проход ничего не меняет.
+    """
+    changed = 0
+    for row in DirectoryEntry.query.all():
+        fixed = {
+            'extension': join_contacts(split_phones(row.extension)) or None,
+            'mobile': join_contacts(split_phones(row.mobile)) or None,
+            'email': join_contacts(split_emails(row.email)) or None,
+        }
+        if any(getattr(row, key) != value for key, value in fixed.items()):
+            for key, value in fixed.items():
+                setattr(row, key, value)
+            changed += 1
+    db.session.commit()
+    if changed:
+        logging.info('Справочник: номера разделены в %d записях', changed)
+
+
 def _issue_token(employee_id):
     """Выдаёт новый пропуск. Старые не трогает: у человека может быть
     и телефон, и планшет. В базу ложится хеш, а пропуск уходит телефону."""
@@ -1486,6 +1511,11 @@ def create_app():
         except Exception as e:
             db.session.rollback()
             logging.error(f'_hash_stored_tokens failed (non-fatal): {e}', exc_info=True)
+        try:
+            _split_directory_contacts()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f'_split_directory_contacts failed (non-fatal): {e}', exc_info=True)
 
         # Сеем под замком. Gunicorn держит три процесса, и каждый при старте
         # доходит сюда; журнал applied_seeds спасает, только если первый успел
