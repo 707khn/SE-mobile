@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../requests/admin_request.dart';
 import '../requests/account_request.dart';
 import '../utils/colors.dart';
+import '../utils/initials.dart';
 import '../utils/dimensions.dart';
 import '../utils/search_fold.dart';
 import '../widgets/app_drawer.dart';
@@ -246,9 +247,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Widget _buildTile(AdminEmployee e) {
-    final initials = e.fullName.trim().isEmpty
-        ? '?'
-        : e.fullName.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0]).join();
+    final initials = initialsOf(e.fullName);
     return Container(
       margin: EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
       decoration: BoxDecoration(

@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../functions/export_share.dart';
 import '../functions/generate_csv.dart';
 import '../utils/colors.dart';
+import '../utils/initials.dart';
 import '../utils/search_fold.dart';
 import '../widgets/access_log_list.dart';
 import '../widgets/app_drawer.dart';
@@ -879,10 +880,7 @@ class _MainPage2State extends State<MainPage2> {
   ];
 
   Widget _buildInitialsAvatar(String name, int index) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    final initials = parts.length >= 2
-        ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
-        : name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final initials = initialsOf(name);
     final color = _avatarColors[index % _avatarColors.length];
     return CircleAvatar(
       radius: 18,
