@@ -1583,6 +1583,26 @@ def create_app():
 _SEED_LOCK_KEY = 8_146_501
 
 
+def _tidy_employee_names():
+    """Схлопывает лишние пробелы в ФИО, заведённых раньше.
+
+    Выгрузка расчётных листков из 1С пробелы внутри ФИО не трогала, и
+    «Тестов  Аман» с двойным пробелом не находился поиском по «Тестов Аман»,
+    а загрузка из Excel тут же переписывала его обратно на одинарный.
+    Теперь схлопывают обе загрузки; это — для уже лежащих в базе. Должность
+    не трогаем: по словам в ней решается, кому что открыто.
+    """
+    changed = 0
+    for emp in Employee.query.all():
+        name = ' '.join((emp.full_name or '').split())
+        if name and name != emp.full_name:
+            emp.full_name = name
+            changed += 1
+    db.session.commit()
+    if changed:
+        logging.info('ФИО: лишние пробелы убраны у %d сотрудников', changed)
+
+
 def _seed_all():
     """Прогоняет сидеры по журналу. Вызывается под замком — см. create_app."""
     _applied = _load_applied_seeds()
@@ -1615,6 +1635,7 @@ def _seed_all():
         _seed_access_august_2026,
         _seed_legacy_from_data,
         _seed_payslips_from_data,
+        _tidy_employee_names,
         # Последним: подчищает следы прежних одновременных запусков.
         _dedupe_access_records,
     ]:
@@ -3396,9 +3417,14 @@ def _find_reportable(name):
     тех, кого смотрящему видно. Из нескольких точных — тот, у кого есть
     проходы, и из них с самым свежим.
     """
-    name = (name or '').strip()
+    # Ищем и как прислали, и со схлопнутыми пробелами: в базе их теперь
+    # схлопывают при загрузке, а у начальника в списке могло остаться ФИО с
+    # двойным пробелом из прежней выгрузки.
+    raw = (name or '').strip()
+    name = ' '.join(raw.split())
     if not name:
         return None
+    forms = list(dict.fromkeys((name, raw)))
     allowed = _visible_employee_ids()
 
     def pick(query):
@@ -3415,15 +3441,16 @@ def _find_reportable(name):
         return max(found, key=lambda e: (last.get(e.employee_id) is not None,
                                          last.get(e.employee_id) or date.min))
 
-    exact = pick(Employee.query.filter(Employee.full_name == name))
+    exact = pick(Employee.query.filter(Employee.full_name.in_(forms)))
     if exact is not None:
         return exact
-    partial = pick(Employee.query.filter(Employee.full_name.contains(name)))
+    contains = db.or_(*(Employee.full_name.contains(f) for f in forms))
+    partial = pick(Employee.query.filter(contains))
     if partial is not None:
         return partial
     # Есть, но не виден — пусть /director_report ответит «нет доступа», а не
     # «не найден»: это разные ответы.
-    return Employee.query.filter(Employee.full_name.contains(name)).first()
+    return Employee.query.filter(contains).first()
 
 
 def _home_access(employee_id, today):

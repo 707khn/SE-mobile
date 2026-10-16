@@ -142,7 +142,10 @@ def parse_1c_xml(content: bytes) -> list[dict]:
 
         results.append({
             'employee_1c_id': employee_1c_id,
-            'full_name': emp.get('Наименование', '').strip(),
+            # Пробелы в ФИО схлопываем, как и загрузка списка сотрудников из
+            # Excel: двойной пробел из 1С иначе менял имя при каждой загрузке
+            # туда и обратно, а поиск «Тестов Аман» его не находил.
+            'full_name': ' '.join(emp.get('Наименование', '').split()),
             'position': emp.get('Должность', '').strip(),
             'department': emp.get('Подразделение', '').strip(),
             'salary_rate': _float(emp.get('Оклад')),
