@@ -294,6 +294,12 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now se-mobile-watchdog.timer
 
+say "Новые сборки из GitHub"
+# Раз в десять минут забирает из Releases сборку новее той, что лежит в
+# /var/www/se-mobile. Пока в /etc/se-mobile-fetch-apk.env нет токена, молча
+# ждёт — см. deploy/README.md, «Сборка приезжает на сервер сама».
+APP_DIR="$APP_DIR" bash "$APP_DIR/deploy/install-fetch-apk.sh"
+
 say "Файрвол"
 ufw allow OpenSSH >/dev/null
 ufw allow 'Nginx Full' >/dev/null

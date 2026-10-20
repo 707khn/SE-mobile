@@ -23,7 +23,7 @@
 | 3 | Сертификат (`certbot`, шаг 5 ниже) | — | проверить |
 | 4 | Удалить старый сервер `85.202.192.168` | вы | тарифицируется |
 | 5 | Сменить пароль базы Neon (засветился) | вы | до отключения Render |
-| 6 | Пересобрать приложение с новым адресом, раздать всем 500 | вы | сборка кладётся в `/var/www/se-mobile`, дальше приложение зовёт само |
+| 6 | Пересобрать приложение с новым адресом, раздать всем 500 | вы | сборка приезжает в `/var/www/se-mobile` сама (токен GitHub — один раз, см. «Раздать новую сборку»), дальше приложение зовёт само |
 | 7 | `REQUIRE_AUTH=1` | — | только после 6; смена паролей — **сделано** |
 | 8 | Присмотр за сервером | — | сторож на машине и проверка снаружи раз в час — **сделаны**; включить письма о неудачах в GitHub — вы |
 
@@ -171,27 +171,73 @@ failed workflows». Письмо уходит тому, кто последни�
 Теперь сборка лежит на сервере, а приложение само говорит человеку, что вышла
 новая, и открывает ссылку на скачивание.
 
-1. **На своём компьютере.** Репозиторий в GitHub → справа **Releases** →
-   верхний релиз (`v<версия>-<номер>`) → скачайте `se-mobile-<версия>+<номер>.apk`.
-   Там же лежит `se-mobile-play-…aab` для Google Play. Ссылку на релиз
-   сборка пишет и в итог своего запуска (Actions → «Build Android APK»).
-2. **Оттуда же — на сервер** (PowerShell в папке с файлом):
+#### Сборка приезжает на сервер сама
 
-   ```powershell
-   scp "se-mobile-1.14.1+21.apk" ubuntu@87.199.130.179:/tmp/
-   ```
+После каждого слияния в `main` GitHub собирает APK и выкладывает его в
+**Releases**. Сервер раз в десять минут спрашивает GitHub, нет ли сборки новее,
+скачивает её, сверяет размер и контрольную сумму и кладёт в
+`/var/www/se-mobile` — оттуда её и предлагают телефонам. Делает это
+`deploy/fetch-apk.sh` по таймеру `se-mobile-fetch-apk.timer`.
 
-3. **На сервере.** Папку создаёт `setup.sh`; если сервер ставили до неё —
-   `mkdir` ниже её заведёт:
+Раньше файл переносили руками — Releases → компьютер → `scp` → `mv`, — и
+шаг то забывали, то `scp` обрывался на середине: сборка 1.16.17 лежала в
+Releases, а телефонам сервер предлагал 1.15.2.
+
+**Настроить один раз.**
+
+1. **Токен GitHub только на чтение.** github.com → аватар → **Settings** →
+   **Developer settings** → **Personal access tokens** → **Fine-grained
+   tokens** → **Generate new token**:
+   - *Token name*: `se-mobile server releases`;
+   - *Expiration*: самый долгий, какой дают, — и поставьте себе напоминание
+     за неделю до конца;
+   - *Repository access*: **Only select repositories** → `707khn/SE-mobile`;
+   - *Permissions* → *Repository permissions* → **Contents: Read-only**
+     (Metadata добавится сам). Больше ничего не нужно.
+
+   **Generate token** и скопируйте его — второй раз GitHub его не покажет.
+2. **На сервере:**
 
    ```bash
-   sudo mkdir -p /var/www/se-mobile
-   sudo mv /tmp/se-mobile-*.apk /var/www/se-mobile/
-   sudo chmod 644 /var/www/se-mobile/se-mobile-*.apk
-   curl -s --resolve api.se-btrz.com:443:127.0.0.1 https://api.se-btrz.com/api/app/latest
+   cd /opt/se-mobile && sudo git pull
+   sudo bash deploy/install-fetch-apk.sh
+   sudo nano /etc/se-mobile-fetch-apk.env     # GITHUB_TOKEN=github_pat_…
+   sudo systemctl start se-mobile-fetch-apk
+   journalctl -u se-mobile-fetch-apk -n 5 -o cat
    ```
 
-   В ответе — версия и номер сборки только что положенного файла.
+   В журнале — «Забираю se-mobile-…apk» и «Готово», или ничего, если новее
+   того, что уже лежит, сборки нет. Файл с токеном читает только root.
+
+**Каждый день** делать ничего не нужно. Что было, видно в журнале:
+`journalctl -u se-mobile-fetch-apk --since today -o cat`. Если там «GitHub не
+принял токен» — срок токена кончился: заведите новый (пункт 1) и впишите в
+`/etc/se-mobile-fetch-apk.env`.
+
+**Откатить плохую сборку** — удалить её файл:
+
+```bash
+sudo rm /var/www/se-mobile/se-mobile-1.20.0+60.apk
+```
+
+Обратно таймер её не принесёт: он берёт только сборки новее всех, что уже
+забирал. Следующая сборка приедет как обычно. Хранятся три последние —
+предыдущие есть куда вернуть.
+
+**Руками, если таймер не настроен или GitHub недоступен.** Releases →
+скачать `se-mobile-<версия>+<номер>.apk` → на сервер:
+
+```powershell
+scp "se-mobile-1.16.17+50.apk" ubuntu@87.199.130.179:/tmp/
+```
+
+```bash
+sudo mv /tmp/se-mobile-*.apk /var/www/se-mobile/
+sudo chmod 644 /var/www/se-mobile/se-mobile-*.apk
+curl -s --resolve api.se-btrz.com:443:127.0.0.1 https://api.se-btrz.com/api/app/latest
+```
+
+В ответе — версия и номер сборки только что положенного файла.
 
 Имя файла менять не надо: **версия записана в имени**, сборка сама его так
 называет, и сервер читает версию оттуда же. Отдельного файла с номером версии
@@ -710,6 +756,10 @@ POST https://api.se-btrz.com/api/admin/news/refresh    сходить прямо
 /etc/se-mobile.env         настройки и секреты (доступ только root)
 /etc/se-mobile-db-password пароль базы
 /var/backups/se-mobile/    суточные копии
+/var/www/se-mobile/        сборки приложения, отсюда их скачивают телефоны
+/etc/se-mobile-fetch-apk.env  токен GitHub для новых сборок (только root)
+/var/lib/se-mobile/fetch-apk/ номер последней забранной сборки
 /etc/nginx/sites-available/se-mobile
 /etc/systemd/system/se-mobile.service
+/etc/systemd/system/se-mobile-fetch-apk.{service,timer}
 ```
