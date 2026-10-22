@@ -31,6 +31,7 @@ class FcmService {
     'payslip': ['payslip_channel', 'Зарплата'],
     'menu': ['menu_channel', 'Столовая'],
     'news': ['news_channel', 'Новости и объявления'],
+    'document': ['document_channel', 'Документы предприятия'],
     'turnstile': ['turnstile_channel', 'Проходы турникета'],
   };
 

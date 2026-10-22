@@ -4,7 +4,9 @@ import 'package:get/get.dart';
 
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
+import '../requests/documents_request.dart';
 import '../screens/directory_screen.dart';
+import '../screens/documents_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -47,6 +49,8 @@ class _AppDrawerState extends State<AppDrawer> {
   void initState() {
     super.initState();
     _loadProfile();
+    // Сколько приказов ждут отметки — числом рядом с «Документами».
+    refreshDocumentsPending();
   }
 
   Future<void> _loadProfile() async {
@@ -165,6 +169,15 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.campaign_outlined,
                   label: 'news'.tr,
                   onTap: () => Get.to(() => NewsScreen(job: _job)),
+                ),
+                ValueListenableBuilder<int>(
+                  valueListenable: documentsPending,
+                  builder: (_, pending, __) => _item(
+                    icon: Icons.folder_open_outlined,
+                    label: 'documents'.tr,
+                    value: pending > 0 ? '$pending' : null,
+                    onTap: () => Get.to(() => const DocumentsScreen()),
+                  ),
                 ),
                 _item(
                   icon: Icons.contact_phone_outlined,
