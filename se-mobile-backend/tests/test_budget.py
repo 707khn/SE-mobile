@@ -8,7 +8,7 @@ import pytest
 from openpyxl import Workbook
 
 import app as app_module
-from budget import BudgetLine, BudgetUpload
+from budget import BudgetLine, BudgetUpload, _is_chief_accountant
 from models import db, Notification
 from parser_budget_excel import parse_budget_excel, parse_month
 
@@ -187,3 +187,9 @@ def test_who_sees_what(app, client):
         assert everything['department'] == _STOCK
         assert len(everything['departments']) == 3
     assert _view(app, client, _DIRECTOR, year='2029').get_json()['articles'] == []
+
+
+def test_acting_chief_accountant():
+    assert _is_chief_accountant('Главный бухгалтер')
+    assert _is_chief_accountant('И.о. главного бухгалтер')
+    assert not _is_chief_accountant('Заместитель главного бухгалтера')

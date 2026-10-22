@@ -71,12 +71,19 @@ def may_upload(employee, core):
             or employee.employee_id in _env_ids('BUDGET_UPLOADERS'))
 
 
+def _is_chief_accountant(job_title):
+    """Главный бухгалтер и исполняющий обязанности — «И.о. главного бухгалтер»."""
+    title = _norm(job_title)
+    return 'главный бухгалтер' in title or (
+        title.startswith(('и.о.', 'и. о.', 'ио ')) and 'главного бухгалтер' in title)
+
+
 def sees_all(employee, core):
     if employee is None:
         return False
     return (is_top(employee) or _is_peo(employee)
             or core._is_system_admin(employee.job_title)
-            or 'главный бухгалтер' in _norm(employee.job_title)
+            or _is_chief_accountant(employee.job_title)
             or employee.employee_id in _env_ids('BUDGET_VIEWERS'))
 
 
