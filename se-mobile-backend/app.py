@@ -34,6 +34,7 @@ import purchases
 import payslip_questions
 import assignments
 import business_trips
+import onboarding
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1664,6 +1665,7 @@ def create_app():
     payslip_questions.register(app, sys.modules[__name__])
     assignments.register(app, sys.modules[__name__])
     business_trips.register(app, sys.modules[__name__])
+    onboarding.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):

@@ -10,6 +10,7 @@ import '../screens/it_requests_screen.dart';
 import '../screens/assignments_screen.dart';
 import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
+import '../screens/onboarding_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
 import '../screens/settings_screen.dart';
@@ -198,6 +199,11 @@ class _AppDrawerState extends State<AppDrawer> {
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
                 const SizedBox(height: 8),
+                _item(
+                  icon: Icons.waving_hand_outlined,
+                  label: 'ob_title'.tr,
+                  onTap: () => Get.to(() => const OnboardingScreen()),
+                ),
                 // Оформление, язык, пароль, код и «О программе» — на своём
                 // экране: в меню они занимали половину списка.
                 _item(

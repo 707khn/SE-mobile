@@ -23,6 +23,8 @@ import 'assignment_detail_screen.dart';
 import 'assignments_screen.dart';
 import 'purchases_screen.dart';
 import 'news_screen.dart';
+import 'onboarding_detail_screen.dart';
+import 'onboarding_screen.dart';
 import 'rollout_screen.dart';
 
 /// Оповещения: что нового с прошлого раза.
@@ -99,6 +101,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const BusinessTripsScreen()
             : BusinessTripDetailScreen(tripId: id));
+      case 'onboarding':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const OnboardingScreen()
+            : OnboardingDetailScreen(onboardingId: id));
       case 'assignment':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -217,6 +224,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'purchase' => (Icons.shopping_cart_outlined, const Color(0xFFAD1457)),
       'payslip_q' => (Icons.contact_support_outlined, context.accentColor),
       'assignment' => (Icons.task_alt, const Color(0xFF0277BD)),
+      'onboarding' => (Icons.waving_hand_outlined, const Color(0xFF00897B)),
       'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
