@@ -14,6 +14,7 @@ import 'localization_pretrip.dart';
 import 'localization_hazard.dart';
 import 'localization_techq.dart';
 import 'localization_balances.dart';
+import 'localization_datafix.dart';
 import 'localization_purchase.dart';
 import 'localization_repair.dart';
 import 'localization_stock.dart';
@@ -38,6 +39,7 @@ class LocaleString extends Translations {
           ...hazardStringsKk,
           ...techQuestionStringsKk,
           ...stockBalanceStringsKk,
+          ...dataCorrectionStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
           'show report': 'Жеке есепті көрсету',
@@ -401,6 +403,7 @@ class LocaleString extends Translations {
           ...hazardStringsRu,
           ...techQuestionStringsRu,
           ...stockBalanceStringsRu,
+          ...dataCorrectionStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',
           'show report': 'Показать личный отчёт',

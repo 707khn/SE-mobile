@@ -45,6 +45,7 @@ import pre_trip
 import hazards
 import tech_questions
 import stock_balances
+import data_corrections
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1686,6 +1687,7 @@ def create_app():
     hazards.register(app, sys.modules[__name__])
     tech_questions.register(app, sys.modules[__name__])
     stock_balances.register(app, sys.modules[__name__])
+    data_corrections.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):

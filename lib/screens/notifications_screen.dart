@@ -10,6 +10,8 @@ import '../utils/notice_badge.dart';
 import '../utils/role_helper.dart';
 import '../utils/shell_tab.dart';
 import '../widgets/load_error_view.dart';
+import 'data_correction_detail_screen.dart';
+import 'data_corrections_screen.dart';
 import 'directory_screen.dart';
 import 'menu_screen.dart';
 import 'news_admin_screen.dart';
@@ -127,6 +129,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             : HazardDetailScreen(hazardId: id));
       case 'pretrip':
         Get.to(() => const PreTripScreen());
+      case 'datafix':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const DataCorrectionsScreen()
+            : DataCorrectionDetailScreen(correctionId: id));
       case 'assignment':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -282,6 +289,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'pretrip' => (Icons.medical_services_outlined, const Color(0xFF00838F)),
       'hazard' => (Icons.report_problem_outlined, const Color(0xFFC62828)),
       'techq' => (Icons.engineering_outlined, const Color(0xFF3949AB)),
+      'datafix' => (Icons.badge_outlined, const Color(0xFF5E35B1)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
+import '../screens/data_corrections_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
 import '../screens/repair_requests_screen.dart';
@@ -253,6 +254,11 @@ class _AppDrawerState extends State<AppDrawer> {
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
                 const SizedBox(height: 8),
+                _item(
+                  icon: Icons.badge_outlined,
+                  label: 'dc_title'.tr,
+                  onTap: () => Get.to(() => const DataCorrectionsScreen()),
+                ),
                 // Оформление, язык, пароль, код и «О программе» — на своём
                 // экране: в меню они занимали половину списка.
                 _item(
