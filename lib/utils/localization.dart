@@ -177,6 +177,16 @@ class LocaleString extends Translations {
           'pin_forgot_body': 'Логин мен құпиясөзбен қайта кіресіз, содан кейін '
               'жаңа код ойлап табасыз.',
           'pin_changed': 'Код өзгертілді',
+          'biometric_reason': 'Қолданбаға кіру үшін саусағыңызды тигізіңіз',
+          'biometric_button': 'Саусақ ізімен кіру',
+          'biometric_setting': 'Саусақ ізімен кіру',
+          'biometric_setting_hint': 'Кодтың орнына. Код бұрынғыдай жұмыс істейді.',
+          'biometric_offer_title': 'Саусақ ізімен кіресіз бе?',
+          'biometric_offer_body': 'Қолданба кодсыз, саусақ ізімен ашылады. '
+              'Саусақ танылмаса, кодты енгізуге болады. Кейін «Баптаулар» '
+              'бөлімінде өшіруге болады.',
+          'biometric_offer_yes': 'Қосу',
+          'biometric_offer_no': 'Қажет емес',
           'password_change_title': 'Құпиясөзді өзгерту',
           'password_change_why_reset': 'Құпиясөзіңіз қалпына келтірілді. '
               'Жаңасын ойлап табыңыз — сізге берілген құпиясөзді басқа '
@@ -516,6 +526,16 @@ class LocaleString extends Translations {
           'pin_forgot_body': 'Вы войдёте по логину и паролю, а потом придумаете '
               'новый код.',
           'pin_changed': 'Код изменён',
+          'biometric_reason': 'Приложите палец, чтобы войти в приложение',
+          'biometric_button': 'Войти по отпечатку',
+          'biometric_setting': 'Вход по отпечатку пальца',
+          'biometric_setting_hint': 'Вместо кода. Код по-прежнему работает.',
+          'biometric_offer_title': 'Входить по отпечатку?',
+          'biometric_offer_body': 'Приложение будет открываться по отпечатку '
+              'пальца, без кода. Если палец не прочитается, можно набрать код. '
+              'Выключить можно в «Настройках».',
+          'biometric_offer_yes': 'Включить',
+          'biometric_offer_no': 'Не нужно',
           'password_change_title': 'Смена пароля',
           'password_change_why_reset': 'Ваш пароль сбросили. Придумайте '
               'новый — тот, что вам передали, знаете не только вы.',

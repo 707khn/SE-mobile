@@ -74,6 +74,15 @@ class SecureStorageHelper {
 
   Future<void> resetPinFails() async => _storage.delete(key: 'pinFails');
 
+  /// Входить ли по отпечатку вместо кода. Включают сами, в «Настройках»:
+  /// по умолчанию выключено. Стирается вместе со всем при выходе.
+  Future<bool> biometricEnabled() async =>
+      await _storage.read(key: 'biometric') == 'true';
+
+  Future<void> setBiometricEnabled(bool enabled) async => enabled
+      ? _storage.write(key: 'biometric', value: 'true')
+      : _storage.delete(key: 'biometric');
+
   Future<String?> getLogin() async {
     return await _storage.read(key: 'login');
   }
