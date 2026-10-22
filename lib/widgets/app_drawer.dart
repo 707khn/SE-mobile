@@ -8,6 +8,7 @@ import '../screens/business_trips_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
 import '../screens/assignments_screen.dart';
+import '../screens/tech_screen.dart';
 import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/onboarding_screen.dart';
@@ -181,6 +182,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.support_agent_outlined,
                   label: 'it_title'.tr,
                   onTap: () => Get.to(() => const ItRequestsScreen()),
+                ),
+                _item(
+                  icon: Icons.devices_outlined,
+                  label: 'ta_title'.tr,
+                  onTap: () => Get.to(() => const TechScreen()),
                 ),
                 _item(
                   icon: Icons.shopping_cart_outlined,
