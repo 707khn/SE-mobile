@@ -13,6 +13,7 @@ import '../screens/approvals_screen.dart';
 import '../screens/material_passes_screen.dart';
 import '../screens/on_site_screen.dart';
 import '../screens/assignments_screen.dart';
+import '../screens/hazards_screen.dart';
 import '../screens/orders_screen.dart';
 import '../screens/pre_trip_screen.dart';
 import '../screens/purchases_screen.dart';
@@ -231,6 +232,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.task_alt,
                   label: 'asg_title'.tr,
                   onTap: () => Get.to(() => const AssignmentsScreen()),
+                ),
+                _item(
+                  icon: Icons.report_problem_outlined,
+                  label: 'hz_title'.tr,
+                  onTap: () => Get.to(() => const HazardsScreen()),
                 ),
                 if (usesPreTrip(_job))
                   _item(

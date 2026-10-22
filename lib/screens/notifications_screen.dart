@@ -28,6 +28,8 @@ import 'purchase_detail_screen.dart';
 import 'assignment_detail_screen.dart';
 import 'assignments_screen.dart';
 import 'order_detail_screen.dart';
+import 'hazard_detail_screen.dart';
+import 'hazards_screen.dart';
 import 'orders_screen.dart';
 import 'pre_trip_screen.dart';
 import 'purchases_screen.dart';
@@ -111,6 +113,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const StockRequestsScreen()
             : StockRequestDetailScreen(requestId: id));
+      case 'hazard':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const HazardsScreen()
+            : HazardDetailScreen(hazardId: id));
       case 'pretrip':
         Get.to(() => const PreTripScreen());
       case 'assignment':
@@ -266,6 +273,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'order' => (Icons.gavel_outlined, const Color(0xFF455A64)),
       'assignment' => (Icons.task_alt, const Color(0xFF0277BD)),
       'pretrip' => (Icons.medical_services_outlined, const Color(0xFF00838F)),
+      'hazard' => (Icons.report_problem_outlined, const Color(0xFFC62828)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(

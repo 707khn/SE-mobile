@@ -27,6 +27,7 @@ import 'approvals_screen.dart';
 import 'material_passes_screen.dart';
 import 'on_site_screen.dart';
 import 'assignments_screen.dart';
+import 'hazards_screen.dart';
 import 'orders_screen.dart';
 import 'pre_trip_screen.dart';
 import 'purchases_screen.dart';
@@ -315,6 +316,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       subtitle: 'asg_home_subtitle'.tr,
                       color: const Color(0xFF0277BD),
                       onTap: () => Get.to(() => const AssignmentsScreen()),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.report_problem_outlined,
+                      label: 'hz_title'.tr,
+                      subtitle: 'hz_home_subtitle'.tr,
+                      color: const Color(0xFFC62828),
+                      onTap: () => Get.to(() => const HazardsScreen()),
                     ),
                     if (usesPreTrip(widget.job))
                       _buildActionCard(
