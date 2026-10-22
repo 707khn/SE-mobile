@@ -10,6 +10,7 @@ import '../utils/notice_badge.dart';
 import '../utils/role_helper.dart';
 import '../utils/shell_tab.dart';
 import '../widgets/load_error_view.dart';
+import 'medical_screen.dart';
 import 'menu_screen.dart';
 import 'news_admin_screen.dart';
 import 'it_request_detail_screen.dart';
@@ -101,6 +102,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const BusinessTripsScreen()
             : BusinessTripDetailScreen(tripId: id));
+      case 'medical':
+        Get.to(() => const MedicalScreen());
       case 'onboarding':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -225,6 +228,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'payslip_q' => (Icons.contact_support_outlined, context.accentColor),
       'assignment' => (Icons.task_alt, const Color(0xFF0277BD)),
       'onboarding' => (Icons.waving_hand_outlined, const Color(0xFF00897B)),
+      'medical' => (Icons.health_and_safety_outlined, const Color(0xFF00838F)),
       'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
