@@ -307,6 +307,12 @@ say "Копии вне сервера"
 # «Копия вне сервера».
 APP_DIR="$APP_DIR" bash "$APP_DIR/deploy/install-offsite.sh"
 
+say "Обновление, откат и тестовый стенд"
+# se-mobile-release / se-mobile-rollback / se-mobile-staging — см.
+# deploy/README.md, «Обновление и откат». Сам стенд не ставится: он нужен
+# не всегда, а память на машине общая.
+APP_DIR="$APP_DIR" bash "$APP_DIR/deploy/install-release.sh"
+
 say "Файрвол"
 ufw allow OpenSSH >/dev/null
 ufw allow 'Nginx Full' >/dev/null

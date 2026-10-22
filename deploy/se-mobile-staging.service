@@ -1,0 +1,37 @@
+# Тестовый стенд — см. deploy/staging.sh. Ставит его se-mobile-staging install.
+#
+# Отличия от se-mobile.service: порт 8001, свои настройки и база
+# (/etc/se-mobile-staging.env), два процесса вместо трёх и потолок памяти.
+# На машине 2 ГБ: стенд, разросшийся сверх меры, systemd остановит раньше,
+# чем он начнёт вытеснять рабочий сервер и PostgreSQL.
+[Unit]
+Description=SE-mobile API — тестовый стенд
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=semobile
+Group=semobile
+WorkingDirectory=/opt/se-mobile-staging/se-mobile-backend
+EnvironmentFile=/etc/se-mobile-staging.env
+
+ExecStart=/opt/se-mobile-staging/venv/bin/gunicorn \
+    --workers 2 \
+    --bind 127.0.0.1:8001 \
+    --timeout 60 \
+    --access-logfile - \
+    --error-logfile - \
+    app:app
+
+MemoryMax=400M
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+# Секции [Install] нет намеренно: стенд не стартует сам после перезагрузки.
+# Запущен, пока нужен: se-mobile-staging start / stop.
