@@ -31,3 +31,15 @@ bool usesPreTrip(String job) {
       lower.contains('заведующий хо') ||
       (lower.contains('руководител') && lower.contains('дмто'));
 }
+
+/// График ППР: мастерам, энергетикам, механикам, инженерам и руководителям.
+/// Остальным пункт в меню ни к чему; что именно видно — решает сервер.
+bool usesMaintenance(String job) {
+  final lower = job.toLowerCase();
+  return isAdminRole(job) ||
+      isSystemAdmin(job) ||
+      lower.contains('мастер') ||
+      lower.contains('энергетик') ||
+      lower.contains('механик') ||
+      lower.contains('инженер');
+}

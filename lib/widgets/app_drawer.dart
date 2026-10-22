@@ -26,6 +26,7 @@ import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/main_screen_2.dart';
+import '../screens/maintenance_screen.dart';
 import '../screens/medical_screen.dart';
 import '../screens/menu_screen.dart';
 import '../screens/settings_screen.dart';
@@ -261,6 +262,12 @@ class _AppDrawerState extends State<AppDrawer> {
                   label: 'bt_title'.tr,
                   onTap: () => Get.to(() => const BusinessTripsScreen()),
                 ),
+                if (usesMaintenance(_job))
+                  _item(
+                    icon: Icons.build_circle_outlined,
+                    label: 'pm_title'.tr,
+                    onTap: () => Get.to(() => const MaintenanceScreen()),
+                  ),
                 if (usesPreTrip(_job))
                   _item(
                     icon: Icons.medical_services_outlined,

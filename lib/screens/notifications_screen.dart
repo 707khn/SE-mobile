@@ -13,6 +13,7 @@ import '../widgets/load_error_view.dart';
 import 'data_correction_detail_screen.dart';
 import 'data_corrections_screen.dart';
 import 'directory_screen.dart';
+import 'maintenance_screen.dart';
 import 'medical_screen.dart';
 import 'menu_screen.dart';
 import 'news_admin_screen.dart';
@@ -154,6 +155,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const BusinessTripsScreen()
             : BusinessTripDetailScreen(tripId: id));
+      case 'maintenance':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const MaintenanceScreen()
+            : EquipmentScreen(equipmentId: id));
       case 'medical':
         Get.to(() => const MedicalScreen());
       case 'workwear':
@@ -326,6 +332,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'onboarding' => (Icons.waving_hand_outlined, const Color(0xFF00897B)),
       'workwear' => (Icons.checkroom_outlined, const Color(0xFF6D4C41)),
       'medical' => (Icons.health_and_safety_outlined, const Color(0xFF00838F)),
+      'maintenance' => (Icons.build_circle_outlined, const Color(0xFF455A64)),
       'datafix' => (Icons.badge_outlined, const Color(0xFF5E35B1)),
       'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       'waybill' => (Icons.route_outlined, const Color(0xFF00695C)),

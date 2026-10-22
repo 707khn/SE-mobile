@@ -22,6 +22,7 @@ import 'localization_lunch.dart';
 import 'localization_onboarding.dart';
 import 'localization_workwear.dart';
 import 'localization_medical.dart';
+import 'localization_maintenance.dart';
 import 'localization_purchase.dart';
 import 'localization_repair.dart';
 import 'localization_stock.dart';
@@ -54,6 +55,7 @@ class LocaleString extends Translations {
           ...onboardingStringsKk,
           ...workwearStringsKk,
           ...medicalStringsKk,
+          ...maintenanceStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
           'show report': 'Жеке есепті көрсету',
@@ -425,6 +427,7 @@ class LocaleString extends Translations {
           ...onboardingStringsRu,
           ...workwearStringsRu,
           ...medicalStringsRu,
+          ...maintenanceStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',
           'show report': 'Показать личный отчёт',
