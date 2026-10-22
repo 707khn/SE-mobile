@@ -19,6 +19,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/notification_bell.dart';
 import 'admin_panel_screen.dart';
 import 'attendance_screen.dart';
+import 'it_requests_screen.dart';
 import 'menu_screen.dart';
 import 'main_screen_2.dart';
 import '../utils/app_theme.dart';
@@ -241,6 +242,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       subtitle: 'canteen_subtitle'.tr,
                       color: const Color(0xFFC62828),
                       onTap: () => widget.onNavigate(4),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.support_agent,
+                      label: 'it_title'.tr,
+                      subtitle: 'it_home_subtitle'.tr,
+                      color: const Color(0xFF37474F),
+                      onTap: () => Get.to(() => const ItRequestsScreen()),
                     ),
                   ],
                   // Managers keep their team-wide screens, now inside the shell.
