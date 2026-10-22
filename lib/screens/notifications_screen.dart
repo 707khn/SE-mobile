@@ -17,6 +17,7 @@ import 'it_request_detail_screen.dart';
 import 'it_requests_screen.dart';
 import 'business_trip_detail_screen.dart';
 import 'business_trips_screen.dart';
+import 'reception_screen.dart';
 import 'tech_screen.dart';
 import 'payslip_question_detail_screen.dart';
 import 'payslip_questions_screen.dart';
@@ -106,6 +107,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'outage':
       case 'itasset':
         Get.to(() => const TechScreen());
+      case 'reception':
+        Get.to(() => const ReceptionScreen());
       case 'medical':
         Get.to(() => const MedicalScreen());
       case 'onboarding':
@@ -235,6 +238,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'medical' => (Icons.health_and_safety_outlined, const Color(0xFF00838F)),
       'outage' => (Icons.power_off_outlined, const Color(0xFFE65100)),
       'itasset' => (Icons.devices_outlined, const Color(0xFF00695C)),
+      'reception' => (Icons.event_seat_outlined, const Color(0xFF5D4037)),
       'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
