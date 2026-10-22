@@ -29,6 +29,9 @@ NAME = 'se-mobile-1.20.0+60.apk'
 class _GitHub(BaseHTTPRequestHandler):
     release = None
     status = 200
+    body = None
+    asset_status = 200
+    expires = None
     seen_tokens = []
 
     def log_message(self, *args):
@@ -45,12 +48,19 @@ class _GitHub(BaseHTTPRequestHandler):
     def do_GET(self):
         self.seen_tokens.append(self.headers.get('Authorization'))
         if self.path == '/repos/test/repo/releases/latest':
+            headers = []
+            if self.expires:
+                headers.append(('GitHub-Authentication-Token-Expiration',
+                                self.expires))
             if self.status != 200:
-                return self._send(self.status, b'{}')
-            return self._send(200, json.dumps(self.release).encode())
+                return self._send(self.status, b'{}', headers)
+            body = self.body or json.dumps(self.release).encode()
+            return self._send(200, body, headers)
         if self.path == '/assets/2':
             if self.headers.get('Accept') != 'application/octet-stream':
                 return self._send(415)
+            if self.asset_status != 200:
+                return self._send(self.asset_status)
             return self._send(302, headers=[('Location', '/blob/apk')])
         if self.path == '/blob/apk':
             return self._send(200, APK)
@@ -62,6 +72,9 @@ def github():
     server = ThreadingHTTPServer(('127.0.0.1', 0), _GitHub)
     base = f'http://127.0.0.1:{server.server_port}'
     _GitHub.status = 200
+    _GitHub.body = None
+    _GitHub.asset_status = 200
+    _GitHub.expires = None
     _GitHub.seen_tokens = []
     _GitHub.release = {'assets': [
         {'name': 'se-mobile-play-1.20.0+60.aab', 'state': 'uploaded',
@@ -167,3 +180,87 @@ def test_without_token_quietly_waits(github, dirs):
     assert 'GITHUB_TOKEN не задан' in done.stdout
     assert _apks(apk_dir) == []
     assert _GitHub.seen_tokens == []
+
+
+def _status(dirs):
+    _, state = dirs
+    lines = (state / 'status').read_text(encoding='utf-8').splitlines()
+    return dict(line.split('=', 1) for line in lines)
+
+
+def test_success_is_recorded_for_the_admin_screen(github, dirs):
+    _GitHub.expires = '2027-01-21 00:00:00 UTC'
+    assert _run(github, dirs).returncode == 0
+    status = _status(dirs)
+    assert status['result'] == 'ok'
+    assert NAME in status['message']
+    assert status['token_expires'] == '2027-01-21 00:00:00 UTC'
+    assert status['checked_at'].endswith('Z')
+
+
+def test_failure_is_recorded_with_the_same_words(github, dirs):
+    _GitHub.status = 401
+    assert _run(github, dirs).returncode == 1
+    status = _status(dirs)
+    assert status['result'] == 'fail'
+    assert 'не принял токен' in status['message']
+
+
+def test_missing_token_is_recorded(github, dirs):
+    assert _run(github, dirs, token='').returncode == 0
+    assert _status(dirs)['result'] == 'no-token'
+
+
+def test_broken_download_is_named_and_leaves_nothing(github, dirs):
+    apk_dir, state = dirs
+    _GitHub.asset_status = 500
+    done = _run(github, dirs)
+    assert done.returncode == 1
+    assert 'не отдал файл' in done.stderr
+    assert _apks(apk_dir) == []
+    assert not list(apk_dir.glob('.download-*'))
+    assert not (state / 'last-build').exists()
+    assert _status(dirs)['result'] == 'fail'
+
+
+def test_garbage_instead_of_release_is_named(github, dirs):
+    # Прокси или страница-заглушка вместо GitHub: 200, а внутри не JSON.
+    _GitHub.body = b'<html>captive portal</html>'
+    done = _run(github, dirs)
+    assert done.returncode == 1
+    assert 'непонятное' in done.stderr
+    assert 'Traceback' not in done.stderr
+
+
+@pytest.mark.skipif(not shutil.which('flock'), reason='нужен flock')
+def test_second_run_waits_for_the_first(github, dirs):
+    apk_dir, state = dirs
+    state.mkdir()
+    holder = subprocess.Popen(['flock', str(state / 'lock'), 'sleep', '5'])
+    try:
+        import time
+        for _ in range(50):
+            done = subprocess.run(['flock', '-n', str(state / 'lock'),
+                                   'true'])
+            if done.returncode != 0:
+                break
+            time.sleep(0.05)
+        done = _run(github, dirs)
+        assert done.returncode == 0
+        assert 'Уже идёт' in done.stdout
+        assert _apks(apk_dir) == []
+    finally:
+        holder.kill()
+        holder.wait()
+
+
+def test_server_understands_what_the_script_wrote(github, dirs, monkeypatch):
+    # Файл пишет bash, читает Flask: формат должен сходиться у обоих.
+    import app as app_module
+    _, state = dirs
+    _GitHub.status = 401
+    _run(github, dirs)
+    monkeypatch.setattr(app_module, '_FETCH_APK_STATUS', str(state / 'status'))
+    seen = app_module._fetch_apk_state()
+    assert seen['result'] == 'fail'
+    assert seen['problem'].startswith('GitHub не принял токен')

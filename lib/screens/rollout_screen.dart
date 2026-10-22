@@ -96,6 +96,7 @@ class _RolloutScreenState extends State<RolloutScreen> {
       else
         _line(r.appProblem.isEmpty ? 'rollout_apk_none'.tr : r.appProblem, '',
             muted: true),
+      if (r.fetchProblem.isNotEmpty) _line(r.fetchProblem, ''),
       SizedBox(height: Dimensions.height30 / 2),
       Text('rollout_apk_why'.tr,
           style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),

@@ -1817,6 +1817,78 @@ def _latest_apk():
     }
 
 
+# Чем кончился последний запуск deploy/fetch-apk.sh. Файл пишет таймер
+# se-mobile-fetch-apk, приложение только читает.
+_FETCH_APK_STATUS = os.environ.get(
+    'FETCH_APK_STATUS', '/var/lib/se-mobile/fetch-apk/status')
+
+# Таймер ходит раз в десять минут. Час без отметки — он не запускается.
+_FETCH_APK_SILENT_AFTER = timedelta(hours=1)
+
+# За сколько дней до конца срока токена начинать предупреждать.
+_TOKEN_WARN_DAYS = 14
+
+
+def _fetch_apk_state():
+    """Приезжают ли новые сборки из GitHub Releases сами.
+
+    Когда у токена кончится срок, сборки просто перестанут приезжать: старая
+    останется на месте, телефоны ничего не заметят, а ошибка будет только в
+    журнале systemd, который читает один root. Поэтому причина показывается
+    там же, где сборка на сервере, — и срок токена заранее, а не по первому
+    отказу.
+
+    `problem` пусто — всё в порядке.
+    """
+    try:
+        with open(_FETCH_APK_STATUS, encoding='utf-8', errors='replace') as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
+        return {'available': False,
+                'problem': 'Сборки из GitHub Releases не забирались ни разу: '
+                           'таймер se-mobile-fetch-apk не установлен или ещё '
+                           'не запускался. См. deploy/README.md.'}
+    except OSError as e:
+        return {'available': False, 'problem': str(e)}
+
+    fields = dict(line.split('=', 1) for line in lines if '=' in line)
+    result = fields.get('result') or 'fail'
+    message = fields.get('message') or ''
+    state = {'available': True, 'result': result, 'message': message,
+             'checked_at': fields.get('checked_at') or None,
+             'token_expires': fields.get('token_expires') or None,
+             'token_days_left': None}
+
+    problems = []
+    if result != 'ok':
+        problems.append(message or 'Последний запуск не удался.')
+
+    now = datetime.now(timezone.utc)
+    try:
+        checked = datetime.strptime(state['checked_at'], '%Y-%m-%dT%H:%M:%SZ') \
+            .replace(tzinfo=timezone.utc)
+        if now - checked > _FETCH_APK_SILENT_AFTER:
+            problems.append(f'Таймер не запускался с {state["checked_at"]}.')
+    except (TypeError, ValueError):
+        problems.append('Непонятно, когда таймер запускался в последний раз.')
+
+    # GitHub называет срок так: «2027-01-21 00:00:00 UTC».
+    try:
+        expires = datetime.strptime(state['token_expires'],
+                                    '%Y-%m-%d %H:%M:%S UTC') \
+            .replace(tzinfo=timezone.utc)
+        days = (expires - now).days
+        state['token_days_left'] = days
+        if result == 'ok' and days < _TOKEN_WARN_DAYS:
+            problems.append(f'Токен GitHub истекает через {max(days, 0)} дн. '
+                            '— заведите новый, см. deploy/README.md.')
+    except (TypeError, ValueError):
+        pass
+
+    state['problem'] = ' '.join(problems)
+    return state
+
+
 # Что сторож записал о перебоях. Файл пишет /usr/local/bin/se-mobile-watchdog,
 # приложение только читает.
 _WATCHDOG_LOG = os.environ.get(
@@ -1969,6 +2041,10 @@ def register_routes(app):
         Отвечает 503, когда базы нет: по этому коду за него может взяться и
         сторож на сервере, и любой сторонний присмотр, если его когда-нибудь
         заведут.
+
+        Текст ошибки — только в журнал. Адрес открыт всему интернету без
+        пропуска, а PostgreSQL в ошибке называет адрес базы и имя
+        пользователя: «password authentication failed for user …».
         """
         try:
             db.session.execute(db.text('SELECT 1'))
@@ -1976,7 +2052,7 @@ def register_routes(app):
         except Exception as e:
             db.session.rollback()
             logging.error('Проверка здоровья не прошла: %s', e)
-            return jsonify({'status': 'fail', 'database': str(e)[:200]}), 503
+            return jsonify({'status': 'fail', 'database': 'unavailable'}), 503
 
     @app.route('/api/app/latest', methods=['GET'])
     def app_latest():
@@ -3154,6 +3230,9 @@ def register_routes(app):
             # «сколько людей на старой версии» не на что и смотреть: обновиться
             # им неоткуда.
             'app': _latest_apk(),
+            # Приезжают ли новые сборки сами. Истёкший токен иначе виден
+            # только в журнале systemd.
+            'fetch_apk': _fetch_apk_state(),
             # Что сторож записал о перебоях. Пусто — сервер не падал.
             'outages': _outage_state(),
         })

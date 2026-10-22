@@ -209,8 +209,11 @@ Releases, а телефонам сервер предлагал 1.15.2.
    В журнале — «Забираю se-mobile-…apk» и «Готово», или ничего, если новее
    того, что уже лежит, сборки нет. Файл с токеном читает только root.
 
-**Каждый день** делать ничего не нужно. Что было, видно в журнале:
-`journalctl -u se-mobile-fetch-apk --since today -o cat`. Если там «GitHub не
+**Каждый день** делать ничего не нужно. Если сборки перестали приезжать —
+истёк токен, таймер не запускается, кончилось место, — причина видна в
+приложении на экране **«Обновление»**, под сборкой на сервере. Там же за две
+недели до конца срока появится предупреждение о токене. Подробности — в
+журнале: `journalctl -u se-mobile-fetch-apk --since today -o cat`. Если там «GitHub не
 принял токен» — срок токена кончился: заведите новый (пункт 1) и впишите в
 `/etc/se-mobile-fetch-apk.env`.
 
@@ -758,7 +761,8 @@ POST https://api.se-btrz.com/api/admin/news/refresh    сходить прямо
 /var/backups/se-mobile/    суточные копии
 /var/www/se-mobile/        сборки приложения, отсюда их скачивают телефоны
 /etc/se-mobile-fetch-apk.env  токен GitHub для новых сборок (только root)
-/var/lib/se-mobile/fetch-apk/ номер последней забранной сборки
+/var/lib/se-mobile/fetch-apk/ номер последней забранной сборки и итог
+                              последнего запуска (status) для экрана «Обновление»
 /etc/nginx/sites-available/se-mobile
 /etc/systemd/system/se-mobile.service
 /etc/systemd/system/se-mobile-fetch-apk.{service,timer}

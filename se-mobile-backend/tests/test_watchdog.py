@@ -28,13 +28,15 @@ def test_health_fails_when_the_database_does(app, client, monkeypatch):
     по нему за дело берётся сторож.
     """
     def _refuse(*args, **kwargs):
-        raise RuntimeError('база не отвечает')
+        raise RuntimeError('password authentication failed for user "semobile"')
 
     monkeypatch.setattr(db.session, 'execute', _refuse)
     answer = client.get('/health')
     assert answer.status_code == 503
     body = answer.get_json()
-    assert body['status'] == 'fail' and 'не отвечает' in body['database']
+    assert body == {'status': 'fail', 'database': 'unavailable'}
+    # Адрес открыт всем: имя пользователя базы наружу не уходит.
+    assert 'semobile' not in answer.get_data(as_text=True)
 
 
 def test_health_needs_no_pass(app, client):

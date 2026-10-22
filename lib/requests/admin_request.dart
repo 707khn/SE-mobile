@@ -110,6 +110,10 @@ class RolloutReport {
   /// Почему её нет.
   String appProblem = '';
 
+  /// Почему новые сборки не приезжают из GitHub Releases сами: истёк токен,
+  /// таймер не запускается. Пусто — приезжают.
+  String fetchProblem = '';
+
   /// Последние перебои, замеченные сторожем на сервере. Пусто — не падал.
   List<Outage> outages = <Outage>[];
 
@@ -171,6 +175,8 @@ Future<RolloutReport> fetchRollout() async {
   } else {
     report.appProblem = (app['reason'] as String?) ?? '';
   }
+  final fetch = (body['fetch_apk'] as Map?) ?? {};
+  report.fetchProblem = (fetch['problem'] as String?) ?? '';
   report.backupCount = (backups['count'] as num?)?.toInt() ?? 0;
   report.backupDaysAgo = (backups['days_ago'] as num?)?.toInt();
   report.backupProblem =
