@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
 import '../screens/directory_screen.dart';
+import '../screens/hr_queue_screen.dart';
+import '../screens/hr_requests_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -114,6 +116,11 @@ class _AppDrawerState extends State<AppDrawer> {
                     label: 'canteen_menu'.tr,
                     onTap: () => Get.to(() => MenuScreen(job: _job)),
                   ),
+                  _item(
+                    icon: Icons.inbox_outlined,
+                    label: 'hr_queue'.tr,
+                    onTap: () => Get.to(() => const HrQueueScreen()),
+                  ),
                 ] else ...[
                   _item(
                     icon: Icons.home_outlined,
@@ -145,6 +152,20 @@ class _AppDrawerState extends State<AppDrawer> {
                     index: 4,
                     onTap: () => _goToTab(4),
                   ),
+                  // Справки и заявление на отпуск — без похода в кадры.
+                  _item(
+                    icon: Icons.assignment_outlined,
+                    label: 'hr_requests'.tr,
+                    onTap: () => Get.to(() => const HrRequestsScreen()),
+                  ),
+                  if (isHrStaff(_job)) ...[
+                    _section('drawer_hr'.tr),
+                    _item(
+                      icon: Icons.inbox_outlined,
+                      label: 'hr_queue'.tr,
+                      onTap: () => Get.to(() => const HrQueueScreen()),
+                    ),
+                  ],
                   if (isAdminRole(_job)) ...[
                     _section('drawer_manager'.tr),
                     _item(

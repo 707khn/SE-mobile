@@ -19,3 +19,10 @@ bool isCanteenTech(String job) {
   final lower = job.toLowerCase();
   return lower.contains('технолог') && lower.contains('столов');
 }
+
+/// Отдел кадров: «Специалист по кадрам», «Инспектор по кадрам», «Начальник
+/// отдела кадров». Им открыта очередь заявок; администратору — тоже, чтобы
+/// подменить. Правило то же, что на сервере.
+bool isHrStaff(String job) => job.toLowerCase().contains('кадр');
+
+bool canProcessHr(String job) => isHrStaff(job) || isSystemAdmin(job);

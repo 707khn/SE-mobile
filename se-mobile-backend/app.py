@@ -19,7 +19,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
-                    AuthMiss)
+                    AuthMiss, HrRequest)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import (parse_directory_excel, split_phones,
@@ -1101,6 +1101,108 @@ def _may_edit_menu():
         return not _AUTH_REQUIRED
     job = (viewer.job_title or '').lower()
     return ('технолог' in job and 'столов' in job) or _is_system_admin(job)
+
+
+def _is_hr_job(job_title):
+    """Сотрудник отдела кадров: «Специалист по кадрам», «Инспектор по
+    кадрам», «Начальник отдела кадров» — всех их объединяет «кадр»."""
+    return 'кадр' in (job_title or '').lower()
+
+
+def _may_process_hr():
+    """Кто разбирает заявки в кадры: сами кадры и админ — подменить их."""
+    viewer = getattr(g, 'employee', None)
+    if viewer is None:
+        return False
+    return _is_hr_job(viewer.job_title) or _is_system_admin(viewer.job_title)
+
+
+# Заявки в отдел кадров.
+_HR_KINDS = {
+    'employment': 'Справка с места работы',
+    'income': 'Справка о доходах',
+    'vacation': 'Заявление на отпуск',
+}
+
+# Куда из какого состояния можно перейти и кто это делает. Выданную или
+# отклонённую заявку назад не открывают: понадобилось снова — новая заявка,
+# иначе в истории не понять, что было на самом деле.
+_HR_STEPS = {
+    'new': {'accepted', 'ready', 'rejected'},
+    'accepted': {'ready', 'rejected'},
+    'ready': {'done', 'rejected'},
+}
+_HR_OPEN = ('new', 'accepted', 'ready')
+
+# Сколько незакрытых заявок может висеть на одном человеке. Обычному
+# сотруднику хватит двух-трёх; ограничение — от случайной очереди одинаковых
+# заявок, когда кнопку нажали десять раз подряд.
+_HR_OPEN_LIMIT = 10
+
+# Что увидит сотрудник в уведомлении о смене состояния.
+_HR_STATUS_TEXT = {
+    'accepted': 'принята',
+    'ready': 'готова',
+    'done': 'выдана',
+    'rejected': 'отклонена',
+}
+
+
+def _utc_iso(moment):
+    return moment.replace(tzinfo=timezone.utc).isoformat() if moment else None
+
+
+def _hr_request_json(row, employee=None):
+    out = {
+        'id': row.id,
+        'kind': row.kind,
+        'kind_title': _HR_KINDS.get(row.kind, row.kind),
+        'details': row.details or '',
+        'copies': row.copies or 1,
+        'leave_type': row.leave_type or '',
+        'start_date': row.start_date.isoformat() if row.start_date else None,
+        'end_date': row.end_date.isoformat() if row.end_date else None,
+        'status': row.status,
+        'hr_note': row.hr_note or '',
+        # В базе UTC без пояса; с поясом телефон сам покажет местное время.
+        'created_at': _utc_iso(row.created_at),
+        'updated_at': _utc_iso(row.updated_at),
+    }
+    if employee is not None:
+        out['employee'] = {
+            'employee_id': employee.employee_id,
+            'full_name': employee.full_name,
+            'job_title': employee.job_title or '',
+            'department': employee.department or '',
+        }
+    return out
+
+
+def _hr_staff_ids():
+    """Кому из кадров сообщать о новой заявке."""
+    return [e.employee_id for e in Employee.query.all() if _is_hr_job(e.job_title)]
+
+
+def _notify_hr_new(request_id):
+    row = db.session.get(HrRequest, request_id)
+    if row is None:
+        return
+    employee = db.session.get(Employee, row.employee_id)
+    who = employee.full_name if employee else row.employee_id
+    _push_to(_hr_staff_ids(), 'Новая заявка в отдел кадров',
+             f'{_HR_KINDS.get(row.kind, row.kind)}: {who}',
+             {'type': 'hr', 'id': row.id, 'queue': 1})
+
+
+def _notify_hr_status(request_id):
+    row = db.session.get(HrRequest, request_id)
+    if row is None or row.status not in _HR_STATUS_TEXT:
+        return
+    body = f'{_HR_KINDS.get(row.kind, row.kind)} {_HR_STATUS_TEXT[row.status]}'
+    if row.hr_note:
+        body += f'. {row.hr_note}'
+    _push_to([row.employee_id], 'Заявка в отдел кадров', body,
+             {'type': 'hr', 'id': row.id})
 
 
 def _employee_names():
@@ -2859,6 +2961,156 @@ def register_routes(app):
             }
         })
 
+
+    # ── Заявки в отдел кадров ────────────────────────────────────────────────
+
+    def _hr_viewer():
+        """Кто спрашивает. Заявка — всегда от своего имени, поэтому без
+        пропуска здесь нельзя даже в переходном режиме: иначе не понять, чья
+        она."""
+        return getattr(g, 'employee', None)
+
+    @app.route('/api/hr/requests', methods=['GET'])
+    @require_auth
+    def hr_my_requests():
+        viewer = _hr_viewer()
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        rows = (HrRequest.query
+                .filter_by(employee_id=viewer.employee_id)
+                .order_by(HrRequest.created_at.desc(), HrRequest.id.desc())
+                .limit(100).all())
+        return jsonify({'message': 'Success',
+                        'items': [_hr_request_json(r) for r in rows]})
+
+    @app.route('/api/hr/requests', methods=['POST'])
+    @require_auth
+    def hr_create_request():
+        viewer = _hr_viewer()
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        data = _json_body()
+        kind = _text(data, 'kind')
+        if kind not in _HR_KINDS:
+            return jsonify({'message': 'Failure', 'error': 'bad_kind'}), 400
+
+        details = _text(data, 'details')[:1000]
+        copies = data.get('copies', 1)
+        if isinstance(copies, bool) or not isinstance(copies, int):
+            copies = 1
+        copies = min(max(copies, 1), 5)
+
+        leave_type = start = end = None
+        if kind == 'vacation':
+            start = _iso_date(data.get('start_date'))
+            end = _iso_date(data.get('end_date'))
+            if start is None or end is None or end < start:
+                return _bad_period()
+            # Год вперёд — с запасом на график отпусков; дальше — опечатка.
+            today = _plant_today()
+            if start < today - timedelta(days=31) or end > today + timedelta(days=400):
+                return _bad_period()
+            leave_type = (_text(data, 'leave_type') or 'Ежегодный трудовой отпуск')[:100]
+            copies = 1
+
+        open_count = HrRequest.query.filter(
+            HrRequest.employee_id == viewer.employee_id,
+            HrRequest.status.in_(_HR_OPEN)).count()
+        if open_count >= _HR_OPEN_LIMIT:
+            return jsonify({'message': 'Failure', 'error': 'too_many_open'}), 429
+
+        now = datetime.utcnow()
+        row = HrRequest(employee_id=viewer.employee_id, kind=kind,
+                        details=details or None, copies=copies,
+                        leave_type=leave_type, start_date=start, end_date=end,
+                        status='new', created_at=now, updated_at=now)
+        db.session.add(row)
+        db.session.commit()
+        _notify_later(app, _notify_hr_new, row.id)
+        return jsonify({'message': 'Success', 'item': _hr_request_json(row)})
+
+    @app.route('/api/hr/requests/<int:request_id>/cancel', methods=['POST'])
+    @require_auth
+    def hr_cancel_request(request_id):
+        """Отозвать свою заявку, пока кадры её не взяли."""
+        viewer = _hr_viewer()
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        row = db.session.get(HrRequest, request_id)
+        # Чужая заявка и несуществующая отвечают одинаково: по номеру нельзя
+        # узнать, что у коллеги есть заявка.
+        if row is None or row.employee_id != viewer.employee_id:
+            return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
+        if row.status != 'new':
+            return jsonify({'message': 'Failure', 'error': 'already_taken',
+                            'item': _hr_request_json(row)}), 409
+        row.status = 'cancelled'
+        row.updated_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'message': 'Success', 'item': _hr_request_json(row)})
+
+    @app.route('/api/hr/queue', methods=['GET'])
+    @require_auth
+    def hr_queue():
+        """Заявки всех сотрудников — для отдела кадров.
+
+        ?status=open (по умолчанию) — незакрытые, старые первыми: их и надо
+        разбирать по порядку. ?status=all — все, свежие первыми.
+        """
+        if not _may_process_hr():
+            return _deny()
+        which = request.args.get('status') or 'open'
+        query = HrRequest.query
+        if which == 'all':
+            query = query.order_by(HrRequest.created_at.desc(), HrRequest.id.desc())
+        elif which in _HR_OPEN:
+            query = query.filter_by(status=which).order_by(HrRequest.created_at.asc())
+        else:
+            query = (query.filter(HrRequest.status.in_(_HR_OPEN))
+                     .order_by(HrRequest.created_at.asc()))
+        rows = query.limit(300).all()
+        people = {e.employee_id: e for e in Employee.query.filter(
+            Employee.employee_id.in_({r.employee_id for r in rows})).all()} if rows else {}
+        counts = dict(db.session.query(HrRequest.status, db.func.count(HrRequest.id))
+                      .filter(HrRequest.status.in_(_HR_OPEN))
+                      .group_by(HrRequest.status).all())
+        return jsonify({
+            'message': 'Success',
+            'counts': {s: counts.get(s, 0) for s in _HR_OPEN},
+            'items': [_hr_request_json(r, people.get(r.employee_id)) for r in rows],
+        })
+
+    @app.route('/api/hr/requests/<int:request_id>', methods=['POST'])
+    @require_auth
+    def hr_change_request(request_id):
+        """Кадры двигают заявку: приняли, готова (и где забрать), выдана,
+        отказ (и почему)."""
+        if not _may_process_hr():
+            return _deny()
+        row = db.session.get(HrRequest, request_id)
+        if row is None:
+            return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
+        data = _json_body()
+        status = _text(data, 'status')
+        note = _text(data, 'note')[:500]
+        if status not in _HR_STEPS.get(row.status, set()):
+            return jsonify({'message': 'Failure', 'error': 'bad_status',
+                            'item': _hr_request_json(row)}), 409
+        # Отказ без причины — это ещё один звонок в кадры с вопросом «почему».
+        if status == 'rejected' and not note:
+            return jsonify({'message': 'Failure', 'error': 'note_required'}), 400
+
+        row.status = status
+        if note or status in ('ready', 'rejected'):
+            row.hr_note = note or None
+        viewer = _hr_viewer()
+        row.handled_by = viewer.full_name[:255] if viewer else None
+        row.updated_at = datetime.utcnow()
+        db.session.commit()
+        _notify_later(app, _notify_hr_status, row.id)
+        employee = db.session.get(Employee, row.employee_id)
+        return jsonify({'message': 'Success',
+                        'item': _hr_request_json(row, employee)})
 
     # ── FCM token registration ────────────────────────────────────────────────
 

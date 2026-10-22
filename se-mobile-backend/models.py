@@ -239,6 +239,51 @@ class NewsItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class HrRequest(db.Model):
+    """Заявка в отдел кадров: справка или заявление на отпуск.
+
+    Раньше за справкой шли в кадры ногами, а потом ещё раз — узнать, готова
+    ли. Здесь у заявки есть состояние, и человек видит его в приложении:
+    «принята», «готова, заберите в каб. 12».
+
+    Состояния: new → accepted → ready → done; на любом шаге до выдачи кадры
+    могут отклонить (rejected), а сам сотрудник — отозвать ещё не принятую
+    (cancelled).
+    """
+    __tablename__ = 'hr_requests'
+    __table_args__ = (
+        db.Index('ix_hr_requests_emp', 'employee_id', 'created_at'),
+        db.Index('ix_hr_requests_status', 'status', 'created_at'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'),
+                            nullable=False)
+
+    # 'employment' — справка с места работы, 'income' — о доходах,
+    # 'vacation' — заявление на отпуск.
+    kind = db.Column(db.String(20), nullable=False)
+
+    # Для чего справка («в банк», «в школу»), за какой срок — свободным
+    # текстом: кадрам проще прочитать фразу, чем разбирать десяток полей.
+    details = db.Column(db.Text)
+    copies = db.Column(db.Integer, nullable=False, default=1)
+
+    # Только у отпуска.
+    leave_type = db.Column(db.String(100))
+    start_date = db.Column(db.Date)
+    end_date = db.Column(db.Date)
+
+    status = db.Column(db.String(20), nullable=False, default='new')
+    # Что кадры сказали сотруднику: где забрать готовую, почему отказ.
+    hr_note = db.Column(db.String(500))
+    # Кто из кадров последним менял состояние. Без внешнего ключа: склейка
+    # сотрудников переписывает ссылки, а это не ссылка, а отметка в истории.
+    handled_by = db.Column(db.String(255))
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class AppliedSeed(db.Model):
     """Журнал отработавших сидеров.
 
