@@ -20,6 +20,8 @@ import 'repair_requests_screen.dart';
 import 'approval_detail_screen.dart';
 import 'approvals_screen.dart';
 import 'inspection_detail_screen.dart';
+import 'material_pass_detail_screen.dart';
+import 'material_passes_screen.dart';
 import 'inspections_screen.dart';
 import 'stock_request_detail_screen.dart';
 import 'stock_requests_screen.dart';
@@ -100,6 +102,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const StockRequestsScreen()
             : StockRequestDetailScreen(requestId: id));
+      case 'pass':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const MaterialPassesScreen()
+            : MaterialPassDetailScreen(passId: id));
       case 'approval':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -222,6 +229,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'stock' => (Icons.inventory_2_outlined, const Color(0xFF00695C)),
       'inspection' => (Icons.fact_check_outlined, const Color(0xFF283593)),
       'approval' => (Icons.approval_outlined, const Color(0xFF6A1B9A)),
+      'pass' => (Icons.local_shipping_outlined, const Color(0xFF4E342E)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(

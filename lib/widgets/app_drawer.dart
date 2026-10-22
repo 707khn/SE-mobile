@@ -10,6 +10,7 @@ import '../screens/repair_requests_screen.dart';
 import '../screens/stock_requests_screen.dart';
 import '../screens/inspections_screen.dart';
 import '../screens/approvals_screen.dart';
+import '../screens/material_passes_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -200,6 +201,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.approval_outlined,
                   label: 'appr_title'.tr,
                   onTap: () => Get.to(() => const ApprovalsScreen()),
+                ),
+                _item(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'pass_title'.tr,
+                  onTap: () => Get.to(() => const MaterialPassesScreen()),
                 ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
