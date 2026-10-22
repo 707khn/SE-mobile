@@ -8,8 +8,8 @@
 пробег и исправность. С положительной пробой на алкоголь допустить нельзя.
 
 Показатели осмотра — медицинские сведения: их видят медпункт и сам
-водитель. Руководителю ДМТО (и FLEET_MANAGERS) и механику — только
-«допущен / не допущен», без причины по здоровью.
+водитель. Заведующему ХО, руководству ДМТО (и FLEET_MANAGERS) и механику —
+только «допущен / не допущен», без причины по здоровью.
 
 Медпункт — подразделение «Медицинский пункт» или MED_STAFF; механики —
 должность «механик» или FLEET_MECHANICS; водители — подразделение «Гараж»,
@@ -99,9 +99,14 @@ def is_driver(employee):
 
 
 def is_fleet_manager(employee):
-    return employee is not None and (
-        is_supply_head(employee)
-        or employee.employee_id in _env_ids('FLEET_MANAGERS'))
+    """Заведующий ХО (гараж и механик — у него) и руководство ДМТО."""
+    if employee is None:
+        return False
+    title = _norm(employee.job_title)
+    return (is_supply_head(employee)
+            or ('хозяйствен' in _norm(employee.department)
+                and title.startswith(('заведующ', 'начальник')))
+            or employee.employee_id in _env_ids('FLEET_MANAGERS'))
 
 
 def warnings_for(systolic, diastolic, pulse, temperature, alcohol):

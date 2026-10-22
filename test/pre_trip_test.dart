@@ -68,6 +68,7 @@ void main() {
     expect(usesPreTrip('Водитель'), isTrue);
     expect(usesPreTrip('Медицинский работник'), isTrue);
     expect(usesPreTrip('Руководитель ДМТО'), isTrue);
+    expect(usesPreTrip('Заведующий ХО'), isTrue);
     expect(usesPreTrip('Менеджер'), isFalse);
   });
 

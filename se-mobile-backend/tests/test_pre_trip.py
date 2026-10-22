@@ -15,6 +15,7 @@ _MEDIC = '0000001977'     # медицинский работник
 _MECHANIC = '0000002029'  # механик
 _HEAD = '0000002198'      # руководитель ДМТО
 _DEPUTY = '0000001777'    # заместитель руководителя ДМТО
+_HO_HEAD = '0000001573'   # заведующий ХО
 _OTHER = '0000002107'     # менеджер по учёту ТМЦ
 
 _TODAY = date(2030, 1, 15)
@@ -69,6 +70,7 @@ def test_roles(app):
         assert pre_trip.is_medic(get(_MEDIC))
         assert pre_trip.is_mechanic(get(_MECHANIC))
         assert pre_trip.is_fleet_manager(get(_HEAD))
+        assert pre_trip.is_fleet_manager(get(_HO_HEAD))
         assert not pre_trip.is_driver(get(_OTHER))
 
 
@@ -115,7 +117,7 @@ def test_day_flow_and_privacy(app, client, pushes):
               temperature=38.1, reason='Температура 38,1')
     assert r.status_code == 201
     assert pushes[0] == ([_DRIVER2], 'Не допущены к рейсу', 'Температура 38,1')
-    assert pushes[1][0] == sorted([_HEAD, _DEPUTY])
+    assert pushes[1][0] == sorted([_HEAD, _DEPUTY, _HO_HEAD])
     assert pushes[1][1].startswith('Не допущен к рейсу: ')
     # Руководству — без причины по здоровью.
     assert '38' not in pushes[1][2]
@@ -159,7 +161,7 @@ def test_failed_vehicle_blocks(app, client, pushes):
     mechanic = _auth(app, _MECHANIC)
     assert _check(client, mechanic, ok=False).status_code == 400
     _check(client, mechanic, ok=False, reason='Течь тормозной жидкости')
-    assert pushes[0][0] == sorted([_DRIVER, _HEAD, _DEPUTY])
+    assert pushes[0][0] == sorted([_DRIVER, _HEAD, _DEPUTY, _HO_HEAD])
     day = client.get('/api/pretrip', headers=mechanic).get_json()
     row = next(r for r in day['drivers'] if r['driver']['id'] == _DRIVER)
     assert row['status'] == 'not_admitted'
