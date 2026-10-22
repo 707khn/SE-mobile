@@ -8,6 +8,7 @@ import '../utils/dimensions.dart';
 import '../utils/load_problem.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/load_error_view.dart';
+import 'stock_balances_screen.dart';
 import 'stock_request_detail_screen.dart';
 import 'stock_request_form_screen.dart';
 
@@ -150,6 +151,13 @@ class _StockRequestsScreenState extends State<StockRequestsScreen> {
       appBar: AppBar(
         title: BigText(content: 'stock_title'.tr, color: Colors.white),
         actions: [
+          if (_mine.balances)
+            IconButton(
+              key: const Key('stock_balances'),
+              icon: const Icon(Icons.inventory_2_outlined),
+              tooltip: 'sb_title'.tr,
+              onPressed: () => Get.to(() => const StockBalancesScreen()),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'refresh'.tr,

@@ -272,7 +272,10 @@ def register(app, core):
                      .filter_by(employee_id=viewer.employee_id)
                      .order_by(StockRequest.created_at.desc())
                      .limit(100).all())
+        # Есть ли кнопка «Остатки на складах» — её видят не все.
+        import stock_balances
         body = {'message': 'Success', 'staff': staff,
+                'balances': stock_balances.may_view(viewer, core),
                 'my_warehouse': warehouse_of(viewer.job_title) if staff else None,
                 'units': list(UNITS), 'items': _list_json(items)}
         if staff:

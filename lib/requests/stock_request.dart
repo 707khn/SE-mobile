@@ -125,10 +125,14 @@ class StockRequestList {
     this.openNew = 0,
     this.openInProgress = 0,
     this.openReady = 0,
+    this.balances = false,
   });
 
   final List<StockRequest> items;
   final bool staff;
+
+  /// Можно ли смотреть остатки на складах — кнопка видна не всем.
+  final bool balances;
 
   /// Склад кладовщика по его должности — его заявки в очереди наверху.
   final int? myWarehouse;
@@ -150,6 +154,7 @@ class StockRequestList {
       openNew: count('new'),
       openInProgress: count('in_progress'),
       openReady: count('ready'),
+      balances: json['balances'] == true,
     );
   }
 }
