@@ -718,6 +718,51 @@ rm /tmp/backup-key
 
 Другие варианты: `--local` — копия с диска сервера, а не из хранилища.
 
+### Обновить конфиг nginx
+
+Рабочий файл на сервере — это файл из репозитория плюс секция 443, которую
+дописал certbot. Поэтому файл копируют и сразу возвращают сертификат — ровно
+так, как это делает `setup.sh`:
+
+```bash
+cd /opt/se-mobile && sudo git pull
+# Копия рабочего файла — на случай отката.
+sudo cp /etc/nginx/sites-available/se-mobile /root/nginx-se-mobile.bak
+sudo cp deploy/nginx-se-mobile.conf /etc/nginx/sites-available/se-mobile
+sudo certbot install --nginx --cert-name api.se-btrz.com --redirect --non-interactive
+sudo nginx -t && sudo systemctl reload nginx
+curl -fsS https://api.se-btrz.com/health && echo OK
+```
+
+`nginx -t` ругается или `/health` не отвечает — вернуть прежний файл:
+
+```bash
+sudo cp /root/nginx-se-mobile.bak /etc/nginx/sites-available/se-mobile
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Пределы частоты запросов
+
+Считаются по адресу, а всё предприятие выходит в интернет через один NAT,
+поэтому пределы широкие: они против сорвавшегося скрипта, а не против
+сотрудников. От подбора пароля защищает замок на учётную запись.
+
+| Что | Сразу | Дальше | Ещё |
+|---|---|---|---|
+| Вход (`/login`) | 100 | 4 в секунду | |
+| Загрузки файлов из 1С и Excel | 20 | 1 в 2 секунды | не больше 2 одновременно |
+| Расчётный лист в Excel | 60 | 2 в секунду | |
+| Скачивание APK (`/app/`) | 200 | 1 в 2 секунды | |
+
+Сверх предела nginx отвечает 429 с `Retry-After`. Сколько таких отказов было:
+
+```bash
+sudo grep -c "limiting requests\|limiting connections" /var/log/nginx/error.log
+```
+
+Если в журнале видно, что упираются живые люди, — поднять `burst` или `rate`
+в `deploy/nginx-se-mobile.conf`, а не убирать предел.
+
 ---
 
 ## Если приложение отвечает «ошибка сервера (503)»

@@ -82,6 +82,14 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      # Пределы частоты в deploy/nginx-se-mobile.conf проверяются на
+      # настоящем nginx (test_nginx_limits.py) — той же версии, что на
+      # сервере с Ubuntu 24.04.
+      - name: Install nginx
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends nginx-core
+
       - name: pytest
         working-directory: se-mobile-backend
         env:
