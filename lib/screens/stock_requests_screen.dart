@@ -8,6 +8,7 @@ import '../utils/dimensions.dart';
 import '../utils/load_problem.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/load_error_view.dart';
+import 'inventory_screen.dart';
 import 'stock_balances_screen.dart';
 import 'stock_request_detail_screen.dart';
 import 'stock_request_form_screen.dart';
@@ -157,6 +158,13 @@ class _StockRequestsScreenState extends State<StockRequestsScreen> {
               icon: const Icon(Icons.inventory_2_outlined),
               tooltip: 'sb_title'.tr,
               onPressed: () => Get.to(() => const StockBalancesScreen()),
+            ),
+          if (queue != null)
+            IconButton(
+              key: const Key('stock_inventory'),
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'inv_title'.tr,
+              onPressed: () => Get.to(() => const InventoryScreen()),
             ),
           IconButton(
             icon: const Icon(Icons.refresh),

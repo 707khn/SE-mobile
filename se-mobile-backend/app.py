@@ -55,6 +55,7 @@ import workwear
 import medical_visits
 import maintenance
 import compliance
+import inventory
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1706,6 +1707,7 @@ def create_app():
     medical_visits.register(app, sys.modules[__name__])
     maintenance.register(app, sys.modules[__name__])
     compliance.register(app, sys.modules[__name__])
+    inventory.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):
