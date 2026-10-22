@@ -6,6 +6,7 @@ import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
+import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -176,6 +177,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.support_agent_outlined,
                   label: 'it_title'.tr,
                   onTap: () => Get.to(() => const ItRequestsScreen()),
+                ),
+                _item(
+                  icon: Icons.shopping_cart_outlined,
+                  label: 'purch_title'.tr,
+                  onTap: () => Get.to(() => const PurchasesScreen()),
                 ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
