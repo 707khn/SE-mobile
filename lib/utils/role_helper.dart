@@ -19,3 +19,14 @@ bool isCanteenTech(String job) {
   final lower = job.toLowerCase();
   return lower.contains('технолог') && lower.contains('столов');
 }
+
+/// Кому нужен раздел «Медосмотр и выпуск»: водителям, медпункту, механикам
+/// и руководству ДМТО, которому подчиняется гараж. Остальным карточка на
+/// главной ни к чему. Последнее слово — за сервером.
+bool usesPreTrip(String job) {
+  final lower = job.toLowerCase();
+  return lower.contains('водител') ||
+      lower.contains('медицин') ||
+      lower.contains('механик') ||
+      (lower.contains('руководител') && lower.contains('дмто'));
+}

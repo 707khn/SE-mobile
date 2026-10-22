@@ -10,6 +10,7 @@ import 'localization_pass.dart';
 import 'localization_payslip_q.dart';
 import 'localization_orders.dart';
 import 'localization_assign.dart';
+import 'localization_pretrip.dart';
 import 'localization_purchase.dart';
 import 'localization_repair.dart';
 import 'localization_stock.dart';
@@ -30,6 +31,7 @@ class LocaleString extends Translations {
           ...payslipQuestionStringsKk,
           ...orderStringsKk,
           ...assignmentStringsKk,
+          ...preTripStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
           'show report': 'Жеке есепті көрсету',
@@ -389,6 +391,7 @@ class LocaleString extends Translations {
           ...payslipQuestionStringsRu,
           ...orderStringsRu,
           ...assignmentStringsRu,
+          ...preTripStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',
           'show report': 'Показать личный отчёт',

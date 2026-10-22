@@ -28,6 +28,7 @@ import 'material_passes_screen.dart';
 import 'on_site_screen.dart';
 import 'assignments_screen.dart';
 import 'orders_screen.dart';
+import 'pre_trip_screen.dart';
 import 'purchases_screen.dart';
 import 'menu_screen.dart';
 import 'main_screen_2.dart';
@@ -315,6 +316,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       color: const Color(0xFF0277BD),
                       onTap: () => Get.to(() => const AssignmentsScreen()),
                     ),
+                    if (usesPreTrip(widget.job))
+                      _buildActionCard(
+                        icon: Icons.medical_services_outlined,
+                        label: 'pt_title'.tr,
+                        subtitle: 'pt_home_subtitle'.tr,
+                        color: const Color(0xFF00838F),
+                        onTap: () => Get.to(() => const PreTripScreen()),
+                      ),
                   ],
                   // Managers keep their team-wide screens, now inside the shell.
                   if (!_isAdmin && isAdminRole(widget.job)) ...[

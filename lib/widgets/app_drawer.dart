@@ -14,6 +14,7 @@ import '../screens/material_passes_screen.dart';
 import '../screens/on_site_screen.dart';
 import '../screens/assignments_screen.dart';
 import '../screens/orders_screen.dart';
+import '../screens/pre_trip_screen.dart';
 import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
@@ -231,6 +232,12 @@ class _AppDrawerState extends State<AppDrawer> {
                   label: 'asg_title'.tr,
                   onTap: () => Get.to(() => const AssignmentsScreen()),
                 ),
+                if (usesPreTrip(_job))
+                  _item(
+                    icon: Icons.medical_services_outlined,
+                    label: 'pt_title'.tr,
+                    onTap: () => Get.to(() => const PreTripScreen()),
+                  ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
                 const SizedBox(height: 8),
