@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
+import '../screens/business_trips_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
 import '../screens/assignments_screen.dart';
@@ -188,6 +189,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.task_alt,
                   label: 'asg_title'.tr,
                   onTap: () => Get.to(() => const AssignmentsScreen()),
+                ),
+                _item(
+                  icon: Icons.flight_takeoff,
+                  label: 'bt_title'.tr,
+                  onTap: () => Get.to(() => const BusinessTripsScreen()),
                 ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
