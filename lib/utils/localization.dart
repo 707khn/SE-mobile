@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'lang.dart';
 import 'localization_it.dart';
 import 'localization_payslip_q.dart';
+import 'localization_assign.dart';
 import 'localization_purchase.dart';
 
 class LocaleString extends Translations {
@@ -12,6 +13,7 @@ class LocaleString extends Translations {
           ...itStringsKk,
           ...purchaseStringsKk,
           ...payslipQuestionStringsKk,
+          ...assignmentStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
           'show report': 'Жеке есепті көрсету',
@@ -362,6 +364,7 @@ class LocaleString extends Translations {
           ...itStringsRu,
           ...purchaseStringsRu,
           ...payslipQuestionStringsRu,
+          ...assignmentStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',
           'show report': 'Показать личный отчёт',
