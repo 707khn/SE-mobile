@@ -170,7 +170,8 @@ class _LeavePageState extends State<LeavePage> {
                 if (_leaveData!.cachedAt != null)
                   Padding(
                     padding: EdgeInsets.only(bottom: Dimensions.height30 / 2),
-                    child: OfflineNotice(at: _leaveData!.cachedAt),
+                    child: OfflineNotice(
+                        at: _leaveData!.cachedAt, onRetry: _fetchLeaves),
                   ),
                 GestureDetector(
                   onLongPress: () {

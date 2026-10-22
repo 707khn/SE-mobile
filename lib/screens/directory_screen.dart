@@ -119,7 +119,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       ),
       body: Column(
         children: [
-          OfflineNotice(at: _cachedAt),
+          OfflineNotice(at: _cachedAt, onRetry: _load),
           Padding(
             padding: EdgeInsets.symmetric(
                 horizontal: Dimensions.width20, vertical: 10),

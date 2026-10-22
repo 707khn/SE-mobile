@@ -189,7 +189,12 @@ Future<PayslipData> fetchPayslip(String month, String year,
     throw const PayslipException(PayslipErrorKind.notFound);
   }
 
-  if (cacheKey != null) await OfflineCache.save(cacheKey, body);
+  if (cacheKey != null) {
+    await OfflineCache.save(cacheKey, body, private: true);
+    // Год листков с запасом: дальше их и с сервером почти не открывают, а
+    // защищённое хранилище читается целиком.
+    await OfflineCache.trim('payslip_${id}_', keep: 13, private: true);
+  }
   return _payslipFrom(body);
 }
 
@@ -238,7 +243,7 @@ PayslipData _payslipFrom(Map<String, dynamic> body) {
 /// Листок, полученный в прошлый раз. Свой листок человек открывает и в
 /// дороге, и в цеху, где связи нет, — пусть открывается.
 Future<PayslipData?> _cachedPayslip(String cacheKey) async {
-  final saved = await OfflineCache.read(cacheKey);
+  final saved = await OfflineCache.read(cacheKey, private: true);
   if (saved == null || saved['payslip'] is! Map) return null;
   try {
     return _payslipFrom(saved);

@@ -541,7 +541,7 @@ class _MainMenu1State extends State<MainMenu1> {
             if (!_loadingReport && _cachedAt != null)
               Padding(
                 padding: EdgeInsets.only(bottom: Dimensions.height30 / 3),
-                child: OfflineNotice(at: _cachedAt),
+                child: OfflineNotice(at: _cachedAt, onRetry: _initData),
               ),
             if (!_loadingReport && _dataIsBehind)
               Padding(
