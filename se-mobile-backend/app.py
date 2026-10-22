@@ -30,6 +30,7 @@ from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
 from privacy import privacy_page
 import it_requests
+import repair_requests
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1656,6 +1657,7 @@ def create_app():
 
     register_routes(app)
     it_requests.register(app, sys.modules[__name__])
+    repair_requests.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):

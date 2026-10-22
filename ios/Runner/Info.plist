@@ -7,9 +7,9 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>NSCameraUsageDescription</key>
-		<string>Чтобы сфотографировать неисправность для заявки в ОИТиС.</string>
+		<string>Чтобы сфотографировать неисправность для заявки в ОИТиС или на ремонт.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Чтобы приложить фото из галереи к заявке в ОИТиС.</string>
+		<string>Чтобы приложить фото из галереи к заявке в ОИТиС или на ремонт.</string>
 		<key>CFBundleDisplayName</key>
 		<string>Se Mobile</string>
 		<key>CFBundleExecutable</key>
