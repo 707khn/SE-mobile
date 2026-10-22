@@ -7,6 +7,7 @@ import '../functions/export_file.dart';
 import '../screens/start_screen.dart';
 import '../services/fcm_service.dart';
 import '../variables.dart';
+import 'notice_badge.dart';
 import 'secure_storage_helper.dart';
 import 'api.dart';
 
@@ -55,6 +56,7 @@ Future<void> forceLogout({String? message}) async {
     // Папки нет или она недоступна — стирать нечего.
   }
   reportsEntries = [["", "", "", ""]];
+  NoticeBadge.reset();
   // The login form's controllers are static, so whatever the previous user
   // typed would still be sitting in the fields on the way back out.
   CustomFormState.loginController.clear();
