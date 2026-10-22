@@ -145,6 +145,17 @@ class _RolloutScreenState extends State<RolloutScreen> {
       else
         _line('rollout_backups_last'.trParams({'days': '${r.backupDaysAgo}'}),
             '${r.backupCount}'),
+      if (r.offsiteProblem.isNotEmpty)
+        _line(r.offsiteProblem, '', muted: true)
+      else
+        _line('rollout_backups_offsite'.tr, '${r.offsiteCount}'),
+      if (r.restoreTestProblem.isNotEmpty)
+        _line(r.restoreTestProblem, '', muted: true)
+      else if (r.restoreTestDaysAgo != null)
+        _line(
+            'rollout_restore_test_last'
+                .trParams({'days': '${r.restoreTestDaysAgo}'}),
+            ''),
       SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_without_pass'.tr),
       if (r.withoutPass.isEmpty)

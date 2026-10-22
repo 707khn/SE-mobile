@@ -300,6 +300,13 @@ say "Новые сборки из GitHub"
 # ждёт — см. deploy/README.md, «Сборка приезжает на сервер сама».
 APP_DIR="$APP_DIR" bash "$APP_DIR/deploy/install-fetch-apk.sh"
 
+say "Копии вне сервера"
+# Каждую ночь увозит копии во внешнее хранилище, раз в квартал пробует из
+# них восстановиться. Пока в /etc/se-mobile-offsite.env нет хранилища, копии
+# лежат только здесь, и админ-панель об этом говорит — см. deploy/README.md,
+# «Копия вне сервера».
+APP_DIR="$APP_DIR" bash "$APP_DIR/deploy/install-offsite.sh"
+
 say "Файрвол"
 ufw allow OpenSSH >/dev/null
 ufw allow 'Nginx Full' >/dev/null
