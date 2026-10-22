@@ -1,11 +1,13 @@
 import 'package:get/get.dart';
 
 import 'lang.dart';
+import 'localization_it.dart';
 
 class LocaleString extends Translations {
   @override
   Map<String, Map<String, String>> get keys => {
         Lang.kk: {
+          ...itStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
           'show report': 'Жеке есепті көрсету',
@@ -339,6 +341,7 @@ class LocaleString extends Translations {
           'admin_data': 'Деректер',
         },
         Lang.ru: {
+          ...itStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',
           'show report': 'Показать личный отчёт',

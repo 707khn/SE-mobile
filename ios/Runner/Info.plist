@@ -4,6 +4,10 @@
 	<dict>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>NSCameraUsageDescription</key>
+		<string>Чтобы сфотографировать неисправность для заявки в ОИТиС.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Чтобы приложить фото из галереи к заявке в ОИТиС.</string>
 		<key>CFBundleDisplayName</key>
 		<string>Se Mobile</string>
 		<key>CFBundleExecutable</key>
