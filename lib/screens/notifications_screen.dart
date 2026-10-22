@@ -21,6 +21,8 @@ import 'repair_request_detail_screen.dart';
 import 'repair_requests_screen.dart';
 import 'approval_detail_screen.dart';
 import 'approvals_screen.dart';
+import 'business_trip_detail_screen.dart';
+import 'business_trips_screen.dart';
 import 'inspection_detail_screen.dart';
 import 'material_pass_detail_screen.dart';
 import 'material_passes_screen.dart';
@@ -143,6 +145,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const WaybillsScreen()
             : WaybillDetailScreen(waybillId: id));
+      case 'trip':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const BusinessTripsScreen()
+            : BusinessTripDetailScreen(tripId: id));
       case 'datafix':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -304,6 +311,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'hazard' => (Icons.report_problem_outlined, const Color(0xFFC62828)),
       'techq' => (Icons.engineering_outlined, const Color(0xFF3949AB)),
       'datafix' => (Icons.badge_outlined, const Color(0xFF5E35B1)),
+      'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       'waybill' => (Icons.route_outlined, const Color(0xFF00695C)),
       'permit' =>
         (Icons.local_fire_department_outlined, const Color(0xFFBF360C)),
