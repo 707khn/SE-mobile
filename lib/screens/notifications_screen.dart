@@ -22,6 +22,8 @@ import 'approvals_screen.dart';
 import 'inspection_detail_screen.dart';
 import 'material_pass_detail_screen.dart';
 import 'material_passes_screen.dart';
+import 'purchase_detail_screen.dart';
+import 'purchases_screen.dart';
 import 'inspections_screen.dart';
 import 'stock_request_detail_screen.dart';
 import 'stock_requests_screen.dart';
@@ -102,6 +104,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const StockRequestsScreen()
             : StockRequestDetailScreen(requestId: id));
+      case 'purchase':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const PurchasesScreen()
+            : PurchaseDetailScreen(purchaseId: id));
       case 'pass':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -230,6 +237,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'inspection' => (Icons.fact_check_outlined, const Color(0xFF283593)),
       'approval' => (Icons.approval_outlined, const Color(0xFF6A1B9A)),
       'pass' => (Icons.local_shipping_outlined, const Color(0xFF4E342E)),
+      'purchase' => (Icons.shopping_cart_outlined, const Color(0xFFAD1457)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(

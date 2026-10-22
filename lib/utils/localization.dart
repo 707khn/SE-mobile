@@ -7,6 +7,7 @@ import 'localization_approval.dart';
 import 'localization_inspection.dart';
 import 'localization_onsite.dart';
 import 'localization_pass.dart';
+import 'localization_purchase.dart';
 import 'localization_repair.dart';
 import 'localization_stock.dart';
 
@@ -22,6 +23,7 @@ class LocaleString extends Translations {
           ...approvalStringsKk,
           ...passStringsKk,
           ...onSiteStringsKk,
+          ...purchaseStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
           'show report': 'Жеке есепті көрсету',
@@ -377,6 +379,7 @@ class LocaleString extends Translations {
           ...approvalStringsRu,
           ...passStringsRu,
           ...onSiteStringsRu,
+          ...purchaseStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',
           'show report': 'Показать личный отчёт',

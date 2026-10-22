@@ -26,6 +26,7 @@ import 'inspections_screen.dart';
 import 'approvals_screen.dart';
 import 'material_passes_screen.dart';
 import 'on_site_screen.dart';
+import 'purchases_screen.dart';
 import 'menu_screen.dart';
 import 'main_screen_2.dart';
 import '../utils/app_theme.dart';
@@ -290,6 +291,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       subtitle: 'pass_home_subtitle'.tr,
                       color: const Color(0xFF4E342E),
                       onTap: () => Get.to(() => const MaterialPassesScreen()),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.shopping_cart_outlined,
+                      label: 'purch_title'.tr,
+                      subtitle: 'purch_home_subtitle'.tr,
+                      color: const Color(0xFFAD1457),
+                      onTap: () => Get.to(() => const PurchasesScreen()),
                     ),
                   ],
                   // Managers keep their team-wide screens, now inside the shell.
