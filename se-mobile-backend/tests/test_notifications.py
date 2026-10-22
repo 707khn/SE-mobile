@@ -253,6 +253,36 @@ def test_fresh_outage_is_reported_and_old_one_is_not(app, client, monkeypatch,
     assert outage and 'перезапущен' in outage[0]['body']
 
 
+def test_backups_left_on_the_server_are_reported(app, client, monkeypatch,
+                                                  tmp_path):
+    """Копии не уезжают и из них не пробовали восстановиться — админу видно."""
+    from datetime import timezone
+
+    def stamp(**delta):
+        return (datetime.now(timezone.utc) - timedelta(**delta)) \
+            .strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    admin = _admin(app)
+    monkeypatch.setattr(app_module, '_OFFSITE_STATUS',
+                        str(tmp_path / 'нет-такого'))
+    monkeypatch.setattr(app_module, '_RESTORE_TEST_STATUS',
+                        str(tmp_path / 'и-такого'))
+    keys = {p['key'] for p in _feed(client, admin)['system']}
+    assert {'offsite', 'restore_test'} <= keys
+
+    # Настроили и проверили — оба пропали сами.
+    offsite = tmp_path / 'offsite'
+    offsite.write_text(f'result=ok\nchecked_at={stamp(hours=2)}\n'
+                       'remote_count=31\n', encoding='utf-8')
+    restore = tmp_path / 'restore'
+    restore.write_text(f'result=ok\nchecked_at={stamp(days=10)}\n',
+                       encoding='utf-8')
+    monkeypatch.setattr(app_module, '_OFFSITE_STATUS', str(offsite))
+    monkeypatch.setattr(app_module, '_RESTORE_TEST_STATUS', str(restore))
+    keys = {p['key'] for p in _feed(client, admin)['system']}
+    assert not {'offsite', 'restore_test'} & keys
+
+
 def test_seen_mark_is_kept_per_account(app, client, clean_notices):
     person = _bearer(app, _DAUREMBEKOVA)
     with app.app_context():
