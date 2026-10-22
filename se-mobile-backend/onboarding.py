@@ -22,6 +22,7 @@ from hazards import is_safety
 from it_requests import _norm, _utc, is_it_staff
 from models import db
 from data_corrections import is_hr
+from workwear import is_workwear_staff
 
 STEPS = ('account', 'pass', 'induction', 'clothing', 'workplace', 'mentor')
 STEP_TITLES = {'account': 'учётная запись', 'pass': 'пропуск',
@@ -33,8 +34,6 @@ _MAX_NOTE = 500
 _MAX_AHEAD = timedelta(days=60)
 _MAX_BEHIND = timedelta(days=30)
 _SHOW_DONE_FOR = timedelta(days=30)
-_CLOTHING_TITLES = ('заведующ', 'начальник', 'специалист', 'машинист по стирке',
-                    'кладовщик')
 
 
 class Onboarding(db.Model):
@@ -84,9 +83,8 @@ def is_service(step, employee, core):
     if step == 'induction':
         return is_safety(employee)
     if step == 'clothing':
-        # Заведующий, специалист и кладовая спецодежды — не механик гаража.
-        return (('хозяйствен' in dept
-                 and _norm(employee.job_title).startswith(_CLOTHING_TITLES))
+        # Те же, кто записывает выдачу спецодежды, — не механик гаража.
+        return (is_workwear_staff(employee)
                 or employee.employee_id in _env_ids('ONBOARDING_CLOTHING_STAFF'))
     return False
 

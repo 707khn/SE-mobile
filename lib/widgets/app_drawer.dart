@@ -21,6 +21,7 @@ import '../screens/pre_trip_screen.dart';
 import '../screens/tech_questions_screen.dart';
 import '../screens/waybills_screen.dart';
 import '../screens/work_permits_screen.dart';
+import '../screens/workwear_screen.dart';
 import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/onboarding_screen.dart';
@@ -274,6 +275,11 @@ class _AppDrawerState extends State<AppDrawer> {
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
                 const SizedBox(height: 8),
+                _item(
+                  icon: Icons.checkroom_outlined,
+                  label: 'ww_title'.tr,
+                  onTap: () => Get.to(() => const WorkwearScreen()),
+                ),
                 _item(
                   icon: Icons.waving_hand_outlined,
                   label: 'ob_title'.tr,
