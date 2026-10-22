@@ -123,3 +123,65 @@ def test_backup_state_is_reported(app, client, tmp_path, monkeypatch):
     with app.app_context():
         missing = app_module._backup_state()
     assert not missing['available'] and missing['reason']
+
+
+def _fetch_status(tmp_path, monkeypatch, **fields):
+    path = tmp_path / 'status'
+    path.write_text(''.join(f'{k}={v}\n' for k, v in fields.items()),
+                    encoding='utf-8')
+    monkeypatch.setattr(app_module, '_FETCH_APK_STATUS', str(path))
+    return app_module._fetch_apk_state()
+
+
+def _now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
+
+
+def test_fetch_apk_all_good(tmp_path, monkeypatch):
+    from datetime import timedelta
+    state = _fetch_status(
+        tmp_path, monkeypatch,
+        checked_at=_now().strftime('%Y-%m-%dT%H:%M:%SZ'), result='ok',
+        message='', token_expires=(_now() + timedelta(days=200))
+        .strftime('%Y-%m-%d %H:%M:%S UTC'))
+    assert state['problem'] == ''
+    assert state['token_days_left'] in (199, 200)
+
+
+def test_fetch_apk_expired_token_is_shown(tmp_path, monkeypatch):
+    """Истёкший токен иначе виден только в журнале, который читает root."""
+    state = _fetch_status(
+        tmp_path, monkeypatch,
+        checked_at=_now().strftime('%Y-%m-%dT%H:%M:%SZ'), result='fail',
+        message='GitHub не принял токен: истёк срок или его отозвали.',
+        token_expires='')
+    assert 'не принял токен' in state['problem']
+
+
+def test_fetch_apk_token_running_out_is_warned(tmp_path, monkeypatch):
+    from datetime import timedelta
+    state = _fetch_status(
+        tmp_path, monkeypatch,
+        checked_at=_now().strftime('%Y-%m-%dT%H:%M:%SZ'), result='ok',
+        message='', token_expires=(_now() + timedelta(days=5, hours=1))
+        .strftime('%Y-%m-%d %H:%M:%S UTC'))
+    assert 'истекает через 5 дн.' in state['problem']
+
+
+def test_fetch_apk_silent_timer_is_shown(tmp_path, monkeypatch):
+    from datetime import timedelta
+    state = _fetch_status(
+        tmp_path, monkeypatch,
+        checked_at=(_now() - timedelta(hours=3)).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        result='ok', message='', token_expires='')
+    assert 'Таймер не запускался' in state['problem']
+
+
+def test_fetch_apk_never_ran_is_shown(app, client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module, '_FETCH_APK_STATUS',
+                        str(tmp_path / 'нет-такого'))
+    answer = client.get('/api/admin/rollout', headers=_ADMIN)
+    assert answer.status_code == 200
+    state = answer.get_json()['fetch_apk']
+    assert not state['available'] and 'ни разу' in state['problem']
