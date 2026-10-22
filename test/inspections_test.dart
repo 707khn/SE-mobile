@@ -211,10 +211,10 @@ void main() {
     await HttpOverrides.runWithHttpOverrides(() async {
       await tester.tap(find.byKey(const Key('insp_return')));
       await tester.pumpAndSettle();
-      final ok = find.byKey(const Key('insp_dialog_ok'));
+      final ok = find.byKey(const Key('prompt_ok'));
       expect(tester.widget<TextButton>(ok).onPressed, isNull);
       await tester.enterText(
-          find.byKey(const Key('insp_dialog_text')), 'Заусенцы на кромке');
+          find.byKey(const Key('prompt_text')), 'Заусенцы на кромке');
       await tester.pump();
       await tester.tap(ok);
       await settle(tester);
@@ -244,7 +244,7 @@ void main() {
     await HttpOverrides.runWithHttpOverrides(() async {
       await tester.tap(find.byKey(const Key('insp_resubmit')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('insp_dialog_ok')));
+      await tester.tap(find.byKey(const Key('prompt_ok')));
       await settle(tester);
     }, server);
     final sent = jsonDecode(server.requests.last) as Map<String, dynamic>;

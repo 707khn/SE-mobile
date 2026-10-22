@@ -9,6 +9,7 @@ import '../utils/load_problem.dart';
 import '../utils/secure_storage_helper.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/load_error_view.dart';
+import '../widgets/text_prompt_dialog.dart';
 import 'inspections_screen.dart';
 import 'repair_requests_screen.dart' show repairDowntimeLabel;
 
@@ -99,7 +100,7 @@ class _InspectionDetailScreenState extends State<InspectionDetailScreen> {
     final text = await showDialog<String>(
       context: context,
       builder: (_) =>
-          _TextDialog(title: title, hint: hint, required: required),
+          TextPromptDialog(title: title, hint: hint, required: required),
     );
     if (text != null) await _act(action, comment: text);
   }
@@ -377,59 +378,6 @@ class _InspectionDetailScreenState extends State<InspectionDetailScreen> {
             onPressed: _busy || value.text.trim().isEmpty
                 ? null
                 : () => _act('comment', comment: value.text.trim()),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Причина возврата или «что доработали». Поле живёт в самом диалоге:
-/// контроллер, закрытый сразу после pop, ломает анимацию закрытия.
-class _TextDialog extends StatefulWidget {
-  const _TextDialog(
-      {required this.title, required this.hint, required this.required});
-
-  final String title;
-  final String hint;
-  final bool required;
-
-  @override
-  State<_TextDialog> createState() => _TextDialogState();
-}
-
-class _TextDialogState extends State<_TextDialog> {
-  final _text = TextEditingController();
-
-  @override
-  void dispose() {
-    _text.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: TextField(
-        key: const Key('insp_dialog_text'),
-        controller: _text,
-        autofocus: true,
-        maxLines: 3,
-        maxLength: 1000,
-        decoration: InputDecoration(hintText: widget.hint),
-      ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context), child: Text('cancel'.tr)),
-        ValueListenableBuilder<TextEditingValue>(
-          valueListenable: _text,
-          builder: (context, value, _) => TextButton(
-            key: const Key('insp_dialog_ok'),
-            onPressed: widget.required && value.text.trim().isEmpty
-                ? null
-                : () => Navigator.pop(context, value.text.trim()),
-            child: Text(widget.title),
           ),
         ),
       ],

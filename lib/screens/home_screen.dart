@@ -23,6 +23,7 @@ import 'it_requests_screen.dart';
 import 'repair_requests_screen.dart';
 import 'stock_requests_screen.dart';
 import 'inspections_screen.dart';
+import 'approvals_screen.dart';
 import 'menu_screen.dart';
 import 'main_screen_2.dart';
 import '../utils/app_theme.dart';
@@ -273,6 +274,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       subtitle: 'insp_home_subtitle'.tr,
                       color: const Color(0xFF283593),
                       onTap: () => Get.to(() => const InspectionsScreen()),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.approval_outlined,
+                      label: 'appr_title'.tr,
+                      subtitle: 'appr_home_subtitle'.tr,
+                      color: const Color(0xFF6A1B9A),
+                      onTap: () => Get.to(() => const ApprovalsScreen()),
                     ),
                   ],
                   // Managers keep their team-wide screens, now inside the shell.
