@@ -28,12 +28,12 @@ jobs:
   # октября проверка съела ~360 минут из 2000 бесплатных в месяц на весь
   # репозиторий — кончатся они, встанут и сборка APK, и присмотр за сервером.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       build: ${{ steps.check.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: check
@@ -56,10 +56,10 @@ jobs:
   build:
     needs: changes
     if: needs.changes.outputs.build == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # На машине GitHub около 14 ГБ свободного места, а Flutter со своим
       # кэшем, кэш Gradle, NDK и три сборки подряд занимают почти всё — 5
@@ -81,7 +81,7 @@ jobs:
           cache: true
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches

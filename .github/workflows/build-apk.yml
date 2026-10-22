@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # contents: write — выкладывать сборку в Releases; actions: write —
     # убирать старые файлы сборок.
     permissions:
@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # На машине GitHub около 14 ГБ свободного места, а Flutter со своим
       # кэшем, кэш Gradle, NDK и три сборки подряд занимают почти всё — 5
@@ -62,7 +62,7 @@ jobs:
       # зависимости при каждой сборке — это минуты. Ключ по файлам сборки:
       # меняются они редко, значит кеш переживает обычную правку экрана.
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
@@ -255,12 +255,12 @@ jobs:
     # Только по отдельной просьбе: проверка на эмуляторе идёт дольше самой
     # сборки, а apk от неё не зависит.
     if: inputs.emulator
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -300,7 +300,7 @@ jobs:
       - name: Upload screenshot
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: emulator-screenshot
           path: screen.png
