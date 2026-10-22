@@ -19,7 +19,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
-                    AuthMiss)
+                    AuthMiss, CrashReport)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import (parse_directory_excel, split_phones,
@@ -887,6 +887,160 @@ def _count_today(field):
 def _note_auth_miss():
     """Считает запрос, пришедший без пропуска."""
     _count_today('count')
+
+
+# Падения приложения, присланные с телефонов (см. CrashReport).
+#
+# Сколько хранить: этого хватает, чтобы сравнить сборку с прошлой, а дольше
+# старые ошибки уже исправлены и только мешают.
+_CRASH_KEEP_DAYS = 90
+# Сколько разных ошибок за день примем от одного человека или телефона, и
+# сколько повторов всех ошибок вместе. Больше — значит, что-то сорвалось и
+# шлёт по кругу; запишется и так всё нужное.
+_CRASH_KINDS_PER_REPORTER = 20
+_CRASH_REPEATS_PER_REPORTER = 500
+# Сколько строк в день вообще. Предел от того, чтобы кто-то, знающий адрес,
+# не забил базу: приложение без пропуска тоже присылает ошибки.
+_CRASH_ROWS_PER_DAY = 5000
+# Всплеск: сегодня с ошибками не меньше стольких человек…
+_CRASH_SPIKE_MIN_PEOPLE = 5
+# …и во столько раз больше, чем в среднем за прошлую неделю.
+_CRASH_SPIKE_RATIO = 3
+
+# Что вычищаем из текста ошибки ещё на сервере — на случай, если сборка
+# прислала его как есть. ИИН, телефоны, табельные номера, почта, пропуска:
+# для поиска причины они не нужны, а в отчёте о падении им делать нечего.
+_CRASH_SCRUB = [
+    (re.compile(r'(?i)bearer\s+[A-Za-z0-9._~+/=-]+'), 'Bearer ***'),
+    (re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+'), '***@***'),
+    (re.compile(r'\+?\d[\d\s()-]{8,}\d'), '***'),
+    (re.compile(r'\d{5,}'), '***'),
+]
+_CRASH_NUMBERS = re.compile(r'\d+')
+_CRASH_INSTALL = re.compile(r'[A-Za-z0-9-]{8,40}')
+
+
+def _crash_scrub(text, limit):
+    text = text if isinstance(text, str) else ''
+    for pattern, repl in _CRASH_SCRUB:
+        text = pattern.sub(repl, text)
+    return text.strip()[:limit]
+
+
+def _crash_fingerprint(error, stack):
+    """Одна и та же ошибка — один отпечаток, на любой сборке и у любого.
+
+    Числа выбрасываем: в тексте ошибки это индексы и размеры, в следе —
+    номера строк, которые сдвигаются от сборки к сборке.
+    """
+    head = '\n'.join(stack.splitlines()[:3])
+    key = _CRASH_NUMBERS.sub('#', f'{error}\n{head}')
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
+def _record_crash(data, employee_id):
+    """Записать присланную ошибку.
+
+    True — записана, False — превышен предел, None — записывать нечего.
+    """
+    error = _crash_scrub(data.get('error'), 500)
+    if not error:
+        return None
+    stack = _crash_scrub(data.get('stack'), 2000)
+    place = _crash_scrub(data.get('where'), 100)
+    version = _text(data, 'version')[:20]
+    platform = _text(data, 'platform')[:60]
+    install = _text(data, 'install')
+    if not _CRASH_INSTALL.fullmatch(install):
+        install = ''
+    if employee_id:
+        reporter = employee_id
+    elif install:
+        reporter = 'i:' + install[:22]
+    else:
+        reporter = 'anon'
+
+    today = _plant_today()
+    now = datetime.utcnow()
+    fingerprint = _crash_fingerprint(error, stack)
+
+    row = CrashReport.query.filter_by(
+        day=today, fingerprint=fingerprint, reporter=reporter,
+        app_version=version).first()
+    mine = CrashReport.query.filter_by(day=today, reporter=reporter)
+    if row is not None:
+        repeats = mine.with_entities(db.func.sum(CrashReport.count)).scalar()
+        if (repeats or 0) >= _CRASH_REPEATS_PER_REPORTER:
+            return False
+        row.count += 1
+        row.last_at = now
+        db.session.commit()
+        return True
+
+    if mine.count() >= _CRASH_KINDS_PER_REPORTER:
+        return False
+    if CrashReport.query.filter_by(day=today).count() >= _CRASH_ROWS_PER_DAY:
+        return False
+    db.session.add(CrashReport(
+        day=today, fingerprint=fingerprint, reporter=reporter,
+        employee_id=employee_id, app_version=version, platform=platform,
+        place=place, error=error, stack=stack, count=1,
+        first_at=now, last_at=now))
+    CrashReport.query.filter(
+        CrashReport.day < today - timedelta(days=_CRASH_KEEP_DAYS)
+    ).delete(synchronize_session=False)
+    db.session.commit()
+    return True
+
+
+def _crash_days(days):
+    """По дням за последние `days`: сколько ошибок и у скольких людей."""
+    today = _plant_today()
+    since = today - timedelta(days=days - 1)
+    rows = (db.session.query(
+                CrashReport.day,
+                db.func.sum(CrashReport.count),
+                db.func.count(db.distinct(CrashReport.reporter)))
+            .filter(CrashReport.day >= since)
+            .group_by(CrashReport.day).all())
+    seen = {day: (int(total or 0), int(people or 0))
+            for day, total, people in rows}
+    out = []
+    for i in range(days):
+        day = today - timedelta(days=i)
+        total, people = seen.get(day, (0, 0))
+        out.append({'day': day.isoformat(), 'count': total, 'people': people})
+    return out
+
+
+def _crash_spike(days=None):
+    """Сегодня ошибок заметно больше обычного — или None.
+
+    Сравниваем людей, а не число ошибок: один телефон с ошибкой на каждом
+    кадре даст сотни строк, но это один человек.
+    """
+    days = days if days is not None else _crash_days(8)
+    if not days:
+        return None
+    today = days[0]['people']
+    before = [d['people'] for d in days[1:8]]
+    usual = sum(before) / len(before) if before else 0
+    if today < _CRASH_SPIKE_MIN_PEOPLE or today < _CRASH_SPIKE_RATIO * max(usual, 1):
+        return None
+    return {'people': today, 'usual': round(usual, 1),
+            'count': days[0]['count']}
+
+
+def _crash_summary():
+    """Коротко для экрана «Обновление»: сколько сегодня и нет ли всплеска."""
+    try:
+        days = _crash_days(8)
+        return {'today': days[0]['count'], 'people': days[0]['people'],
+                'spike': _crash_spike(days)}
+    except Exception as e:
+        db.session.rollback()
+        logging.warning('Не удалось посчитать падения: %s', e)
+        return {'today': 0, 'people': 0, 'spike': None}
 
 
 def require_auth(view):
@@ -3349,7 +3503,150 @@ def register_routes(app):
             'restore_test': _restore_test_state(),
             # Что сторож записал о перебоях. Пусто — сервер не падал.
             'outages': _outage_state(),
+            # Падения приложения у людей: сегодня и всплеск, если есть.
+            'crashes': _crash_summary(),
         })
+
+    @app.route('/api/crash', methods=['POST'])
+    def crash_report():
+        """Ошибка или падение приложения — с телефона.
+
+        Без обязательного пропуска: приложение падает и на экране входа, и
+        когда пропуск уже просрочен, а знать об этом нужнее всего. Пропуск
+        есть — запишем, чьё; нет — только номер установки.
+
+        Отвечаем 202 и тогда, когда предел превышен: телефону всё равно
+        нечего с этим делать, кроме как выбросить отчёт, а повторять его
+        незачем.
+        """
+        if (request.content_length or 0) > 16 * 1024:
+            return jsonify({'message': 'Failure', 'error': 'too_large'}), 413
+        data = _json_body()
+        employee = None
+        try:
+            employee = _resolve_token(_bearer_token())
+        except Exception:
+            db.session.rollback()
+        try:
+            saved = _record_crash(
+                data, employee.employee_id if employee else None)
+        except Exception as e:
+            db.session.rollback()
+            logging.warning('Отчёт о падении не записан: %s', e)
+            return jsonify({'message': 'Failure', 'error': 'not_saved'}), 503
+        if saved is None:
+            return jsonify({'message': 'Failure', 'error': 'empty'}), 400
+        return jsonify({'message': 'Success', 'saved': saved}), 202
+
+    def _real_admin():
+        """Админ по пропуску — без поблажек переходного режима.
+
+        В отчётах о падениях есть табельные номера и имена: смотреть их без
+        пропуска нельзя, даже пока REQUIRE_AUTH выключен.
+        """
+        viewer = getattr(g, 'employee', None)
+        return viewer is not None and _is_system_admin(viewer.job_title)
+
+    @app.route('/api/admin/crashes', methods=['GET'])
+    @require_auth
+    def admin_crashes():
+        """Что падает у людей: по дням, по версиям и по самим ошибкам."""
+        if not _real_admin():
+            return _deny()
+        try:
+            days = int(request.args.get('days', 14))
+        except ValueError:
+            days = 14
+        days = max(1, min(days, _CRASH_KEEP_DAYS))
+        since = _plant_today() - timedelta(days=days - 1)
+        rows = (CrashReport.query.filter(CrashReport.day >= since)
+                .order_by(CrashReport.last_at.desc()).all())
+
+        groups = {}
+        for r in rows:
+            grp = groups.get(r.fingerprint)
+            if grp is None:
+                # Строки идут от свежих к старым: первая — самый свежий
+                # образец, его и показываем.
+                grp = groups[r.fingerprint] = {
+                    'fingerprint': r.fingerprint, 'error': r.error,
+                    'where': r.place, 'stack': r.stack, 'count': 0,
+                    'reporters': set(), 'employees': set(),
+                    'versions': set(), 'platforms': set(),
+                    'first_at': r.first_at, 'last_at': r.last_at}
+            grp['count'] += r.count
+            grp['reporters'].add(r.reporter)
+            if r.employee_id:
+                grp['employees'].add(r.employee_id)
+            if r.app_version:
+                grp['versions'].add(r.app_version)
+            if r.platform:
+                grp['platforms'].add(r.platform.split(' ')[0])
+            grp['first_at'] = min(grp['first_at'], r.first_at)
+            grp['last_at'] = max(grp['last_at'], r.last_at)
+
+        wanted = {e for grp in groups.values() for e in grp['employees']}
+        names = {e.employee_id: e.full_name for e in
+                 Employee.query.filter(Employee.employee_id.in_(wanted))} \
+            if wanted else {}
+
+        out = []
+        for grp in sorted(groups.values(),
+                          key=lambda x: (len(x['reporters']), x['count']),
+                          reverse=True)[:50]:
+            out.append({
+                'fingerprint': grp['fingerprint'],
+                'error': grp['error'],
+                'where': grp['where'],
+                'stack': grp['stack'],
+                'count': grp['count'],
+                'people': len(grp['reporters']),
+                'names': sorted(names.get(e, e) for e in grp['employees'])[:10],
+                'versions': sorted(grp['versions'], reverse=True),
+                'platforms': sorted(grp['platforms']),
+                'first_at': grp['first_at'].isoformat() + 'Z',
+                'last_at': grp['last_at'].isoformat() + 'Z',
+            })
+
+        # Версии: у скольких стоит, у скольких падала. Сколько у кого стоит —
+        # из той же записи, что на экране «Обновление».
+        users = {}
+        for account in UserAccount.query.filter_by(is_active=True).all():
+            key = account.app_version or ''
+            users[key] = users.get(key, 0) + 1
+        crashed = {}
+        for r in rows:
+            item = crashed.setdefault(r.app_version, {'count': 0, 'who': set()})
+            item['count'] += r.count
+            item['who'].add(r.reporter)
+        versions = []
+        for version in set(users) | set(crashed):
+            item = crashed.get(version, {'count': 0, 'who': set()})
+            versions.append({'version': version,
+                             'users': users.get(version, 0),
+                             'crashes': item['count'],
+                             'people': len(item['who'])})
+        versions.sort(key=lambda v: (v['users'], v['people']), reverse=True)
+
+        by_day = _crash_days(days)
+        return jsonify({
+            'message': 'Success',
+            'days': by_day,
+            'spike': _crash_spike(by_day[:8] if days >= 8 else None),
+            'versions': versions,
+            'groups': out,
+        })
+
+    @app.route('/api/admin/crashes/<fingerprint>', methods=['DELETE'])
+    @require_auth
+    def admin_crash_forget(fingerprint):
+        """«Исправлено»: убрать ошибку из списка. Вернётся — появится снова."""
+        if not _real_admin():
+            return _deny()
+        removed = CrashReport.query.filter_by(
+            fingerprint=fingerprint[:16]).delete(synchronize_session=False)
+        db.session.commit()
+        return jsonify({'message': 'Success', 'removed': removed})
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])
     @require_auth

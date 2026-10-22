@@ -12,6 +12,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/skeleton.dart';
 import 'admin_employee_screen.dart';
+import 'crashes_screen.dart';
 import 'rollout_screen.dart';
 import '../utils/app_theme.dart';
 import '../utils/load_problem.dart';
@@ -111,6 +112,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         ),
         title: BigText(content: 'admin_panel'.tr, color: Colors.white),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            tooltip: 'crashes_title'.tr,
+            onPressed: () => Get.to(() => const CrashesScreen()),
+          ),
           IconButton(
             icon: const Icon(Icons.system_update_outlined),
             tooltip: 'rollout_title'.tr,

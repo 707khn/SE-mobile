@@ -181,3 +181,15 @@ def test_whole_shift_downloads_the_apk(nginx):
     _, headers, body = refused[0]
     assert headers['Retry-After'] == '60'
     assert 'Повторите через минуту' in body.decode('utf-8')
+
+
+def test_crash_reports_burst_then_slow_down(nginx):
+    """Сборка с ошибкой: отчёты полсмены разом проходят, бесконечный цикл — нет."""
+    url = f'{nginx}/api/crash'
+    assert set(_statuses(url, 300, 'POST')) == {200}
+    assert 429 in _statuses(url, 60, 'POST')
+
+
+def test_crash_report_body_is_small(nginx):
+    status, _, _ = _hit(f'{nginx}/api/crash', 'POST', data=b'x' * 40000)
+    assert status == 413

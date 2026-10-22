@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/pin_screen.dart';
 import 'utils/api.dart';
 import 'utils/app_lock.dart';
+import 'utils/crash_report.dart';
 import 'utils/error_log.dart';
 import 'utils/lang.dart';
 import 'utils/secure_storage_helper.dart';
@@ -70,6 +71,10 @@ void main() {
     // минут — спросим код. Наблюдателя снимать некому и незачем: он живёт
     // столько же, сколько сам процесс.
     AppLock.instance.start();
+
+    // Ошибки, не успевшие уйти на сервер в прошлый раз: упало приложение,
+    // не было связи. Ждать не нужно — экран от этого не зависит.
+    unawaited(CrashReport.flush());
 
     runApp(const MyApp());
   }, (error, stack) => ErrorLog.record(error, stack));

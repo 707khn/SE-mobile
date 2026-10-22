@@ -328,3 +328,42 @@ class AuthMiss(db.Model):
     # Этот словарь — последнее место, где пароли лежат открытым текстом, и
     # удалить его можно ровно тогда, когда здесь несколько дней подряд ноль.
     fallback_logins = db.Column(db.Integer, nullable=False, default=0)
+
+
+class CrashReport(db.Model):
+    """Ошибка или падение приложения, присланное с телефона.
+
+    Прежде ошибка оставалась на самом телефоне, в «О программе», и узнавали
+    о ней, только если человек сам догадывался её переслать — то есть почти
+    никогда. Теперь телефон присылает её сам.
+
+    Одна строка — одна и та же ошибка у одного человека (или телефона) на
+    одной сборке за один день; повторы только прибавляют `count`. Иначе
+    ошибка отрисовки, которая случается на каждом кадре, за минуту дала бы
+    тысячи строк.
+
+    Табельный номер — строка без внешнего ключа: отчёт о падении не повод
+    мешать склейке или удалению сотрудника, а хранится он недолго.
+    """
+    __tablename__ = 'crash_reports'
+    __table_args__ = (
+        db.Index('ix_crash_reports_day_fp', 'day', 'fingerprint'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    day = db.Column(db.Date, nullable=False, index=True)
+    # Ошибка без чисел и номеров строк: одна и та же ошибка на разных
+    # сборках и у разных людей получает один отпечаток.
+    fingerprint = db.Column(db.String(16), nullable=False, index=True)
+    # Кто прислал: табельный номер, если человек вошёл, иначе случайный
+    # номер установки — по нему считаем, у скольких разных людей ошибка, и
+    # не даём одному телефону завалить базу.
+    reporter = db.Column(db.String(24), nullable=False)
+    employee_id = db.Column(db.String(10), index=True)
+    app_version = db.Column(db.String(20), nullable=False, default='')
+    platform = db.Column(db.String(60), nullable=False, default='')
+    place = db.Column(db.String(100), nullable=False, default='')
+    error = db.Column(db.String(500), nullable=False, default='')
+    stack = db.Column(db.Text, nullable=False, default='')
+    count = db.Column(db.Integer, nullable=False, default=1)
+    first_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    last_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
