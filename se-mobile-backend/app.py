@@ -47,6 +47,7 @@ import tech_questions
 import stock_balances
 import data_corrections
 import work_permits
+import waybills
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1690,6 +1691,7 @@ def create_app():
     stock_balances.register(app, sys.modules[__name__])
     data_corrections.register(app, sys.modules[__name__])
     work_permits.register(app, sys.modules[__name__])
+    waybills.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):

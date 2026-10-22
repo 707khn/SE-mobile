@@ -18,6 +18,7 @@ import '../screens/hazards_screen.dart';
 import '../screens/orders_screen.dart';
 import '../screens/pre_trip_screen.dart';
 import '../screens/tech_questions_screen.dart';
+import '../screens/waybills_screen.dart';
 import '../screens/work_permits_screen.dart';
 import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
@@ -256,6 +257,12 @@ class _AppDrawerState extends State<AppDrawer> {
                     icon: Icons.medical_services_outlined,
                     label: 'pt_title'.tr,
                     onTap: () => Get.to(() => const PreTripScreen()),
+                  ),
+                if (usesPreTrip(_job))
+                  _item(
+                    icon: Icons.route_outlined,
+                    label: 'wb_title'.tr,
+                    onTap: () => Get.to(() => const WaybillsScreen()),
                   ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
