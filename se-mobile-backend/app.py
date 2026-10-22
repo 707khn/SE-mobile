@@ -40,6 +40,7 @@ import on_site
 import purchases
 import payslip_questions
 import orders_ack
+import assignments
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1676,6 +1677,7 @@ def create_app():
     purchases.register(app, sys.modules[__name__])
     payslip_questions.register(app, sys.modules[__name__])
     orders_ack.register(app, sys.modules[__name__])
+    assignments.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):

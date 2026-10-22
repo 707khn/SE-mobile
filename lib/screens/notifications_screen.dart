@@ -25,6 +25,8 @@ import 'material_passes_screen.dart';
 import 'payslip_question_detail_screen.dart';
 import 'payslip_questions_screen.dart';
 import 'purchase_detail_screen.dart';
+import 'assignment_detail_screen.dart';
+import 'assignments_screen.dart';
 import 'order_detail_screen.dart';
 import 'orders_screen.dart';
 import 'purchases_screen.dart';
@@ -108,6 +110,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const StockRequestsScreen()
             : StockRequestDetailScreen(requestId: id));
+      case 'assignment':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const AssignmentsScreen()
+            : AssignmentDetailScreen(assignmentId: id));
       case 'order':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -254,6 +261,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'purchase' => (Icons.shopping_cart_outlined, const Color(0xFFAD1457)),
       'payslip_q' => (Icons.contact_support_outlined, context.accentColor),
       'order' => (Icons.gavel_outlined, const Color(0xFF455A64)),
+      'assignment' => (Icons.task_alt, const Color(0xFF0277BD)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(
