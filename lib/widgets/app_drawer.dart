@@ -16,6 +16,7 @@ import '../screens/assignments_screen.dart';
 import '../screens/hazards_screen.dart';
 import '../screens/orders_screen.dart';
 import '../screens/pre_trip_screen.dart';
+import '../screens/tech_questions_screen.dart';
 import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
@@ -237,6 +238,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.report_problem_outlined,
                   label: 'hz_title'.tr,
                   onTap: () => Get.to(() => const HazardsScreen()),
+                ),
+                _item(
+                  icon: Icons.engineering_outlined,
+                  label: 'tq_title'.tr,
+                  onTap: () => Get.to(() => const TechQuestionsScreen()),
                 ),
                 if (usesPreTrip(_job))
                   _item(

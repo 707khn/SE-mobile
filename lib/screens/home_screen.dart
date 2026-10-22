@@ -30,6 +30,7 @@ import 'assignments_screen.dart';
 import 'hazards_screen.dart';
 import 'orders_screen.dart';
 import 'pre_trip_screen.dart';
+import 'tech_questions_screen.dart';
 import 'purchases_screen.dart';
 import 'menu_screen.dart';
 import 'main_screen_2.dart';
@@ -323,6 +324,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       subtitle: 'hz_home_subtitle'.tr,
                       color: const Color(0xFFC62828),
                       onTap: () => Get.to(() => const HazardsScreen()),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.engineering_outlined,
+                      label: 'tq_title'.tr,
+                      subtitle: 'tq_home_subtitle'.tr,
+                      color: const Color(0xFF3949AB),
+                      onTap: () => Get.to(() => const TechQuestionsScreen()),
                     ),
                     if (usesPreTrip(widget.job))
                       _buildActionCard(
