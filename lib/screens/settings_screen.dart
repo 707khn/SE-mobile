@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/app_theme.dart';
 import '../utils/app_version.dart';
+import '../utils/biometric.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
 import '../utils/secure_storage_helper.dart';
@@ -33,6 +34,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _fullName = '';
   String _job = '';
 
+  /// Есть ли на телефоне датчик с заведённым отпечатком. Нет — строки
+  /// «Вход по отпечатку» не показываем вовсе, чтобы не обещать лишнего.
+  bool _biometricAvailable = false;
+  bool _biometricOn = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,12 +50,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final storage = SecureStorageHelper.instance;
     final fullName = await storage.getFullName();
     final job = await storage.getJob();
+    final biometricAvailable = await Biometric.instance.available();
+    final biometricOn = await storage.biometricEnabled();
     if (!mounted) return;
     setState(() {
       _lang = Lang.code(prefs.getString(AppValues.LANG));
       _themeMode = ThemePref.read(prefs);
       _fullName = fullName ?? '';
       _job = job ?? '';
+      _biometricAvailable = biometricAvailable;
+      _biometricOn = biometricOn;
     });
   }
 
@@ -92,6 +102,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: 'pin_change_title'.tr,
             onTap: () => Get.to(() => const PinScreen(mode: PinMode.change)),
           ),
+          if (_biometricAvailable)
+            SwitchListTile(
+              secondary: Icon(Icons.fingerprint, color: context.mutedColor),
+              title: Text('biometric_setting'.tr,
+                  style: const TextStyle(fontSize: 15)),
+              subtitle: Text('biometric_setting_hint'.tr,
+                  style: TextStyle(fontSize: 12.5, color: context.mutedColor)),
+              value: _biometricOn,
+              onChanged: _toggleBiometric,
+            ),
           _section('settings_app'.tr),
           _tile(
             icon: Icons.info_outline,
@@ -197,6 +217,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (chosen == null || chosen == _themeMode) return;
     await ThemePref.write(chosen);
     if (mounted) setState(() => _themeMode = chosen);
+  }
+
+  /// Включить можно, только приложив палец: так человек сразу видит, что
+  /// датчик его узнаёт, а чужой, взявший открытый телефон, не включит вход
+  /// своим пальцем. Выключают без вопросов — код остаётся.
+  Future<void> _toggleBiometric(bool on) async {
+    HapticFeedback.selectionClick();
+    if (on && !await Biometric.instance.authenticate(biometricReason())) {
+      return;
+    }
+    await SecureStorageHelper.instance.setBiometricEnabled(on);
+    if (mounted) setState(() => _biometricOn = on);
   }
 
   Future<void> _pickLanguage() async {
