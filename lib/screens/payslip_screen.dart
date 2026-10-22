@@ -11,6 +11,7 @@ import '../requests/payslip_request.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
 import '../utils/dimensions.dart';
+import 'payslip_questions_screen.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/offline_notice.dart';
 import '../widgets/custom_text.dart';
@@ -399,6 +400,13 @@ class _PayslipPageState extends State<PayslipPage> {
               tooltip: 'share'.tr,
               onPressed: _sharing ? null : _sharePayslip,
             ),
+          if (widget.employeeId == null)
+            IconButton(
+              key: const Key('payslip_questions'),
+              icon: const Icon(Icons.contact_support_outlined),
+              tooltip: 'psq_title'.tr,
+              onPressed: () => Get.to(() => const PayslipQuestionsScreen()),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'refresh'.tr,
@@ -637,6 +645,17 @@ class _PayslipPageState extends State<PayslipPage> {
                               color: context.mutedColor,
                             ),
                           ],
+                          // Чужой листок (из панели администратора) —
+                          // спрашивать о нём не нам.
+                          if (widget.employeeId == null) ...[
+                            SizedBox(height: Dimensions.height30 / 2),
+                            OutlinedButton.icon(
+                              key: const Key('payslip_ask'),
+                              onPressed: _askAboutPayslip,
+                              icon: const Icon(Icons.contact_support_outlined),
+                              label: Text('psq_ask'.tr),
+                            ),
+                          ],
                           SizedBox(height: Dimensions.height30),
                         ],
                       ),
@@ -744,6 +763,22 @@ class _PayslipPageState extends State<PayslipPage> {
         ),
       ),
     );
+  }
+
+  /// Вопрос расчётной группе: строки — из этого листка, чтобы не
+  /// переписывать сумму руками.
+  void _askAboutPayslip() {
+    final payslip = _payslip;
+    if (payslip == null) return;
+    String line(String section, PayslipItem item) =>
+        '$section: ${item.name} — ${_numberFormat.format(item.amount)}';
+    Get.to(() => PayslipAskScreen(
+          month: DateTime(_selectedDate.year, _selectedDate.month),
+          lines: [
+            for (final item in payslip.accruals) line('accruals'.tr, item),
+            for (final item in payslip.deductions) line('deductions'.tr, item),
+          ],
+        ));
   }
 
   static String _monthTitle(DateTime month) {
