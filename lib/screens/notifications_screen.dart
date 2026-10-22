@@ -47,6 +47,8 @@ import 'inspections_screen.dart';
 import 'stock_request_detail_screen.dart';
 import 'stock_requests_screen.dart';
 import 'news_screen.dart';
+import 'onboarding_detail_screen.dart';
+import 'onboarding_screen.dart';
 import 'rollout_screen.dart';
 
 /// Оповещения: что нового с прошлого раза.
@@ -150,6 +152,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const BusinessTripsScreen()
             : BusinessTripDetailScreen(tripId: id));
+      case 'onboarding':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const OnboardingScreen()
+            : OnboardingDetailScreen(onboardingId: id));
       case 'datafix':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -310,6 +317,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'pretrip' => (Icons.medical_services_outlined, const Color(0xFF00838F)),
       'hazard' => (Icons.report_problem_outlined, const Color(0xFFC62828)),
       'techq' => (Icons.engineering_outlined, const Color(0xFF3949AB)),
+      'onboarding' => (Icons.waving_hand_outlined, const Color(0xFF00897B)),
       'datafix' => (Icons.badge_outlined, const Color(0xFF5E35B1)),
       'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       'waybill' => (Icons.route_outlined, const Color(0xFF00695C)),
