@@ -110,6 +110,19 @@ class RolloutReport {
   /// Почему её нет.
   String appProblem = '';
 
+  /// Номер сборки на сервере; null — её нет.
+  int? appBuild;
+
+  /// Ниже какой сборки приложение не пускает дальше экрана обновления.
+  /// 0 — ограничения нет.
+  int minBuild = 0;
+
+  /// Граница из MIN_APP_BUILD на сервере: с телефона ниже не опустить.
+  int minBuildEnv = 0;
+
+  /// Сколько учётных записей, судя по последнему заходу, ниже минимальной.
+  int minBuildBelow = 0;
+
   /// Почему новые сборки не приезжают из GitHub Releases сами: истёк токен,
   /// таймер не запускается. Пусто — приезжают.
   String fetchProblem = '';
@@ -185,9 +198,14 @@ Future<RolloutReport> fetchRollout() async {
   final app = (body['app'] as Map?) ?? {};
   if (app['available'] == true) {
     report.appOnServer = '${app['version']} (${app['build']})';
+    report.appBuild = (app['build'] as num?)?.toInt();
   } else {
     report.appProblem = (app['reason'] as String?) ?? '';
   }
+  final minimum = (body['min_build'] as Map?) ?? {};
+  report.minBuild = (minimum['min_build'] as num?)?.toInt() ?? 0;
+  report.minBuildEnv = (minimum['env'] as num?)?.toInt() ?? 0;
+  report.minBuildBelow = (minimum['below'] as num?)?.toInt() ?? 0;
   final fetch = (body['fetch_apk'] as Map?) ?? {};
   report.fetchProblem = (fetch['problem'] as String?) ?? '';
   report.backupCount = (backups['count'] as num?)?.toInt() ?? 0;
@@ -201,6 +219,41 @@ Future<RolloutReport> fetchRollout() async {
   report.restoreTestDaysAgo = (restore['days_ago'] as num?)?.toInt();
   report.restoreTestProblem = (restore['problem'] as String?) ?? '';
   return report;
+}
+
+/// Почему сервер не принял минимальную сборку.
+class MinBuildRefused implements Exception {
+  const MinBuildRefused(this.error, {this.latest});
+
+  /// bad_build — не число; no_such_build — такой сборки на сервере нет.
+  final String error;
+
+  /// Последняя сборка на сервере, если она есть.
+  final int? latest;
+}
+
+/// Назначает минимальную сборку; возвращает ту, что действует теперь.
+///
+/// Действующая может оказаться выше назначенной: MIN_APP_BUILD на сервере —
+/// нижняя граница, с телефона её не опустить.
+Future<int> setMinBuild(int build) async {
+  final response = await http
+      .post(Uri.parse('${AppValues.baseUrl}/api/admin/min-build'),
+          headers: await authHeaders(),
+          body: jsonEncode({'build': build}))
+      .timeout(const Duration(seconds: 20));
+  if (response.statusCode == 400) {
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    throw MinBuildRefused((body['error'] as String?) ?? '',
+        latest: (body['latest'] as num?)?.toInt());
+  }
+  if (response.statusCode != 200) {
+    throw LoadFailure(problemForStatus(response.statusCode),
+        'HTTP ${response.statusCode}');
+  }
+  final body = jsonDecode(response.body) as Map<String, dynamic>;
+  final state = (body['min_build'] as Map?) ?? {};
+  return (state['min_build'] as num?)?.toInt() ?? build;
 }
 
 /// Свежесть одного источника данных: листки, проходы, меню, новости.

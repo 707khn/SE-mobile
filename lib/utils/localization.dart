@@ -108,6 +108,27 @@ class LocaleString extends Translations {
           'update_available': 'Жаңа нұсқа: @version',
           'update_hint': 'Жүктеп алып, орнатыңыз',
           'update_download': 'Жүктеу',
+          'update_required_title': 'Қолданбаны жаңарту қажет',
+          'update_required_text': 'Бұл нұсқа (@version) енді қолдау '
+              'көрсетілмейді. Жаңасын үстінен орнатыңыз — кіру мен деректер '
+              'сақталады.',
+          'update_required_no_file': 'Жаңа нұсқа әлі серверде жоқ. '
+              'Әкімшіге хабарласыңыз.',
+          'update_required_retry': 'Қайта тексеру',
+          'rollout_min_build': 'Ең төменгі нұсқа',
+          'rollout_min_build_none': 'Шектеу жоқ',
+          'rollout_min_build_below': 'Әлі жаңартпағандар',
+          'rollout_min_build_change': 'Өзгерту',
+          'rollout_min_build_why': 'Бұдан төмен жинақ «Жаңарту қажет» '
+              'экранынан әрі өткізбейді. Серверде жоқ жинақты қоюға болмайды. '
+              '0 — шектеуді алып тастау.',
+          'rollout_min_build_floor': 'Сервердегі MIN_APP_BUILD: @build — '
+              'бұдан төмен түсірілмейді.',
+          'rollout_min_build_saved': 'Сақталды',
+          'rollout_min_build_no_such': 'Серверде мұндай жинақ жоқ. Соңғысы: '
+              '@build.',
+          'rollout_min_build_bad': 'Жинақ нөмірі — бүтін сан, 0 немесе одан '
+              'көп.',
           'later': 'Кейінірек',
           'rollout_outages': 'Сервердің іркілістері',
           'rollout_outages_none': 'Іркіліс болмаған',
@@ -441,6 +462,26 @@ class LocaleString extends Translations {
           'update_available': 'Вышла версия @version',
           'update_hint': 'Скачайте и установите поверх',
           'update_download': 'Скачать',
+          'update_required_title': 'Нужно обновить приложение',
+          'update_required_text': 'Эта версия (@version) больше не '
+              'поддерживается. Установите новую поверх — вход и данные '
+              'сохранятся.',
+          'update_required_no_file': 'Новой версии на сервере пока нет. '
+              'Обратитесь к администратору.',
+          'update_required_retry': 'Проверить снова',
+          'rollout_min_build': 'Минимальная версия',
+          'rollout_min_build_none': 'Без ограничения',
+          'rollout_min_build_below': 'Ещё не обновились',
+          'rollout_min_build_change': 'Изменить',
+          'rollout_min_build_why': 'Сборка ниже этой не пускает дальше '
+              'экрана «Нужно обновить приложение». Назначить сборку, которой '
+              'нет на сервере, нельзя. 0 — снять ограничение.',
+          'rollout_min_build_floor': 'На сервере задано MIN_APP_BUILD: @build '
+              '— ниже не опустить.',
+          'rollout_min_build_saved': 'Сохранено',
+          'rollout_min_build_no_such': 'Такой сборки на сервере нет. '
+              'Последняя: @build.',
+          'rollout_min_build_bad': 'Номер сборки — целое число, 0 или больше.',
           'later': 'Позже',
           'rollout_outages': 'Перебои сервера',
           'rollout_outages_none': 'Перебоев не было',

@@ -19,6 +19,7 @@ import 'utils/app_lock.dart';
 import 'utils/error_log.dart';
 import 'utils/lang.dart';
 import 'utils/secure_storage_helper.dart';
+import 'widgets/update_gate.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
 // ignore: depend_on_referenced_packages
@@ -122,7 +123,11 @@ class MyApp extends StatelessWidget {
             textScaler: media.textScaler
                 .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.3),
           ),
-          child: child ?? const SizedBox.shrink(),
+          // Устаревшая сборка дальше экрана «Нужно обновить» не пускает.
+          child: UpdateGate(
+            prefs: prefs,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       home: FutureBuilder<Map<String, String?>>(

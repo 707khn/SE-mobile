@@ -19,7 +19,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
-                    AuthMiss)
+                    AuthMiss, AppSetting)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import (parse_directory_excel, split_phones,
@@ -1817,6 +1817,63 @@ def _latest_apk():
     }
 
 
+# Сборка, ниже которой приложение не пускает дальше экрана «Нужно обновить».
+#
+# Две ручки: MIN_APP_BUILD в окружении и настройка в базе, которую
+# администратор меняет с телефона (экран «Обновление»). Действует большая из
+# двух: окружение — нижняя граница, которую с телефона не опустить; база —
+# чтобы поднять её без ssh. Ноль — проверки нет.
+#
+# Это подготовка к REQUIRE_AUTH=1: сначала всех переводят на сборку, которая
+# умеет пропуск, и только потом проверку включают. Саму REQUIRE_AUTH это не
+# трогает.
+_MIN_BUILD_KEY = 'min_app_build'
+
+
+def _env_min_build():
+    try:
+        return max(0, int((os.environ.get('MIN_APP_BUILD') or '0').strip()))
+    except ValueError:
+        logging.warning('MIN_APP_BUILD не число: %r — считаем нулём',
+                        os.environ.get('MIN_APP_BUILD'))
+        return 0
+
+
+def _min_build_state():
+    """Какая сборка минимальная, кто её назначил и когда."""
+    env = _env_min_build()
+    admin, updated_at, updated_by = 0, None, None
+    try:
+        row = db.session.get(AppSetting, _MIN_BUILD_KEY)
+    except Exception as e:      # настройка не повод ронять проверку обновления
+        db.session.rollback()
+        logging.warning('Не удалось прочитать минимальную сборку: %s', e)
+        row = None
+    if row is not None:
+        try:
+            admin = max(0, int(row.value or '0'))
+        except ValueError:
+            admin = 0
+        updated_at, updated_by = row.updated_at, row.updated_by
+    return {
+        'min_build': max(env, admin),
+        'env': env,
+        'admin': admin,
+        'updated_at': (updated_at.replace(tzinfo=timezone.utc).isoformat()
+                       if updated_at else None),
+        'updated_by': updated_by,
+    }
+
+
+_VERSION_BUILD = re.compile(r'\((\d+)\)\s*$')
+
+
+def _build_of(version_label):
+    """«1.16.18 (51)» → 51. То, что присылает приложение в X-App-Version."""
+    found = _VERSION_BUILD.search(version_label or '')
+    return int(found.group(1)) if found else None
+
+
 # Чем кончился последний запуск deploy/fetch-apk.sh. Файл пишет таймер
 # se-mobile-fetch-apk, приложение только читает.
 _FETCH_APK_STATUS = os.environ.get(
@@ -2177,7 +2234,11 @@ def register_routes(app):
         Отвечаем и когда файла нет: приложение тогда просто молчит, а
         администратор видит причину на экране «Обновление».
         """
-        return jsonify({'message': 'Success', 'app': _latest_apk()})
+        # min_build — ниже этой сборки приложение дальше не пускает. Сравнивает
+        # сам телефон: свою сборку он знает точно, а заголовок с версией
+        # шлют не все старые сборки.
+        return jsonify({'message': 'Success', 'app': _latest_apk(),
+                        'min_build': _min_build_state()['min_build']})
 
     @app.route('/api/me', methods=['GET'])
     @require_auth
@@ -3315,6 +3376,7 @@ def register_routes(app):
                   if a.last_seen_at is None or a.last_seen_at < week_ago]
 
         misses = (AuthMiss.query.order_by(AuthMiss.day.desc()).limit(14).all())
+        minimum = _min_build_state()
         return jsonify({
             'message': 'Success',
             'require_auth': _AUTH_REQUIRED,
@@ -3345,11 +3407,60 @@ def register_routes(app):
             # Приезжают ли новые сборки сами. Истёкший токен иначе виден
             # только в журнале systemd.
             'fetch_apk': _fetch_apk_state(),
+            # Ниже какой сборки приложение не пускает, и сколько людей,
+            # судя по последнему заходу, упрётся в экран «Нужно обновить».
+            'min_build': dict(minimum, below=sum(
+                count for label, count in by_version.items()
+                if (_build_of(label) or 0) < minimum['min_build'])),
             'offsite': _offsite_state(),
             'restore_test': _restore_test_state(),
             # Что сторож записал о перебоях. Пусто — сервер не падал.
             'outages': _outage_state(),
         })
+
+    @app.route('/api/admin/min-build', methods=['POST'])
+    @require_auth
+    def admin_set_min_build():
+        """Поднять или снять минимальную сборку.
+
+        Отказываем, если такой сборки нет на сервере: иначе люди упрутся в
+        «Нужно обновить», а скачать им будет нечего — приложение выключится
+        у всех разом. Опустить ниже MIN_APP_BUILD отсюда тоже нельзя: эту
+        границу поставил тот, у кого доступ к серверу, и снимает её он же.
+        """
+        if not _is_admin_account():
+            return _deny()
+        raw = _json_body().get('build')
+        if isinstance(raw, bool) or not isinstance(raw, (int, str)):
+            return jsonify({'message': 'Failure', 'error': 'bad_build'}), 400
+        try:
+            build = int(raw)
+        except ValueError:
+            return jsonify({'message': 'Failure', 'error': 'bad_build'}), 400
+        if build < 0:
+            return jsonify({'message': 'Failure', 'error': 'bad_build'}), 400
+
+        if build > 0:
+            latest = _latest_apk()
+            if not latest.get('available') or latest['build'] < build:
+                return jsonify({
+                    'message': 'Failure', 'error': 'no_such_build',
+                    'latest': latest.get('build') if latest.get('available') else None,
+                }), 400
+
+        viewer = getattr(g, 'employee', None)
+        row = db.session.get(AppSetting, _MIN_BUILD_KEY)
+        if row is None:
+            row = AppSetting(key=_MIN_BUILD_KEY)
+            db.session.add(row)
+        row.value = str(build)
+        row.updated_at = datetime.utcnow()
+        row.updated_by = viewer.employee_id if viewer is not None else None
+        db.session.commit()
+        state = _min_build_state()
+        logging.info('Минимальная сборка: %s (назначил %s, действует %s)',
+                     build, row.updated_by, state['min_build'])
+        return jsonify({'message': 'Success', 'min_build': state})
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])
     @require_auth

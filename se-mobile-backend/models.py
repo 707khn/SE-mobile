@@ -328,3 +328,18 @@ class AuthMiss(db.Model):
     # Этот словарь — последнее место, где пароли лежат открытым текстом, и
     # удалить его можно ровно тогда, когда здесь несколько дней подряд ноль.
     fallback_logins = db.Column(db.Integer, nullable=False, default=0)
+
+
+class AppSetting(db.Model):
+    """Настройка, которую администратор меняет из приложения, без передеплоя.
+
+    Одна строка — одна настройка. Отдельная таблица, а не переменная
+    окружения: переменную на сервере меняет только тот, у кого есть доступ
+    по ssh, а поднять минимальную версию приложения должен уметь и
+    администратор с телефона.
+    """
+    __tablename__ = 'app_settings'
+    key = db.Column(db.String(50), primary_key=True)
+    value = db.Column(db.String(200), nullable=False, default='')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_by = db.Column(db.String(50))

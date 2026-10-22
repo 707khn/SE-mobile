@@ -101,6 +101,34 @@ class _RolloutScreenState extends State<RolloutScreen> {
       Text('rollout_apk_why'.tr,
           style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
       SizedBox(height: Dimensions.height30 / 1.5),
+      _section('rollout_min_build'.tr),
+      _line(
+          r.minBuild > 0
+              ? 'rollout_min_build'.tr
+              : 'rollout_min_build_none'.tr,
+          r.minBuild > 0 ? '${r.minBuild}' : '',
+          muted: r.minBuild == 0),
+      if (r.minBuild > 0)
+        _line('rollout_min_build_below'.tr, '${r.minBuildBelow}'),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          label: Text('rollout_min_build_change'.tr),
+          onPressed: () => _changeMinBuild(r),
+        ),
+      ),
+      Text('rollout_min_build_why'.tr,
+          style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
+      if (r.minBuildEnv > 0)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+              'rollout_min_build_floor'.trParams({'build': '${r.minBuildEnv}'}),
+              style: TextStyle(
+                  fontSize: 12, color: context.mutedColor, height: 1.4)),
+        ),
+      SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_versions'.tr),
       ...(r.byVersion.entries.toList()
             ..sort((a, b) => b.value.compareTo(a.value)))
@@ -172,6 +200,64 @@ class _RolloutScreenState extends State<RolloutScreen> {
       Text('rollout_lost_accounts_why'.tr,
           style: TextStyle(fontSize: 12, color: context.mutedColor, height: 1.4)),
     ];
+  }
+
+  /// Спрашивает новую минимальную сборку и отправляет её на сервер.
+  ///
+  /// Предлагаем ту, что лежит на сервере: поднимают минимальную почти
+  /// всегда до неё, а ошибка в номере выключит приложение людям.
+  Future<void> _changeMinBuild(RolloutReport r) async {
+    final field = TextEditingController(
+        text: '${r.minBuild > 0 ? r.minBuild : (r.appBuild ?? 0)}');
+    final chosen = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('rollout_min_build'.tr),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: field,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 10),
+            Text('rollout_min_build_why'.tr,
+                style: TextStyle(
+                    fontSize: 12, color: context.mutedColor, height: 1.4)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text('cancel'.tr),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext)
+                .pop(int.tryParse(field.text.trim()) ?? -1),
+            child: Text('save'.tr),
+          ),
+        ],
+      ),
+    );
+    field.dispose();
+    if (chosen == null || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    String message;
+    try {
+      await setMinBuild(chosen);
+      message = 'rollout_min_build_saved'.tr;
+    } on MinBuildRefused catch (e) {
+      message = e.error == 'no_such_build'
+          ? 'rollout_min_build_no_such'.trParams({'build': '${e.latest ?? '—'}'})
+          : 'rollout_min_build_bad'.tr;
+    } catch (e) {
+      message = problemTexts(problemOfAny(e)).$1;
+    }
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+    if (mounted) _load();
   }
 
   Widget _verdict(RolloutReport r, bool ready, int today) {
