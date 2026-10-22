@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../utils/app_theme.dart';
+import '../utils/biometric.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
@@ -94,10 +95,48 @@ class _PinScreenState extends State<PinScreen> {
   String? _error;
   bool _busy = false;
 
+  /// Можно войти по отпечатку: человек включил это в «Настройках», и датчик
+  /// на месте. Отпечаток могли и стереть из телефона — тогда кнопки нет.
+  bool _biometric = false;
+
   @override
   void initState() {
     super.initState();
     _open++;
+    if (_unlocking) _prepareBiometric();
+  }
+
+  /// Окно датчика открываем сразу, не дожидаясь нажатия: ради этого
+  /// отпечаток и включают. Закрыли окно — остаются код и кнопка с пальцем.
+  Future<void> _prepareBiometric() async {
+    if (!await SecureStorageHelper.instance.biometricEnabled()) return;
+    if (!await Biometric.instance.available()) return;
+    if (!mounted) return;
+    setState(() => _biometric = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _tryBiometric();
+    });
+  }
+
+  Future<void> _tryBiometric() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final ok = await Biometric.instance.authenticate(biometricReason());
+      if (!ok || !mounted) return;
+      // Узнали палец — значит, телефон в руках у хозяина: прежние неверные
+      // коды больше не в счёт, как и после верного кода.
+      await SecureStorageHelper.instance.resetPinFails();
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      if (widget.mode == PinMode.relock) {
+        Get.back();
+      } else {
+        await _openApp();
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -276,7 +315,23 @@ class _PinScreenState extends State<PinScreen> {
   }
 
   Widget _key(String value) {
-    if (value.isEmpty) return const SizedBox.shrink();
+    if (value.isEmpty) {
+      // Слева от нуля пусто — там и место для пальца.
+      if (!_biometric) return const SizedBox.shrink();
+      return Semantics(
+        button: true,
+        label: 'biometric_button'.tr,
+        child: InkWell(
+          key: const ValueKey('biometric'),
+          borderRadius: BorderRadius.circular(40),
+          onTap: _busy ? null : _tryBiometric,
+          child: Center(
+            child: Icon(Icons.fingerprint,
+                size: 30, color: context.accentColor),
+          ),
+        ),
+      );
+    }
     final isBackspace = value == '<';
     return InkWell(
       borderRadius: BorderRadius.circular(40),
@@ -409,7 +464,42 @@ class _PinScreenState extends State<PinScreen> {
           snackPosition: SnackPosition.BOTTOM,
           margin: const EdgeInsets.all(12));
     } else {
+      await _offerBiometric();
+      if (!mounted) return;
       await _openApp();
+    }
+  }
+
+  /// Код придуман — предлагаем один раз входить и по отпечатку.
+  ///
+  /// Сами не включаем: не каждый хочет, чтобы приложение открывал палец.
+  /// Отказался — включит потом в «Настройках».
+  Future<void> _offerBiometric() async {
+    if (!await Biometric.instance.available()) return;
+    if (!mounted) return;
+    final wants = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.fingerprint, size: 36),
+        title: Text('biometric_offer_title'.tr),
+        content: Text('biometric_offer_body'.tr),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('biometric_offer_no'.tr),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('biometric_offer_yes'.tr),
+          ),
+        ],
+      ),
+    );
+    if (wants != true) return;
+    // Включаем, только когда палец действительно прочитался: иначе на
+    // следующем входе окно датчика открывалось бы впустую.
+    if (await Biometric.instance.authenticate(biometricReason())) {
+      await SecureStorageHelper.instance.setBiometricEnabled(true);
     }
   }
 

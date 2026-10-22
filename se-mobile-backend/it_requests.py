@@ -260,17 +260,15 @@ def register(app, core):
                 or core._is_system_admin(viewer.job_title))
 
     def _notify(employee_ids, title, body, item_id, actor_id=None):
-        """В ленту оповещений приложения и пушем, без самого действующего."""
+        """В ленту оповещений приложения, без самого действующего.
+
+        Только лента, без пуша: так решили — Firebase не настроен, а в
+        ленте оповещение не теряется, даже если его смахнули.
+        """
         ids = sorted({e for e in employee_ids if e and e != actor_id})
         if not ids:
             return
-        # Лента оповещений в приложении появилась отдельно; где её ещё нет,
-        # остаётся пуш.
-        record = getattr(core, '_record_notice', None)
-        if record is not None:
-            record('it', title, body, employee_ids=ids, ref=item_id)
-        core._notify_later(app, core._push_to, ids, title, body,
-                           {'type': 'it_request', 'id': item_id})
+        core._record_notice('it', title, body, employee_ids=ids, ref=item_id)
 
     def _forget_old_photos():
         """Снимки закрытых давно заявок больше не нужны."""

@@ -75,6 +75,12 @@ class _ItRequestDetailScreenState extends State<ItRequestDetailScreen> {
     }
   }
 
+  /// Чужую заявку сервер показывает только ОИТиС (и админу), так что
+  /// смотрящий не автор — значит, из ОИТиС. Так экран знает это и тогда,
+  /// когда открыт из оповещения, а не из очереди.
+  bool get _staff =>
+      widget.staff || (_item != null && _me != null && !_isAuthor);
+
   bool get _isAuthor => _item?.author?.id != null && _item?.author?.id == _me;
 
   Future<void> _act(String action, {String comment = ''}) async {
@@ -190,7 +196,7 @@ class _ItRequestDetailScreenState extends State<ItRequestDetailScreen> {
                               fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       for (final event in item.events) _event(event),
-                      if (item.isOpen || _isAuthor || widget.staff) ...[
+                      if (item.isOpen || _isAuthor || _staff) ...[
                         const SizedBox(height: 8),
                         _commentBox(),
                       ],
@@ -234,7 +240,7 @@ class _ItRequestDetailScreenState extends State<ItRequestDetailScreen> {
           const SizedBox(height: 10),
           Text(created,
               style: TextStyle(fontSize: 12, color: context.mutedColor)),
-          if (widget.staff && item.author != null) ...[
+          if (_staff && item.author != null) ...[
             const SizedBox(height: 4),
             Text(
               '${'it_author'.tr}: ${item.author!.name}'
@@ -270,13 +276,13 @@ class _ItRequestDetailScreenState extends State<ItRequestDetailScreen> {
 
   Widget _actions(ItRequest item) {
     final buttons = <Widget>[
-      if (widget.staff && item.isOpen && item.assignee?.id != _me)
+      if (_staff && item.isOpen && item.assignee?.id != _me)
         ElevatedButton.icon(
           onPressed: _busy ? null : () => _act('take'),
           icon: const Icon(Icons.pan_tool_alt_outlined),
           label: Text('it_take'.tr),
         ),
-      if (widget.staff && item.isOpen)
+      if (_staff && item.isOpen)
         ElevatedButton.icon(
           onPressed: _busy
               ? null
@@ -284,7 +290,7 @@ class _ItRequestDetailScreenState extends State<ItRequestDetailScreen> {
           icon: const Icon(Icons.check),
           label: Text('it_done'.tr),
         ),
-      if (widget.staff && item.isOpen)
+      if (_staff && item.isOpen)
         OutlinedButton.icon(
           onPressed: _busy
               ? null

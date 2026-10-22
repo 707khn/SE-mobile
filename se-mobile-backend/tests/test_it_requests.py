@@ -7,7 +7,7 @@ import pytest
 import app as app_module
 import it_requests
 from it_requests import ItRequest, ItRequestPhoto, ItRequestEvent
-from models import db
+from models import db, Notification
 
 _AUTHOR = '0000002184'      # Шаяхметов, не ОИТиС
 _STRANGER = '0000002183'    # Асқаров, тоже не ОИТиС
@@ -25,6 +25,7 @@ def clean(app):
         ItRequestEvent.query.delete()
         ItRequestPhoto.query.delete()
         ItRequest.query.delete()
+        Notification.query.filter_by(kind='it').delete()
         db.session.commit()
 
 
@@ -33,10 +34,11 @@ def pushes(monkeypatch):
     """Что ушло бы людям: (кому, заголовок, текст)."""
     sent = []
 
-    def fake_later(_app, fn, ids, title, body, data=None):
-        sent.append((sorted(ids), title, body))
+    def fake_record(kind, title, body='', employee_ids=None, ref=None, **_):
+        assert kind == 'it'
+        sent.append((sorted(employee_ids), title, body))
 
-    monkeypatch.setattr(app_module, '_notify_later', fake_later)
+    monkeypatch.setattr(app_module, '_record_notice', fake_record)
     return sent
 
 
@@ -243,18 +245,17 @@ def test_unknown_action(app, client, pushes):
     assert _act(client, author, item_id, 'explode').status_code == 400
 
 
-def test_in_app_feed_is_used_when_present(app, client, monkeypatch):
-    """Лента оповещений (если она есть на сервере) получает то же, что пуш."""
-    recorded = []
-    monkeypatch.setattr(app_module, '_notify_later', lambda *a, **k: None)
-    monkeypatch.setattr(app_module, '_record_notice',
-                        lambda kind, title, body, employee_ids=None, ref=None, **k:
-                        recorded.append((kind, title, sorted(employee_ids), ref)),
-                        raising=False)
-    item_id = _create(client, _auth(app, _AUTHOR)).get_json()['item']['id']
-    assert recorded and recorded[0][0] == 'it'
-    assert recorded[0][3] == item_id
-    assert _IT in recorded[0][2]
+def test_author_sees_it_in_the_app_feed(app, client):
+    """Настоящая лента: «взята в работу» приходит автору, со ссылкой на заявку."""
+    author = _auth(app, _AUTHOR)
+    item_id = _create(client, author).get_json()['item']['id']
+    _act(client, _auth(app, _IT), item_id, 'take')
+    feed = client.get('/api/notifications', headers=author).get_json()
+    mine = [n for n in feed['items'] if n['kind'] == 'it']
+    assert mine[0]['title'] == f'Заявка №{item_id} в работе'
+    assert mine[0]['ref'] == str(item_id)
+    # О новой заявке пишут ОИТиС, а не автору.
+    assert not any('каб. 305' in n['title'] for n in mine)
 
 
 def test_old_photos_are_forgotten(app, client, pushes):

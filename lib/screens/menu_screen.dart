@@ -140,7 +140,7 @@ class _MenuScreenState extends State<MenuScreen> {
           child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            SliverToBoxAdapter(child: OfflineNotice(at: _cachedAt)),
+            SliverToBoxAdapter(child: OfflineNotice(at: _cachedAt, onRetry: _loadMenu)),
             SliverToBoxAdapter(child: _buildDateNavigation()),
             if (_loading)
               const SliverToBoxAdapter(child: SkeletonList(rows: 5))
