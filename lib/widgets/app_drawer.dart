@@ -26,6 +26,7 @@ import '../screens/waybills_screen.dart';
 import '../screens/work_permits_screen.dart';
 import '../screens/workwear_screen.dart';
 import '../screens/purchases_screen.dart';
+import '../screens/reception_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/main_screen_2.dart';
@@ -316,6 +317,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.waving_hand_outlined,
                   label: 'ob_title'.tr,
                   onTap: () => Get.to(() => const OnboardingScreen()),
+                ),
+                _item(
+                  icon: Icons.event_seat_outlined,
+                  label: 'rc_title'.tr,
+                  onTap: () => Get.to(() => const ReceptionScreen()),
                 ),
                 _item(
                   icon: Icons.badge_outlined,
