@@ -26,6 +26,7 @@ import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/main_screen_2.dart';
+import '../screens/medical_screen.dart';
 import '../screens/menu_screen.dart';
 import '../screens/settings_screen.dart';
 import '../utils/app_version.dart';
@@ -275,6 +276,11 @@ class _AppDrawerState extends State<AppDrawer> {
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
                 const SizedBox(height: 8),
+                _item(
+                  icon: Icons.health_and_safety_outlined,
+                  label: 'md_title'.tr,
+                  onTap: () => Get.to(() => const MedicalScreen()),
+                ),
                 _item(
                   icon: Icons.checkroom_outlined,
                   label: 'ww_title'.tr,
