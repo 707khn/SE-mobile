@@ -21,6 +21,7 @@ import '../widgets/custom_text.dart';
 import '../utils/app_theme.dart';
 import '../utils/load_problem.dart';
 import '../widgets/load_error_view.dart';
+import '../widgets/month_summary_card.dart';
 import '../widgets/offline_notice.dart';
 
 
@@ -191,6 +192,14 @@ class _MainMenu1State extends State<MainMenu1> {
     endDate = DateTime.now();
   }
 
+  /// Потянули вниз — обновить и итоги месяца: заводим карточку заново.
+  Key _summaryKey = UniqueKey();
+
+  Future<void> _refresh() {
+    setState(() => _summaryKey = UniqueKey());
+    return _initData();
+  }
+
   Future<void> _initData() async {
     _retryLoad = _initData;
     setState(() { _loadingReport = true; _initError = false; });
@@ -322,7 +331,7 @@ class _MainMenu1State extends State<MainMenu1> {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: _initData,
+      onRefresh: _refresh,
       child: SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Container(
@@ -333,6 +342,10 @@ class _MainMenu1State extends State<MainMenu1> {
         ),
         child: Column(
           children: [
+            // Сначала итог — ради него на экран и заходят чаще всего; список
+            // проходов за любой период — ниже, как и был.
+            MonthSummaryCard(
+                key: _summaryKey, employeeId: widget.employeeId),
             const SizedBox(height: 4.0),
             // Две кнопки в строку не помещались даже на обычном телефоне:
             // «Просмотреть последний файл Excel» и «…CSV» шире 360 точек, и

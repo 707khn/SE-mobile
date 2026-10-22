@@ -2458,6 +2458,26 @@ def register_routes(app):
             'coverage': _access_coverage(key_suffix),
         })
 
+    @app.route('/report/month', methods=['POST'])
+    @require_auth
+    def report_month():
+        data = _json_body()
+        key_suffix = _text(data, 'key_suffix')
+        if not _may_view(key_suffix):
+            return _deny()
+        month_str = _text(data, 'month') or _plant_today().strftime('%Y-%m')
+        if not re.fullmatch(r'\d{4}-\d{2}', month_str):
+            return _bad_period()
+        year, month = (int(x) for x in month_str.split('-'))
+        if not (1 <= month <= 12 and 2000 <= year <= 2100):
+            return _bad_period()
+
+        summary = _month_summary(key_suffix, year, month)
+        summary['message'] = 'Success'
+        summary['first_month'] = _first_access_month(key_suffix)
+        summary['coverage'] = _access_coverage(key_suffix)
+        return jsonify(summary)
+
     @app.route('/director_report', methods=['POST'])
     @require_auth
     def director_report():
@@ -3684,6 +3704,126 @@ def _home_access(employee_id, today):
         db.session.rollback()
         logging.warning('Сводка: проходы %s не прочитались: %s', employee_id, e)
         return None
+
+
+def _work_day_start():
+    """С какого времени приход считается опозданием — «ЧЧ:ММ».
+
+    Задаётся в WORK_DAY_START: у предприятия один общий график, а сменщикам
+    итог по опозданиям всё равно не подходит — их смена начинается когда
+    угодно. Кривое значение не роняет запрос, а возвращает к 08:00.
+    """
+    raw = os.environ.get('WORK_DAY_START', '').strip()
+    if re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', raw):
+        return raw
+    if raw:
+        logging.warning('WORK_DAY_START=%r — не время ЧЧ:ММ, беру 08:00', raw)
+    return '08:00'
+
+
+def _minutes(hhmm):
+    try:
+        h, m = hhmm.split(':')[:2]
+        return int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _hhmm(minutes):
+    return f'{minutes // 60:02d}:{minutes % 60:02d}'
+
+
+def _month_summary(employee_id, year, month):
+    """Итоги месяца по своим проходам: сколько дней, во сколько, опоздания.
+
+    Раньше человек видел только список проходов и считал сам. Источник —
+    выгрузка СКУД; дни, которых в ней ещё нет (её приносят раз в месяц), —
+    из событий турникета, которые приходят сразу. Иначе текущий месяц был
+    бы пуст у всех до следующей выгрузки.
+
+    Приход — первый «Вход» или «Проход» за день, уход — последний «Выход»,
+    как на главном экране. Опоздание считаем только по будням: приход в
+    субботу к десяти — не опоздание.
+    """
+    first = date(year, month, 1)
+    last = (date(year + 1, 1, 1) if month == 12
+            else date(year, month + 1, 1)) - _ONE_DAY
+
+    days = {}
+    rows = AccessRecord.query.filter(
+        AccessRecord.employee_id == employee_id,
+        AccessRecord.access_date >= first,
+        AccessRecord.access_date <= last,
+    ).all()
+    for r in rows:
+        day = days.setdefault(r.access_date, {'ins': [], 'outs': []})
+        if r.event_type in ('Вход', 'Проход'):
+            day['ins'].append(r.access_time)
+        elif r.event_type == 'Выход':
+            day['outs'].append(r.access_time)
+
+    events = TurnstileEvent.query.filter(
+        TurnstileEvent.employee_id == employee_id,
+        TurnstileEvent.timestamp >= datetime.combine(first, datetime.min.time()),
+        TurnstileEvent.timestamp < datetime.combine(last + _ONE_DAY,
+                                                    datetime.min.time()),
+    ).all()
+    live = {}
+    for e in events:
+        day = live.setdefault(e.timestamp.date(), {'ins': [], 'outs': []})
+        (day['ins'] if e.direction == 'in' else day['outs']).append(
+            e.timestamp.strftime('%H:%M'))
+    # День из выгрузки главнее: в ней все двери, а турникет — одна.
+    for d, day in live.items():
+        days.setdefault(d, day)
+
+    start = _work_day_start()
+    start_min = _minutes(start)
+    out_days = []
+    arrivals = []
+    departures = []
+    late = 0
+    for d in sorted(days):
+        ins = sorted(t for t in days[d]['ins'] if _minutes(t) is not None)
+        outs = sorted(t for t in days[d]['outs'] if _minutes(t) is not None)
+        first_in = ins[0] if ins else None
+        last_out = outs[-1] if outs else None
+        is_late = (first_in is not None and d.weekday() < 5
+                   and _minutes(first_in) > start_min)
+        if first_in is not None:
+            arrivals.append(_minutes(first_in))
+        if last_out is not None:
+            departures.append(_minutes(last_out))
+        late += is_late
+        out_days.append({'date': d.isoformat(), 'first_in': first_in,
+                         'last_out': last_out, 'late': is_late,
+                         'weekend': d.weekday() >= 5})
+
+    def avg(values):
+        return _hhmm(round(sum(values) / len(values))) if values else None
+
+    return {
+        'month': f'{year:04d}-{month:02d}',
+        'work_start': start,
+        'days_present': len(out_days),
+        'weekend_days': sum(1 for d in out_days if d['weekend']),
+        'avg_arrival': avg(arrivals),
+        'avg_departure': avg(departures),
+        'late_count': late,
+        'days': out_days,
+    }
+
+
+def _first_access_month(employee_id):
+    """С какого месяца у человека вообще есть проходы — дальше листать незачем."""
+    try:
+        earliest = (db.session.query(db.func.min(AccessRecord.access_date))
+                    .filter(AccessRecord.employee_id == employee_id).scalar())
+    except Exception as e:
+        db.session.rollback()
+        logging.warning('Не смог узнать первый проход %s: %s', employee_id, e)
+        return None
+    return earliest.strftime('%Y-%m') if earliest else None
 
 
 def _home_payslip(employee_id):
