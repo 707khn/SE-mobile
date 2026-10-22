@@ -33,6 +33,7 @@ import it_requests
 import repair_requests
 import away
 import stock_requests
+import inspections
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1662,6 +1663,7 @@ def create_app():
     repair_requests.register(app, sys.modules[__name__])
     away.register(app, sys.modules[__name__])
     stock_requests.register(app, sys.modules[__name__])
+    inspections.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):

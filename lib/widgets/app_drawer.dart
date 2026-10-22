@@ -8,6 +8,7 @@ import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
 import '../screens/repair_requests_screen.dart';
 import '../screens/stock_requests_screen.dart';
+import '../screens/inspections_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -188,6 +189,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.inventory_2_outlined,
                   label: 'stock_title'.tr,
                   onTap: () => Get.to(() => const StockRequestsScreen()),
+                ),
+                _item(
+                  icon: Icons.fact_check_outlined,
+                  label: 'insp_title'.tr,
+                  onTap: () => Get.to(() => const InspectionsScreen()),
                 ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
