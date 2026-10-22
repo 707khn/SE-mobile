@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
 import '../screens/business_trips_screen.dart';
+import '../screens/compliance_screen.dart';
 import '../screens/data_corrections_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
@@ -283,6 +284,11 @@ class _AppDrawerState extends State<AppDrawer> {
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
                 const SizedBox(height: 8),
+                _item(
+                  icon: Icons.shield_outlined,
+                  label: 'cp_title'.tr,
+                  onTap: () => Get.to(() => const ComplianceScreen()),
+                ),
                 _item(
                   icon: Icons.health_and_safety_outlined,
                   label: 'md_title'.tr,
