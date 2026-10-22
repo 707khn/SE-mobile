@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
+import '../screens/budget_screen.dart';
 import '../screens/business_trips_screen.dart';
 import '../screens/compliance_screen.dart';
 import '../screens/data_corrections_screen.dart';
@@ -263,6 +264,12 @@ class _AppDrawerState extends State<AppDrawer> {
                   label: 'bt_title'.tr,
                   onTap: () => Get.to(() => const BusinessTripsScreen()),
                 ),
+                if (usesBudget(_job))
+                  _item(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'bg_title'.tr,
+                    onTap: () => Get.to(() => const BudgetScreen()),
+                  ),
                 if (usesMaintenance(_job))
                   _item(
                     icon: Icons.build_circle_outlined,

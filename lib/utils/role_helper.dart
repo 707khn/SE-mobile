@@ -43,3 +43,13 @@ bool usesMaintenance(String job) {
       lower.contains('механик') ||
       lower.contains('инженер');
 }
+
+/// План-факт бюджета: начальникам подразделений и их заместителям,
+/// руководству, ПЭО и главному бухгалтеру. Чьи статьи видно — решает сервер.
+bool usesBudget(String job) {
+  final lower = job.toLowerCase();
+  return isAdminRole(job) ||
+      isSystemAdmin(job) ||
+      lower.contains('заведующ') ||
+      lower.contains('пэо');
+}

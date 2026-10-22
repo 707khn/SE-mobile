@@ -25,6 +25,7 @@ import 'approval_detail_screen.dart';
 import 'approvals_screen.dart';
 import 'business_trip_detail_screen.dart';
 import 'business_trips_screen.dart';
+import 'budget_screen.dart';
 import 'compliance_screen.dart';
 import 'inspection_detail_screen.dart';
 import 'material_pass_detail_screen.dart';
@@ -158,6 +159,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             : BusinessTripDetailScreen(tripId: id));
       case 'compliance':
         Get.to(() => const ComplianceScreen());
+      case 'budget':
+        Get.to(() => const BudgetScreen());
       case 'maintenance':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -337,6 +340,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'medical' => (Icons.health_and_safety_outlined, const Color(0xFF00838F)),
       'maintenance' => (Icons.build_circle_outlined, const Color(0xFF455A64)),
       'compliance' => (Icons.shield_outlined, const Color(0xFF37474F)),
+      'budget' =>
+        (Icons.account_balance_wallet_outlined, const Color(0xFFC62828)),
       'datafix' => (Icons.badge_outlined, const Color(0xFF5E35B1)),
       'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       'waybill' => (Icons.route_outlined, const Color(0xFF00695C)),
