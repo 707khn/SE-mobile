@@ -19,7 +19,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
-                    AuthMiss)
+                    AuthMiss, Notification)
 from parser_1c_xml import parse_1c_xml
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import (parse_directory_excel, split_phones,
@@ -192,6 +192,73 @@ def _push_to_everyone(title, body, data=None):
                     title, body, data)
 
 
+# Сколько держать оповещения в ленте. Полгода — с запасом на отпуск и
+# больничный: вернулся человек, а листки за три месяца на месте.
+_NOTICE_KEEP = timedelta(days=180)
+
+# Непрочитанными считаются только свежие. Иначе новый сотрудник или человек,
+# впервые обновивший приложение, увидел бы на колокольчике «47» — всё, что
+# было разослано до него.
+_NOTICE_UNREAD_WINDOW = timedelta(days=14)
+
+
+def _record_notice(kind, title, body='', employee_ids=None, audience='all',
+                   ref=None):
+    """Записать оповещение в ленту приложения.
+
+    Работает и без Firebase — в этом и смысл: колокольчик в приложении есть
+    всегда, а пуш только там, где его настроили.
+
+    `employee_ids` — каждому из них своё оповещение. Тому, у кого точно
+    такое же уже лежит, второе не пишется: листки за месяц бухгалтерия
+    выгружает и по второму разу, с поправками, и «расчётный лист за сентябрь
+    готов» дважды подряд ничего человеку не говорит.
+
+    Ошибка записи не роняет то, ради чего оповещение пишется: загрузка
+    листков важнее сообщения о ней.
+    """
+    title = (title or '')[:200]
+    body = (body or '')[:500]
+    ref = str(ref)[:50] if ref is not None else None
+    try:
+        if employee_ids is not None:
+            wanted = sorted({e for e in employee_ids if e})
+            if not wanted:
+                return 0
+            have = {r.employee_id for r in Notification.query.filter(
+                Notification.kind == kind, Notification.title == title,
+                Notification.body == body,
+                Notification.employee_id.in_(wanted))}
+            rows = [Notification(audience='person', employee_id=e, kind=kind,
+                                 title=title, body=body, ref=ref)
+                    for e in wanted if e not in have]
+        else:
+            rows = [Notification(audience=audience, kind=kind, title=title,
+                                 body=body, ref=ref)]
+        db.session.add_all(rows)
+        Notification.query.filter(
+            Notification.created_at < datetime.utcnow() - _NOTICE_KEEP
+        ).delete(synchronize_session=False)
+        db.session.commit()
+        return len(rows)
+    except Exception as e:
+        db.session.rollback()
+        logging.warning('Оповещение не записано: %s', e)
+        return 0
+
+
+def _visible_notices(viewer):
+    """Оповещения, которые видит этот сотрудник: общие, свои и — админу —
+    служебные."""
+    from sqlalchemy import or_, and_
+    allowed = [Notification.audience == 'all',
+               and_(Notification.audience == 'person',
+                    Notification.employee_id == viewer.employee_id)]
+    if _is_system_admin(viewer.job_title):
+        allowed.append(Notification.audience == 'admins')
+    return Notification.query.filter(or_(*allowed))
+
+
 _XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 _MONTHS_RU = ('январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль',
@@ -202,13 +269,44 @@ def _month_name(month):
     return _MONTHS_RU[month - 1] if 1 <= month <= 12 else str(month)
 
 
-def _notify_menu_published():
-    """Одно уведомление на выкладку меню.
+def _menu_notice_text(days):
+    """«Меню на завтра опубликовано» — по датам, которые выложили.
+
+    Раньше пуш говорил «меню на сегодня» всегда, даже когда технолог
+    выкладывала его с вечера на завтра или сразу на неделю.
+    """
+    days = sorted(set(days))
+    if not days:
+        return 'Меню опубликовано'
+    today = _plant_today()
+
+    def name(day):
+        if day == today:
+            return 'сегодня'
+        if day == today + _ONE_DAY:
+            return 'завтра'
+        return day.strftime('%d.%m')
+
+    if len(days) == 1:
+        return f'Меню на {name(days[0])} опубликовано'
+    return f'Меню на {name(days[0])} – {name(days[-1])} опубликовано'
+
+
+def _announce_menu(app, days):
+    """Одно оповещение на выкладку меню — в ленту сразу, пуш следом.
 
     Одно, а не по дню на каждый: в файле из 1С бывает сразу неделя, и семь
     сообщений подряд означают только то, что уведомления отключат.
     """
-    _push_to_everyone('Столовая', 'Меню на сегодня 🍽️', {'type': 'menu'})
+    days = sorted(set(days))
+    text = _menu_notice_text(days)
+    _record_notice('menu', 'Столовая', text,
+                   ref=days[0].isoformat() if days else None)
+    _notify_later(app, _notify_menu_published, text)
+
+
+def _notify_menu_published(text='Меню опубликовано'):
+    _push_to_everyone('Столовая', f'{text} 🍽️', {'type': 'menu'})
 
 
 def _send_turnstile_notification(employee_name: str, direction: str, timestamp_str: str, employee_id: str):
@@ -1367,11 +1465,12 @@ def _refresh_site_news(force=False):
     if newest is None:
         return
     if added == 1:
+        _record_notice('news', 'Новость', newest.title, ref=newest.id)
         _push_to_everyone('Новость', newest.title, {'type': 'news'})
     else:
-        _push_to_everyone('Новости',
-                          f'На сайте появилось новых материалов: {added}',
-                          {'type': 'news'})
+        text = f'На сайте появилось новых материалов: {added}'
+        _record_notice('news', 'Новости', text)
+        _push_to_everyone('Новости', text, {'type': 'news'})
 
 
 def _news_json(item):
@@ -2066,6 +2165,118 @@ def _restore_test_state():
     return state
 
 
+# Сколько дней без копии базы — уже беда. Копия суточная: два дня — это
+# пропущенная ночь, а не опоздавший таймер.
+_BACKUP_LATE_DAYS = 2
+
+# Проходы привозят каждый день, листки — раз в месяц. Пороги — те же, что на
+# экране «Обновление»: там отставание больше сорока дней уже красится.
+_ACCESS_LATE_DAYS = 3
+_PAYSLIPS_LATE_DAYS = 40
+
+# Запись сторожа о перебое показываем сутки: дольше — это уже история, она
+# есть на экране «Обновление».
+_OUTAGE_FRESH = timedelta(hours=24)
+
+
+def _system_problems():
+    """Что на сервере требует рук администратора — прямо сейчас.
+
+    Не хранится, а считается при каждом запросе: копии базы и их вывоз,
+    пробное восстановление, таймер сборок, сторож и свежесть данных и так
+    лежат на сервере, и оповещение о них не может «устареть» — починили, и
+    оно пропало само. Раньше всё это было видно, только если зайти на экран
+    «Обновление», то есть почти никогда: копии базы три недели не делались,
+    и узнали об этом случайно.
+    """
+    problems = []
+
+    def add(key, title, body):
+        problems.append({'key': key, 'title': title, 'body': body})
+
+    try:
+        backups = _backup_state()
+        if not backups.get('available'):
+            add('backup', 'Копии базы не видны', backups.get('reason') or '')
+        elif not backups.get('count'):
+            add('backup', 'Копий базы нет',
+                'Служба копирования ещё ни разу не отработала.')
+        elif (backups.get('days_ago') or 0) >= _BACKUP_LATE_DAYS:
+            add('backup', 'Копия базы не обновляется',
+                f'Последняя — {backups["last"]}, '
+                f'{backups["days_ago"]} дн. назад.')
+    except Exception as e:
+        logging.warning('Не удалось проверить копии базы: %s', e)
+
+    try:
+        fetch = _fetch_apk_state()
+        if fetch.get('problem'):
+            add('fetch_apk', 'Новые сборки не приезжают', fetch['problem'])
+    except Exception as e:
+        logging.warning('Не удалось проверить доставку сборок: %s', e)
+
+    # Копия, лежащая только на сервере, умрёт вместе с ним, а из той, что ни
+    # разу не восстанавливали, может и не восстановиться.
+    try:
+        offsite = _offsite_state()
+        if offsite.get('problem'):
+            add('offsite', 'Копии базы не уезжают с сервера',
+                offsite['problem'])
+    except Exception as e:
+        logging.warning('Не удалось проверить вывоз копий: %s', e)
+
+    try:
+        restore = _restore_test_state()
+        if restore.get('problem'):
+            add('restore_test', 'Пробное восстановление из копии',
+                restore['problem'])
+    except Exception as e:
+        logging.warning('Не удалось проверить пробное восстановление: %s', e)
+
+    try:
+        outages = _outage_state(limit=1)
+        if outages.get('entries'):
+            last = outages['entries'][0]
+            when = datetime.fromisoformat(last['at'].replace('Z', '+00:00'))
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) - when < _OUTAGE_FRESH:
+                add('outage', 'Перебой в работе сервера',
+                    f'{last["at"]} {last["what"]}')
+    except Exception as e:
+        logging.warning('Не удалось прочитать журнал сторожа: %s', e)
+
+    try:
+        late = {'access': ('Проходы не загружаются', _ACCESS_LATE_DAYS),
+                'payslips': ('Расчётные листки отстают', _PAYSLIPS_LATE_DAYS)}
+        for source in _data_freshness():
+            if source['key'] not in late:
+                continue
+            title, limit = late[source['key']]
+            behind = source.get('days_behind')
+            if behind is not None and behind > limit:
+                add(f'data_{source["key"]}', title,
+                    f'Последние данные — за {source["last"]}, '
+                    f'{behind} дн. назад.')
+    except Exception as e:
+        db.session.rollback()
+        logging.warning('Не удалось проверить свежесть данных: %s', e)
+
+    return problems
+
+
+def _notice_json(row, seen_id):
+    return {
+        'id': row.id,
+        'kind': row.kind,
+        'title': row.title,
+        'body': row.body or '',
+        'ref': row.ref,
+        'created_at': row.created_at.replace(tzinfo=timezone.utc).isoformat(),
+        'unread': row.id > seen_id,
+    }
+
+
 def register_routes(app):
 
     @app.route('/')
@@ -2086,6 +2297,9 @@ def register_routes(app):
                 'POST /leaves',
                 'POST /api/fcm-token',
                 'DELETE /api/fcm-token',
+                'GET /api/notifications',
+                'GET /api/notifications/unread',
+                'POST /api/notifications/seen',
                 'POST /api/turnstile',
                 'GET /api/attendance',
                 'GET /api/attendance/summary',
@@ -2205,6 +2419,97 @@ def register_routes(app):
             'department': viewer.department or '',
             'must_change_password': bool(account and account.must_change_password),
         })
+
+    # ── Оповещения в приложении ───────────────────────────────────────────────
+
+    def _notice_viewer():
+        """Кто спрашивает оповещения и докуда он дочитал.
+
+        Без пропуска — отказ, даже пока проверка пропуска не обязательна:
+        «чьи» оповещения отдавать, иначе не узнать, а листок за месяц — это
+        уже про чужую зарплату.
+        """
+        viewer = getattr(g, 'employee', None)
+        if viewer is None:
+            return None, None
+        account = UserAccount.query.filter_by(
+            employee_id=viewer.employee_id).first()
+        return viewer, account
+
+    def _unread_count(viewer, seen_id):
+        since = datetime.utcnow() - _NOTICE_UNREAD_WINDOW
+        return (_visible_notices(viewer)
+                .filter(Notification.id > seen_id,
+                        Notification.created_at >= since)
+                .count())
+
+    @app.route('/api/notifications', methods=['GET'])
+    @require_auth
+    def notifications():
+        """Лента оповещений: свежие сверху.
+
+        Администратору — ещё и `system`: что на сервере сломано прямо сейчас.
+        Это не строки ленты, а состояние: починили — пропало само.
+        """
+        viewer, account = _notice_viewer()
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        seen_id = (account.notifications_seen_id or 0) if account else 0
+        try:
+            limit = max(1, min(int(request.args.get('limit', 50)), 200))
+        except ValueError:
+            limit = 50
+        rows = (_visible_notices(viewer)
+                .order_by(Notification.id.desc()).limit(limit).all())
+        system = (_system_problems()
+                  if _is_system_admin(viewer.job_title) else [])
+        return jsonify({
+            'message': 'Success',
+            'items': [_notice_json(r, seen_id) for r in rows],
+            'unread': _unread_count(viewer, seen_id),
+            'system': system,
+        })
+
+    @app.route('/api/notifications/unread', methods=['GET'])
+    @require_auth
+    def notifications_unread():
+        """Сколько показать на колокольчике. Спрашивается часто — без ленты."""
+        viewer, account = _notice_viewer()
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        seen_id = (account.notifications_seen_id or 0) if account else 0
+        system = (len(_system_problems())
+                  if _is_system_admin(viewer.job_title) else 0)
+        return jsonify({'message': 'Success',
+                        'unread': _unread_count(viewer, seen_id),
+                        'system': system})
+
+    @app.route('/api/notifications/seen', methods=['POST'])
+    @require_auth
+    def notifications_seen():
+        """Дочитал до `last_id` — а без него до самого свежего.
+
+        Отметка только растёт: телефон, который был без связи и прислал
+        старый номер, не вернёт прочитанному «непрочитано».
+        """
+        viewer, account = _notice_viewer()
+        if viewer is None or account is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        newest = (_visible_notices(viewer)
+                  .order_by(Notification.id.desc()).first())
+        newest_id = newest.id if newest else 0
+        data = _json_body()
+        try:
+            wanted = int(data.get('last_id', newest_id))
+        except (TypeError, ValueError):
+            return jsonify({'message': 'Failure', 'error': 'bad_last_id'}), 400
+        account.notifications_seen_id = max(account.notifications_seen_id or 0,
+                                            min(wanted, newest_id))
+        db.session.commit()
+        return jsonify({'message': 'Success',
+                        'seen_id': account.notifications_seen_id,
+                        'unread': _unread_count(viewer,
+                                                account.notifications_seen_id)})
 
     @app.route('/change-password', methods=['POST'])
     @require_auth
@@ -2813,8 +3118,10 @@ def register_routes(app):
         for display, employee_ids in by_period.items():
             # «Июль 2026» в середине фразы читается как заголовок — снижаем.
             period = display[:1].lower() + display[1:] if display else ''
-            _notify_later(app, _push_to, employee_ids, 'Зарплата',
-                          f'Расчётный лист за {period} готов'.replace('  ', ' '),
+            text = f'Расчётный лист за {period} готов'.replace('  ', ' ')
+            _record_notice('payslip', 'Зарплата', text,
+                           employee_ids=employee_ids)
+            _notify_later(app, _push_to, employee_ids, 'Зарплата', text,
                           {'type': 'payslip'})
 
         return jsonify({
@@ -3145,7 +3452,7 @@ def register_routes(app):
 
         db.session.commit()
         if was_new:
-            _notify_later(app, _notify_menu_published)
+            _announce_menu(app, [menu_date])
         return jsonify({'message': 'Success'})
 
     @app.route('/api/menu/import-excel', methods=['POST'])
@@ -3217,11 +3524,16 @@ def register_routes(app):
             days[0]['date'] = forced
 
         summary = []
+        # Оповещаем только о днях, которых ещё не было: файл с поправкой
+        # перезаливают, и второе «меню опубликовано» про то же самое меню
+        # разбудило бы всё предприятие ради одной цены.
+        new_days = []
         for day in days:
             menu = MenuDate.query.filter_by(date=day['date']).first()
             if menu:
                 MenuItem.query.filter_by(menu_date_id=menu.id).delete()
             else:
+                new_days.append(day['date'])
                 menu = MenuDate(date=day['date'])
                 db.session.add(menu)
                 db.session.flush()
@@ -3245,7 +3557,8 @@ def register_routes(app):
             })
 
         db.session.commit()
-        _notify_later(app, _notify_menu_published)
+        if new_days:
+            _announce_menu(app, new_days)
 
         lines = [
             f"{d['date_display']} — {d['count']} блюд "
@@ -3392,6 +3705,11 @@ def register_routes(app):
         )
         db.session.add(item)
         db.session.commit()
+        # Раньше набранное здесь объявление молча ложилось в ленту, и узнавал
+        # о нём только тот, кто сам открыл «Новости». А это как раз важное.
+        _record_notice('news', 'Объявление', item.title, ref=item.id)
+        _notify_later(app, _push_to_everyone, 'Объявление', item.title,
+                      {'type': 'news', 'id': item.id})
         return jsonify({'message': 'Success', 'item': _news_json(item)})
 
     @app.route('/api/admin/news/<int:item_id>', methods=['POST', 'DELETE'])
@@ -3422,6 +3740,7 @@ def register_routes(app):
         db.session.commit()
 
         if item.is_published and not was_published:
+            _record_notice('news', 'Объявление', item.title, ref=item.id)
             _notify_later(app, _push_to_everyone, 'Объявление', item.title,
                           {'type': 'news', 'id': item.id})
         return jsonify({'message': 'Success', 'item': _news_json(item)})
@@ -3478,6 +3797,9 @@ def register_routes(app):
         )
         db.session.add(item)
         db.session.commit()
+        # Ждёт одобрения — а то, что ждёт, никто не одобрит, пока не увидит.
+        _record_notice('queue', 'Объявление ждёт одобрения', title,
+                       audience='admins', ref=item.id)
         logging.info('Объявление принято в очередь: %r', title[:80])
         return jsonify({'message': 'Принято, ждёт одобрения', 'id': item.id})
 
@@ -4165,7 +4487,7 @@ def _remove_departed_employees():
             db.session.delete(slip)
 
         for model in (AccessRecord, LeaveBalance, LeaveHistory,
-                      FcmToken, TurnstileEvent, UserAccount):
+                      FcmToken, TurnstileEvent, UserAccount, Notification):
             model.query.filter_by(employee_id=emp_id).delete()
 
         if emp:
