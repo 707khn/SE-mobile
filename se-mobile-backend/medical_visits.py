@@ -159,16 +159,16 @@ def register(app, core):
         today = core._plant_today()
         now = core._plant_now()
         exams = (MedicalExam.query.filter_by(employee_id=viewer.employee_id)
-                 .order_by(MedicalExam.due_on).all())
+                 .order_by(MedicalExam.due_on, MedicalExam.id).all())
         mine = (MedicalSlot.query.filter_by(employee_id=viewer.employee_id)
                 .filter(MedicalSlot.starts_at >= now)
-                .order_by(MedicalSlot.starts_at).all())
+                .order_by(MedicalSlot.starts_at, MedicalSlot.kind, MedicalSlot.id).all())
         free = (MedicalSlot.query.filter(MedicalSlot.employee_id.is_(None),
                                          MedicalSlot.starts_at >= now,
                                          MedicalSlot.starts_at < datetime.combine(
                                              today + timedelta(days=_SLOTS_AHEAD),
                                              time()))
-                .order_by(MedicalSlot.starts_at).limit(300).all())
+                .order_by(MedicalSlot.starts_at, MedicalSlot.kind, MedicalSlot.id).limit(300).all())
         return jsonify({
             'message': 'Success',
             'medic': is_medic(viewer),
@@ -248,9 +248,9 @@ def register(app, core):
                  .filter(MedicalSlot.starts_at >= datetime.combine(day, time()),
                          MedicalSlot.starts_at < datetime.combine(
                              day + timedelta(days=1), time()))
-                 .order_by(MedicalSlot.starts_at).all())
+                 .order_by(MedicalSlot.starts_at, MedicalSlot.kind, MedicalSlot.id).all())
         due = (MedicalExam.query.filter(MedicalExam.due_on <= today + _DUE_SOON)
-               .order_by(MedicalExam.due_on).limit(300).all())
+               .order_by(MedicalExam.due_on, MedicalExam.id).limit(300).all())
         people = _names([s.employee_id for s in slots] + [e.employee_id for e in due])
         return jsonify({
             'message': 'Success',

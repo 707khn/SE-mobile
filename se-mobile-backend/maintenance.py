@@ -256,7 +256,7 @@ def register(app, core):
             MaintenancePlan.active.is_(True),
             MaintenancePlan.equipment_id.in_(list(equipment) or [-1]),
             MaintenancePlan.next_on <= today + timedelta(days=days))
-            .order_by(MaintenancePlan.next_on).limit(500).all())
+            .order_by(MaintenancePlan.next_on, MaintenancePlan.id).limit(500).all())
         people = _names([i for e in equipment.values()
                          for i in (e.master_id, e.engineer_id)])
         return jsonify({
