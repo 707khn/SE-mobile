@@ -36,6 +36,8 @@ import 'orders_screen.dart';
 import 'pre_trip_screen.dart';
 import 'tech_question_detail_screen.dart';
 import 'tech_questions_screen.dart';
+import 'work_permit_detail_screen.dart';
+import 'work_permits_screen.dart';
 import 'purchases_screen.dart';
 import 'inspections_screen.dart';
 import 'stock_request_detail_screen.dart';
@@ -129,6 +131,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             : HazardDetailScreen(hazardId: id));
       case 'pretrip':
         Get.to(() => const PreTripScreen());
+      case 'permit':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const WorkPermitsScreen()
+            : WorkPermitDetailScreen(permitId: id));
       case 'datafix':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -290,6 +297,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'hazard' => (Icons.report_problem_outlined, const Color(0xFFC62828)),
       'techq' => (Icons.engineering_outlined, const Color(0xFF3949AB)),
       'datafix' => (Icons.badge_outlined, const Color(0xFF5E35B1)),
+      'permit' =>
+        (Icons.local_fire_department_outlined, const Color(0xFFBF360C)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(

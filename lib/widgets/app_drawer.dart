@@ -18,6 +18,7 @@ import '../screens/hazards_screen.dart';
 import '../screens/orders_screen.dart';
 import '../screens/pre_trip_screen.dart';
 import '../screens/tech_questions_screen.dart';
+import '../screens/work_permits_screen.dart';
 import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
@@ -244,6 +245,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.engineering_outlined,
                   label: 'tq_title'.tr,
                   onTap: () => Get.to(() => const TechQuestionsScreen()),
+                ),
+                _item(
+                  icon: Icons.local_fire_department_outlined,
+                  label: 'wp_title'.tr,
+                  onTap: () => Get.to(() => const WorkPermitsScreen()),
                 ),
                 if (usesPreTrip(_job))
                   _item(
