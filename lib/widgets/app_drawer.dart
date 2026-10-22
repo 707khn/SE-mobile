@@ -11,6 +11,7 @@ import '../screens/stock_requests_screen.dart';
 import '../screens/inspections_screen.dart';
 import '../screens/approvals_screen.dart';
 import '../screens/material_passes_screen.dart';
+import '../screens/on_site_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/menu_screen.dart';
@@ -163,6 +164,11 @@ class _AppDrawerState extends State<AppDrawer> {
                       icon: Icons.insights_outlined,
                       label: 'attendance'.tr,
                       onTap: () => Get.to(() => const AttendanceScreen()),
+                    ),
+                    _item(
+                      icon: Icons.how_to_reg_outlined,
+                      label: 'onsite_title'.tr,
+                      onTap: () => Get.to(() => const OnSiteScreen()),
                     ),
                   ],
                 ],

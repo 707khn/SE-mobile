@@ -25,6 +25,7 @@ import 'stock_requests_screen.dart';
 import 'inspections_screen.dart';
 import 'approvals_screen.dart';
 import 'material_passes_screen.dart';
+import 'on_site_screen.dart';
 import 'menu_screen.dart';
 import 'main_screen_2.dart';
 import '../utils/app_theme.dart';
@@ -309,6 +310,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       subtitle: 'attendance_subtitle'.tr,
                       color: const Color(0xFF00695C),
                       onTap: () => Get.to(() => const AttendanceScreen()),
+                    ),
+                    _buildActionCard(
+                      icon: Icons.how_to_reg_outlined,
+                      label: 'onsite_title'.tr,
+                      subtitle: 'onsite_home_subtitle'.tr,
+                      color: const Color(0xFF2E7D32),
+                      onTap: () => Get.to(() => const OnSiteScreen()),
                     ),
                   ],
                 ],

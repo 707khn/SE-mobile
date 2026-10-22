@@ -12,6 +12,7 @@ import '../widgets/day_navigator.dart';
 import '../utils/app_theme.dart';
 import '../utils/load_problem.dart';
 import '../widgets/load_error_view.dart';
+import 'on_site_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({Key? key}) : super(key: key);
@@ -99,6 +100,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
         title: BigText(content: 'attendance'.tr, color: Colors.white),
         actions: [
+          IconButton(
+            key: const Key('attendance_now'),
+            icon: const Icon(Icons.how_to_reg_outlined),
+            tooltip: 'onsite_title'.tr,
+            onPressed: () => Get.to(() => const OnSiteScreen()),
+          ),
           if (!_isToday)
             IconButton(
               icon: const Icon(Icons.today),
