@@ -4,6 +4,7 @@ import 'lang.dart';
 import 'localization_it.dart';
 import 'localization_away.dart';
 import 'localization_repair.dart';
+import 'localization_stock.dart';
 
 class LocaleString extends Translations {
   @override
@@ -12,6 +13,7 @@ class LocaleString extends Translations {
           ...itStringsKk,
           ...repairStringsKk,
           ...awayStringsKk,
+          ...stockStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
           'show report': 'Жеке есепті көрсету',
@@ -362,6 +364,7 @@ class LocaleString extends Translations {
           ...itStringsRu,
           ...repairStringsRu,
           ...awayStringsRu,
+          ...stockStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',
           'show report': 'Показать личный отчёт',

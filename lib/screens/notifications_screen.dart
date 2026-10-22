@@ -17,6 +17,8 @@ import 'it_request_detail_screen.dart';
 import 'it_requests_screen.dart';
 import 'repair_request_detail_screen.dart';
 import 'repair_requests_screen.dart';
+import 'stock_request_detail_screen.dart';
+import 'stock_requests_screen.dart';
 import 'news_screen.dart';
 import 'rollout_screen.dart';
 
@@ -89,6 +91,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const ItRequestsScreen()
             : ItRequestDetailScreen(requestId: id));
+      case 'stock':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const StockRequestsScreen()
+            : StockRequestDetailScreen(requestId: id));
       case 'away':
         Get.to(() => const DirectoryScreen());
       case 'repair':
@@ -198,6 +205,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'it' => (Icons.support_agent, const Color(0xFF37474F)),
       'repair' => (Icons.build_outlined, const Color(0xFF5D4037)),
       'away' => (Icons.event_busy_outlined, const Color(0xFFE65100)),
+      'stock' => (Icons.inventory_2_outlined, const Color(0xFF00695C)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(
