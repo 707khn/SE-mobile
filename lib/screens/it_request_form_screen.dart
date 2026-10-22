@@ -12,10 +12,14 @@ import 'it_requests_screen.dart';
 
 /// Новая заявка в ОИТиС. Закрывается с созданной заявкой в результате.
 class ItRequestFormScreen extends StatefulWidget {
-  const ItRequestFormScreen({Key? key, this.picker}) : super(key: key);
+  const ItRequestFormScreen({Key? key, this.picker, this.description = ''})
+      : super(key: key);
 
   /// Подменяется в проверках: настоящей камеры там нет.
   final ImagePicker? picker;
+
+  /// Начало описания — с карточки своей техники: модель и инвентарный номер.
+  final String description;
 
   @override
   State<ItRequestFormScreen> createState() => _ItRequestFormScreenState();
@@ -28,7 +32,7 @@ const _maxPhotos = 3;
 
 class _ItRequestFormScreenState extends State<ItRequestFormScreen> {
   final _room = TextEditingController();
-  final _description = TextEditingController();
+  late final _description = TextEditingController(text: widget.description);
   final _phone = TextEditingController();
   String _category = 'printer';
   final List<Uint8List> _photos = [];

@@ -21,6 +21,7 @@ import '../screens/hazards_screen.dart';
 import '../screens/orders_screen.dart';
 import '../screens/pre_trip_screen.dart';
 import '../screens/tech_questions_screen.dart';
+import '../screens/tech_screen.dart';
 import '../screens/waybills_screen.dart';
 import '../screens/work_permits_screen.dart';
 import '../screens/workwear_screen.dart';
@@ -203,6 +204,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.support_agent_outlined,
                   label: 'it_title'.tr,
                   onTap: () => Get.to(() => const ItRequestsScreen()),
+                ),
+                _item(
+                  icon: Icons.devices_outlined,
+                  label: 'ta_title'.tr,
+                  onTap: () => Get.to(() => const TechScreen()),
                 ),
                 _item(
                   icon: Icons.build_outlined,

@@ -27,6 +27,7 @@ import 'business_trip_detail_screen.dart';
 import 'business_trips_screen.dart';
 import 'budget_screen.dart';
 import 'compliance_screen.dart';
+import 'tech_screen.dart';
 import 'inspection_detail_screen.dart';
 import 'material_pass_detail_screen.dart';
 import 'material_passes_screen.dart';
@@ -161,6 +162,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => const ComplianceScreen());
       case 'budget':
         Get.to(() => const BudgetScreen());
+      case 'outage':
+      case 'itasset':
+        Get.to(() => const TechScreen());
       case 'maintenance':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -342,6 +346,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'compliance' => (Icons.shield_outlined, const Color(0xFF37474F)),
       'budget' =>
         (Icons.account_balance_wallet_outlined, const Color(0xFFC62828)),
+      'outage' => (Icons.power_off_outlined, const Color(0xFFE65100)),
+      'itasset' => (Icons.devices_outlined, const Color(0xFF00695C)),
       'datafix' => (Icons.badge_outlined, const Color(0xFF5E35B1)),
       'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       'waybill' => (Icons.route_outlined, const Color(0xFF00695C)),
