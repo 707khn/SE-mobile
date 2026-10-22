@@ -38,6 +38,7 @@ import approvals
 import material_passes
 import on_site
 import purchases
+import payslip_questions
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1672,6 +1673,7 @@ def create_app():
     material_passes.register(app, sys.modules[__name__])
     on_site.register(app, sys.modules[__name__])
     purchases.register(app, sys.modules[__name__])
+    payslip_questions.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):
