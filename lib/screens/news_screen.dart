@@ -98,7 +98,7 @@ class _NewsScreenState extends State<NewsScreen> {
       ),
       body: Column(
         children: [
-          OfflineNotice(at: _cachedAt),
+          OfflineNotice(at: _cachedAt, onRetry: _load),
           Expanded(child: _buildBody()),
         ],
       ),

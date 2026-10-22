@@ -382,22 +382,15 @@ def register(app, core):
 
 
 def _announce(app, core, doc):
-    """Сказать всем, что появился документ.
-
-    Лента оповещений в приложении — если она есть в этой сборке сервера
-    (`_record_notice`); пуш — если настроен Firebase. Ни то ни другое не
-    повод отказать в загрузке: документ уже выложен.
+    """Сказать всем, что появился документ: в ленте оповещений приложения
+    и пушем, если настроен Firebase. Ни то ни другое не повод отказать в
+    загрузке — документ уже выложен, поэтому обе записи молчат об ошибках.
     """
     if doc.requires_ack:
         title, body = 'Новый приказ — ознакомьтесь', doc.title
     else:
         title, body = 'Новый документ', doc.title
-    record = getattr(core, '_record_notice', None)
-    if record is not None:
-        try:
-            record('document', title, body, ref=doc.id)
-        except Exception as e:
-            logging.warning('Оповещение о документе не записано: %s', e)
+    core._record_notice('document', title, body, ref=doc.id)
     try:
         core._notify_later(app, core._push_to_everyone, title, body,
                            {'type': 'document', 'id': doc.id})

@@ -173,3 +173,16 @@ def test_who_may_edit():
     assert documents.may_edit('Специалист по кадрам')
     assert not documents.may_edit('Техник-программист')
     assert not documents.may_edit('')
+
+
+def test_new_document_lands_in_the_notice_feed(app, client, cleanup):
+    from models import Notification
+    doc_id = _upload(client, _headers(app, _SECRETARY)).get_json()['item']['id']
+    with app.app_context():
+        notice = (Notification.query.filter_by(kind='document', ref=str(doc_id))
+                  .order_by(Notification.id.desc()).first())
+        assert notice is not None
+        assert notice.title == 'Новый приказ — ознакомьтесь'
+        assert notice.body == 'Приказ о режиме работы'
+        db.session.delete(notice)
+        db.session.commit()

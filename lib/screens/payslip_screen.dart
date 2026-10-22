@@ -426,7 +426,7 @@ class _PayslipPageState extends State<PayslipPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              OfflineNotice(at: _payslip?.cachedAt),
+              OfflineNotice(at: _payslip?.cachedAt, onRetry: _fetchPayslip),
               // Month picker card
               Card(
                 child: Padding(

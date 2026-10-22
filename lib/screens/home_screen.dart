@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -8,11 +10,13 @@ import '../requests/home_request.dart';
 import '../utils/app_update.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
+import '../utils/notice_badge.dart';
 import '../utils/open_external.dart';
 import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
 import '../utils/variables.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/notification_bell.dart';
 import 'admin_panel_screen.dart';
 import 'attendance_screen.dart';
 import 'menu_screen.dart';
@@ -47,6 +51,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// не отложил.
   AppUpdate? _update;
 
+  /// Пока приложение открыто, колокольчик переспрашивает сервер сам:
+  /// пуша нет, и иначе о новом листке человек узнал бы, только выйдя и
+  /// вернувшись.
+  Timer? _noticeTimer;
+  static const _noticeEvery = Duration(minutes: 5);
+
   @override
   void initState() {
     super.initState();
@@ -54,19 +64,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _initPrefs();
     _checkForUpdate();
     _loadSummary();
+    _startNoticeTimer();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _noticeTimer?.cancel();
     super.dispose();
+  }
+
+  void _startNoticeTimer() {
+    NoticeBadge.refresh();
+    _noticeTimer?.cancel();
+    _noticeTimer = Timer.periodic(_noticeEvery, (_) => NoticeBadge.refresh());
   }
 
   /// Вернулся в приложение — сводка могла устареть: утром открыл, в обед
   /// прошёл турникет, а на экране всё ещё «вход 07:52».
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _loadSummary();
+    if (state == AppLifecycleState.resumed) {
+      _loadSummary();
+      _startNoticeTimer();
+    } else if (state == AppLifecycleState.paused) {
+      // В фоне спрашивать незачем: число всё равно никто не видит.
+      _noticeTimer?.cancel();
+    }
   }
 
   Future<void> _loadSummary() async {
@@ -127,10 +151,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         centerTitle: true,
         // Language and logout live in the drawer now, so they are in the same
         // place on every section instead of only here.
+        actions: [NotificationBell(job: widget.job)],
       ),
       // Потянуть вниз — обновить сводку.
       body: RefreshIndicator(
-        onRefresh: _loadSummary,
+        onRefresh: () => Future.wait([_loadSummary(), NoticeBadge.refresh()]),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.symmetric(
