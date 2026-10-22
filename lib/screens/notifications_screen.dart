@@ -10,6 +10,7 @@ import '../utils/notice_badge.dart';
 import '../utils/role_helper.dart';
 import '../utils/shell_tab.dart';
 import '../widgets/load_error_view.dart';
+import 'directory_screen.dart';
 import 'menu_screen.dart';
 import 'news_admin_screen.dart';
 import 'it_request_detail_screen.dart';
@@ -88,6 +89,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const ItRequestsScreen()
             : ItRequestDetailScreen(requestId: id));
+      case 'away':
+        Get.to(() => const DirectoryScreen());
       case 'repair':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -194,6 +197,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'queue' => (Icons.pending_actions, const Color(0xFF4527A0)),
       'it' => (Icons.support_agent, const Color(0xFF37474F)),
       'repair' => (Icons.build_outlined, const Color(0xFF5D4037)),
+      'away' => (Icons.event_busy_outlined, const Color(0xFFE65100)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(

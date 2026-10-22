@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../requests/away_request.dart';
 import '../requests/directory_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/dimensions.dart';
@@ -12,6 +13,7 @@ import '../widgets/offline_notice.dart';
 import '../widgets/custom_text.dart';
 import '../utils/load_problem.dart';
 import '../widgets/load_error_view.dart';
+import 'away_screen.dart';
 
 /// Телефонный справочник предприятия.
 ///
@@ -102,6 +104,14 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
   Future<void> _mail(String address) =>
       openExternal(context, 'mailto:$address');
 
+  Future<void> _away() async {
+    final names = {for (final e in _all) e.name}.toList()..sort();
+    await Get.to(() => AwayScreen(names: names));
+    // Отметку могли поставить или снять — справочник показывает её всем,
+    // и себе тоже.
+    if (mounted) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,6 +120,12 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       appBar: AppBar(
         title: BigText(content: 'directory'.tr, color: Colors.white),
         actions: [
+          IconButton(
+            key: const Key('directory_away'),
+            icon: const Icon(Icons.event_busy_outlined),
+            tooltip: 'away_menu'.tr,
+            onPressed: _away,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'refresh'.tr,
@@ -229,6 +245,8 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
   }
 
   Widget _entryTile(_Entry entry) {
+    final away = entry.away;
+    final awayNow = away != null && away.shownOn(DateTime.now());
     return Container(
       margin: EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
       decoration: BoxDecoration(
@@ -249,6 +267,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
               Text(entry.position,
                   style: TextStyle(fontSize: 13, color: context.mutedColor)),
             ],
+            if (awayNow) _awayBlock(away),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -267,6 +286,57 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Кого нет и кому звонить вместо него — с номером заместителя под рукой.
+  Widget _awayBlock(AwayNote away) {
+    const color = Color(0xFFE65100);
+    final readable = context.readable(color);
+    return Container(
+      key: const Key('directory_away_block'),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.event_busy_outlined, size: 16, color: readable),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(awayLine(away),
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: readable,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          if (away.note.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(away.note, style: const TextStyle(fontSize: 13)),
+          ],
+          if (away.deputyExtension.isNotEmpty ||
+              away.deputyMobile.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final number in _each(away.deputyExtension))
+                  _chip(Icons.dialpad, number, () => _dial(number)),
+                for (final number in _each(away.deputyMobile))
+                  _chip(Icons.phone_outlined, number, () => _dial(number)),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -316,6 +386,7 @@ class _Entry {
     required this.extension,
     required this.email,
     required this.mobile,
+    this.away,
   });
 
   factory _Entry.fromJson(Map<String, dynamic> json) => _Entry(
@@ -325,6 +396,7 @@ class _Entry {
         extension: (json['extension'] as String?) ?? '',
         email: (json['email'] as String?) ?? '',
         mobile: (json['mobile'] as String?) ?? '',
+        away: AwayNote.fromJson(json['away']),
       );
 
   final String department;
@@ -333,4 +405,7 @@ class _Entry {
   final String extension;
   final String email;
   final String mobile;
+
+  /// Отметка «нет на месте», если человек её поставил.
+  final AwayNote? away;
 }

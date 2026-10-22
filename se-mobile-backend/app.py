@@ -10,7 +10,7 @@ import threading
 from functools import wraps
 from io import BytesIO
 from datetime import date, datetime, timedelta, timezone
-from flask import Flask, Response, request, jsonify, g, send_file
+from flask import Flask, Response, request, jsonify, g, send_file, current_app
 from flask_cors import CORS
 # Werkzeug идёт вместе с Flask, ставить ничего не нужно. По умолчанию scrypt.
 from werkzeug.exceptions import HTTPException
@@ -31,6 +31,7 @@ from parser_employees_excel import parse_employees_excel
 from privacy import privacy_page
 import it_requests
 import repair_requests
+import away
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -1658,6 +1659,7 @@ def create_app():
     register_routes(app)
     it_requests.register(app, sys.modules[__name__])
     repair_requests.register(app, sys.modules[__name__])
+    away.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):
@@ -3821,6 +3823,10 @@ def register_routes(app):
         # Все строки приезжают одной загрузкой, поэтому дата у них общая —
         # приложение показывает её как «справочник от такого-то числа».
         updated = max((r.updated_at for r in rows if r.updated_at), default=None)
+        # Кто сегодня не на месте и кто за него (away.py). Без модуля —
+        # просто справочник, как раньше.
+        away_of = current_app.extensions.get('away_by_name')
+        away_now = away_of() if away_of else {}
         return jsonify({
             'message': 'Success',
             'entries': [{
@@ -3830,6 +3836,7 @@ def register_routes(app):
                 'extension': row.extension or '',
                 'email': row.email or '',
                 'mobile': row.mobile or '',
+                'away': away_now.get(away._norm(row.name)),
             } for row in rows],
             'updated_at': updated.isoformat() if updated else None,
         })
