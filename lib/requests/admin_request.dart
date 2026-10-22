@@ -125,6 +125,19 @@ class RolloutReport {
   int? backupDaysAgo;
   int backupCount = 0;
   String backupProblem = '';
+
+  /// Сколько копий лежит во внешнем хранилище — на случай, если сервер умрёт
+  /// вместе со своими копиями.
+  int offsiteCount = 0;
+
+  /// Почему копии не уезжают с сервера. Пусто — уезжают.
+  String offsiteProblem = '';
+
+  /// Сколько дней назад из копии пробовали восстановиться. null — ни разу.
+  int? restoreTestDaysAgo;
+
+  /// Что не так с пробным восстановлением: не было, не удалось, давно.
+  String restoreTestProblem = '';
 }
 
 List<MapEntry<String, int>> _days(dynamic raw) {
@@ -181,6 +194,12 @@ Future<RolloutReport> fetchRollout() async {
   report.backupDaysAgo = (backups['days_ago'] as num?)?.toInt();
   report.backupProblem =
       backups['available'] == false ? ((backups['reason'] as String?) ?? '') : '';
+  final offsite = (body['offsite'] as Map?) ?? {};
+  report.offsiteCount = (offsite['count'] as num?)?.toInt() ?? 0;
+  report.offsiteProblem = (offsite['problem'] as String?) ?? '';
+  final restore = (body['restore_test'] as Map?) ?? {};
+  report.restoreTestDaysAgo = (restore['days_ago'] as num?)?.toInt();
+  report.restoreTestProblem = (restore['problem'] as String?) ?? '';
   return report;
 }
 

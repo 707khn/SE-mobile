@@ -1954,6 +1954,118 @@ def _backup_state():
     }
 
 
+# Чем кончился последний вывоз копий во внешнее хранилище и последнее
+# пробное восстановление. Файлы пишут таймеры se-mobile-offsite и
+# se-mobile-restore-test (deploy/backup-offsite.sh, deploy/restore-test.sh),
+# приложение только читает.
+_OFFSITE_STATUS = os.environ.get(
+    'OFFSITE_STATUS', '/var/lib/se-mobile/offsite/status')
+_RESTORE_TEST_STATUS = os.environ.get(
+    'RESTORE_TEST_STATUS', '/var/lib/se-mobile/restore-test/status')
+
+# Вывоз идёт раз в сутки. Полтора дня без отметки — таймер не запускается.
+_OFFSITE_SILENT_AFTER = timedelta(hours=36)
+
+# Проба — раз в квартал. Дольше — пора повторить.
+_RESTORE_TEST_DUE_AFTER = timedelta(days=100)
+
+
+def _status_file(path):
+    """Поля файла отметки вида «ключ=значение»."""
+    with open(path, encoding='utf-8', errors='replace') as f:
+        return dict(line.split('=', 1) for line in f.read().splitlines()
+                    if '=' in line)
+
+
+def _status_age(fields):
+    try:
+        checked = datetime.strptime(fields.get('checked_at') or '',
+                                    '%Y-%m-%dT%H:%M:%SZ') \
+            .replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return datetime.now(timezone.utc) - checked
+
+
+def _offsite_state():
+    """Уезжают ли копии базы с сервера.
+
+    Копия, которая лежит только на сервере, умрёт вместе с ним. Перестань
+    копии уезжать — истёк ключ хранилища, кончилось место, — ошибка была бы
+    только в журнале systemd, и узнали бы о ней в день, когда сервер упал.
+
+    `problem` пусто — всё в порядке.
+    """
+    try:
+        fields = _status_file(_OFFSITE_STATUS)
+    except FileNotFoundError:
+        return {'available': False,
+                'problem': 'Копии не увозятся с сервера: таймер '
+                           'se-mobile-offsite не установлен. См. '
+                           'deploy/README.md, «Копия вне сервера».'}
+    except OSError as e:
+        return {'available': False, 'problem': str(e)}
+
+    result = fields.get('result') or 'fail'
+    try:
+        count = int(fields.get('remote_count') or 0)
+    except ValueError:
+        count = 0
+    state = {'available': True, 'result': result,
+             'message': fields.get('message') or '',
+             'checked_at': fields.get('checked_at') or None,
+             'count': count,
+             'newest': fields.get('remote_newest') or None}
+
+    problems = []
+    if result != 'ok':
+        problems.append(state['message'] or 'Последний вывоз не удался.')
+    age = _status_age(fields)
+    if age is None:
+        problems.append('Непонятно, когда копии увозились в последний раз.')
+    elif age > _OFFSITE_SILENT_AFTER:
+        problems.append(f'Таймер не запускался с {state["checked_at"]}.')
+    state['problem'] = ' '.join(problems)
+    return state
+
+
+def _restore_test_state():
+    """Когда из копии в последний раз пробовали восстановиться и чем кончилось.
+
+    Копия, из которой ни разу не восстанавливались, — надежда, а не резерв:
+    не тот ключ или дамп, который не ложится в базу, обнаружатся ровно тогда,
+    когда копия нужна.
+    """
+    try:
+        fields = _status_file(_RESTORE_TEST_STATUS)
+    except FileNotFoundError:
+        return {'available': False,
+                'problem': 'Из копии ещё ни разу не восстанавливались. См. '
+                           'deploy/README.md, «Пробное восстановление».'}
+    except OSError as e:
+        return {'available': False, 'problem': str(e)}
+
+    result = fields.get('result') or 'fail'
+    state = {'available': True, 'result': result,
+             'message': fields.get('message') or '',
+             'checked_at': fields.get('checked_at') or None,
+             'source': fields.get('source') or None,
+             'key': fields.get('key') or None,
+             'days_ago': None}
+
+    problems = []
+    if result != 'ok':
+        problems.append(state['message'] or 'Последняя проба не удалась.')
+    age = _status_age(fields)
+    if age is not None:
+        state['days_ago'] = age.days
+        if age > _RESTORE_TEST_DUE_AFTER:
+            problems.append(f'Последняя проба — {age.days} дн. назад, '
+                            'пора повторить.')
+    state['problem'] = ' '.join(problems)
+    return state
+
+
 def register_routes(app):
 
     @app.route('/')
@@ -3233,6 +3345,8 @@ def register_routes(app):
             # Приезжают ли новые сборки сами. Истёкший токен иначе виден
             # только в журнале systemd.
             'fetch_apk': _fetch_apk_state(),
+            'offsite': _offsite_state(),
+            'restore_test': _restore_test_state(),
             # Что сторож записал о перебоях. Пусто — сервер не падал.
             'outages': _outage_state(),
         })
