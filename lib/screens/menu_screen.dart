@@ -11,6 +11,8 @@ import '../widgets/offline_notice.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/day_navigator.dart';
 import '../widgets/skeleton.dart';
+import 'lunch_order_screen.dart';
+import 'lunch_summary_screen.dart';
 import 'menu_edit_screen.dart';
 import '../utils/app_theme.dart';
 import '../utils/load_problem.dart';
@@ -88,6 +90,12 @@ class _MenuScreenState extends State<MenuScreen> {
         _selectedDate.day == now.day;
   }
 
+  bool get _isPast {
+    final now = DateTime.now();
+    return DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day)
+        .isBefore(DateTime(now.year, now.month, now.day));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,6 +126,14 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
           if (canEditMenu(widget.job))
             IconButton(
+              key: const Key('lo_summary_open'),
+              icon: const Icon(Icons.list_alt),
+              tooltip: 'lo_summary'.tr,
+              onPressed: () =>
+                  Get.to(() => LunchSummaryScreen(day: _selectedDate)),
+            ),
+          if (canEditMenu(widget.job))
+            IconButton(
               icon: const Icon(Icons.edit_calendar),
               tooltip: 'menu_edit_title'.tr,
               onPressed: () async {
@@ -127,6 +143,16 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
         ],
       ),
+      // Заказать можно на сегодня и вперёд — и только то, что в меню.
+      floatingActionButton: !_loading && !_error && _items.isNotEmpty && !_isPast
+          ? FloatingActionButton.extended(
+              key: const Key('lo_order'),
+              onPressed: () =>
+                  Get.to(() => LunchOrderScreen(day: _selectedDate)),
+              icon: const Icon(Icons.room_service_outlined),
+              label: Text('lo_order'.tr),
+            )
+          : null,
       body: RefreshIndicator(
         color: context.accentColor,
         onRefresh: _loadMenu,
