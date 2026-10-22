@@ -12,6 +12,7 @@ import '../screens/inspections_screen.dart';
 import '../screens/approvals_screen.dart';
 import '../screens/material_passes_screen.dart';
 import '../screens/on_site_screen.dart';
+import '../screens/orders_screen.dart';
 import '../screens/purchases_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/main_screen_2.dart';
@@ -218,6 +219,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.shopping_cart_outlined,
                   label: 'purch_title'.tr,
                   onTap: () => Get.to(() => const PurchasesScreen()),
+                ),
+                _item(
+                  icon: Icons.gavel_outlined,
+                  label: 'ord_title'.tr,
+                  onTap: () => Get.to(() => const OrdersScreen()),
                 ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
