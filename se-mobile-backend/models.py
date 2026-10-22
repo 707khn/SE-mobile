@@ -141,6 +141,35 @@ class FcmToken(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Notification(db.Model):
+    """Оповещение в самом приложении — колокольчик на главном экране.
+
+    Пуш через Firebase доходит, только когда Firebase настроен, и пропадает,
+    если человек его смахнул. Здесь то же сообщение лежит, пока его не
+    прочтут: «расчётный лист готов», «меню выложено», объявление.
+
+    Кому — по `audience`: 'all' — всем, 'admins' — администраторам системы,
+    'person' — одному сотруднику из `employee_id`. Листок за месяц — по строке
+    на человека: у каждого он свой, и чужого видеть незачем.
+    """
+    __tablename__ = 'notifications'
+    __table_args__ = (
+        db.Index('ix_notifications_emp', 'employee_id'),
+        db.Index('ix_notifications_created', 'created_at'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    audience = db.Column(db.String(10), nullable=False, default='all')
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'))
+    # 'payslip' | 'menu' | 'news' | 'queue' — по нему приложение знает,
+    # какой экран открыть.
+    kind = db.Column(db.String(20), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.String(500), nullable=False, default='')
+    # На что указывает: номер новости, дата меню. Пусто — просто раздел.
+    ref = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class TurnstileEvent(db.Model):
     __tablename__ = 'turnstile_events'
     # Табель выбирает события за сутки или за месяц — то есть диапазоном по
@@ -336,6 +365,9 @@ class UserAccount(db.Model):
     # и назавтра останется без приложения.
     app_version = db.Column(db.String(20))
     last_seen_at = db.Column(db.DateTime)
+    # До какого оповещения человек дочитал. Отметка одна на человека, а не
+    # на каждое оповещение: объявление для всех — одна строка, а не пятьсот.
+    notifications_seen_id = db.Column(db.Integer, nullable=False, default=0)
 
 
 class AuthToken(db.Model):

@@ -117,9 +117,10 @@ def test_hr_moves_it_and_the_worker_is_told(client, people, pushes):
     assert r.get_json()['item']['hr_note'] == 'Заберите в каб. 12'
 
     to_worker = [p for p in pushes if p[0] == [_WORKER]]
+    n = item['id']
     assert [p[2] for p in to_worker] == [
-        'Справка о доходах принята',
-        'Справка о доходах готова. Заберите в каб. 12',
+        f'Справка о доходах №{n} принята',
+        f'Справка о доходах №{n} готова. Заберите в каб. 12',
     ]
     assert to_worker[-1][3] == {'type': 'hr', 'id': item['id']}
 
@@ -141,7 +142,8 @@ def test_rejection_needs_a_reason(client, people, pushes):
                     json={'status': 'rejected', 'note': 'Нужен паспорт'},
                     headers=people[_HR])
     assert r.status_code == 200
-    assert pushes[-1][2] == 'Справка с места работы отклонена. Нужен паспорт'
+    assert pushes[-1][2] == \
+        f'Справка с места работы №{item["id"]} отклонена. Нужен паспорт'
 
 
 def test_worker_cancels_only_own_and_only_new(client, people):
@@ -178,3 +180,21 @@ def test_queue_filters(client, people):
     assert item['id'] in [i['id'] for i in accepted]
     new = client.get('/api/hr/queue?status=new', headers=people[_HR]).get_json()['items']
     assert item['id'] not in [i['id'] for i in new]
+
+
+def test_steps_land_in_the_in_app_feed(client, people, pushes):
+    """Без Firebase оповещение всё равно есть — в ленте приложения."""
+    item = _create(client, people[_WORKER], kind='employment').get_json()['item']
+    hr_feed = client.get('/api/notifications', headers=people[_HR]).get_json()
+    assert any(f'№{item["id"]}' in (n.get('body') or '')
+               for n in hr_feed['items'])
+
+    client.post(f'/api/hr/requests/{item["id"]}',
+                json={'status': 'ready', 'note': 'Каб. 12'}, headers=people[_HR])
+    feed = client.get('/api/notifications', headers=people[_WORKER]).get_json()
+    mine = [n for n in feed['items'] if n.get('kind') == 'hr']
+    assert mine and mine[0]['body'] == \
+        f'Справка с места работы №{item["id"]} готова. Каб. 12'
+    # Коллега чужого не видит.
+    other = client.get('/api/notifications', headers=people[_OTHER]).get_json()
+    assert not [n for n in other['items'] if n.get('kind') in ('hr', 'hr_queue')]
