@@ -87,6 +87,10 @@ jobs:
       # сервере с Ubuntu 24.04.
       - name: Install nginx
         run: |
+          # Нам нужен только nginx из Ubuntu. Сторонний репозиторий Microsoft,
+          # прописанный в образе GitHub, иногда отвечает 403, и apt-get update
+          # валит весь прогон ещё до проверок. Его список убираем.
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list /etc/apt/sources.list.d/microsoft-prod.sources
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends nginx-core
 
