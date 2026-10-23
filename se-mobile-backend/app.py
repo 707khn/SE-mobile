@@ -2558,7 +2558,17 @@ def register_routes(app):
             return jsonify({'message': 'Failure', 'error': 'locked',
                             'retry_after': max(1, int(
                                 (account.locked_until - now).total_seconds()))}), 429
-        if not check_password_hash(account.password_hash, old_password):
+        # Временный пароль принимаем в тех же формах номера, что и на входе:
+        # человек вошёл с «450», а в хеше «0000000450». Приложение при
+        # обязательной смене подставляет старый пароль само — ровно тот, что
+        # набран на входе, — и поле не показывает. Проверка одной формы
+        # отвечала «Текущий пароль неверен», и исправить было нечего.
+        candidates = [old_password]
+        if account.must_change_password:
+            candidates += [form for form in _number_forms(old_password)
+                           if form not in candidates]
+        if not any(check_password_hash(account.password_hash, candidate)
+                   for candidate in candidates):
             account.failed_attempts = (account.failed_attempts or 0) + 1
             delay = _lock_delay(account.failed_attempts)
             if delay is not None:
