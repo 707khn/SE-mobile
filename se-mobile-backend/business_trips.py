@@ -172,7 +172,10 @@ def register(app, core):
     def _json(item, people, viewer, lines=None, events=None):
         traveller = people.get(item.employee_id)
         mine = viewer.employee_id == item.employee_id
-        accountant = is_accountant(viewer)
+        # Свою командировку бухгалтер не ведёт: аванс себе и приём своего же
+        # отчёта — то же, что согласовать себе поездку, а это запрещено
+        # (may_approve). Её ведёт другой бухгалтер.
+        accountant = is_accountant(viewer) and not mine
         approver = traveller is not None and may_approve(viewer, traveller)
         data = {
             'id': item.id,
@@ -253,7 +256,7 @@ def register(app, core):
         ids = sorted({i for i in ids if i and i != actor_id})
         if ids:
             core._record_notice('trip', title[:200], body[:500],
-                                employee_ids=ids, ref=ref)
+                                employee_ids=ids, ref=ref, repeat=True)
 
     @app.route('/api/trips', methods=['GET'])
     @core.require_auth
@@ -482,5 +485,6 @@ def register(app, core):
         if action in ('approve', 'reject'):
             return may_approve(viewer, traveller)
         if action in ('advance', 'accept', 'send_back'):
-            return is_accountant(viewer)
+            return (is_accountant(viewer)
+                    and viewer.employee_id != traveller.employee_id)
         return viewer.employee_id == traveller.employee_id

@@ -214,7 +214,7 @@ _NOTICE_UNREAD_WINDOW = timedelta(days=14)
 
 
 def _record_notice(kind, title, body='', employee_ids=None, audience='all',
-                   ref=None):
+                   ref=None, repeat=False):
     """Записать оповещение в ленту приложения.
 
     Работает и без Firebase — в этом и смысл: колокольчик в приложении есть
@@ -224,6 +224,13 @@ def _record_notice(kind, title, body='', employee_ids=None, audience='all',
     такое же уже лежит, второе не пишется: листки за месяц бухгалтерия
     выгружает и по второму разу, с поправками, и «расчётный лист за сентябрь
     готов» дважды подряд ничего человеку не говорит.
+
+    `repeat=True` — для событий, которые и правда случаются снова с тем же
+    текстом: второе напоминание по поручению, второй ответ расчётной группы,
+    заявка, выполненная повторно после «не помогло». Сравнение с прежними
+    там глотало всё, кроме первого: «Вопрос №5: ответ расчётной группы,
+    сентябрь 2026» второй раз не приходил никогда. Для них дубль не пишем
+    только поверх ещё непрочитанного такого же — его поднимаем наверх.
 
     Ошибка записи не роняет то, ради чего оповещение пишется: загрузка
     листков важнее сообщения о ней.
@@ -236,10 +243,23 @@ def _record_notice(kind, title, body='', employee_ids=None, audience='all',
             wanted = sorted({e for e in employee_ids if e})
             if not wanted:
                 return 0
-            have = {r.employee_id for r in Notification.query.filter(
+            same = Notification.query.filter(
                 Notification.kind == kind, Notification.title == title,
                 Notification.body == body,
-                Notification.employee_id.in_(wanted))}
+                Notification.employee_id.in_(wanted)).all()
+            if repeat:
+                seen = dict(db.session.query(
+                    UserAccount.employee_id, UserAccount.notifications_seen_id
+                ).filter(UserAccount.employee_id.in_(wanted)))
+                unread = [r.id for r in same
+                          if r.id > (seen.get(r.employee_id) or 0)]
+                if unread:
+                    Notification.query.filter(
+                        Notification.id.in_(unread)
+                    ).delete(synchronize_session=False)
+                have = set()
+            else:
+                have = {r.employee_id for r in same}
             rows = [Notification(audience='person', employee_id=e, kind=kind,
                                  title=title, body=body, ref=ref)
                     for e in wanted if e not in have]
@@ -830,7 +850,14 @@ def _password_problem(password, login):
     """
     if len(password) < _MIN_PASSWORD_LENGTH:
         return 'too_short'
-    if password.strip().lower() == (login or '').strip().lower():
+    login = (login or '').strip()
+    if password.strip().lower() == login.lower():
+        return 'same_as_login'
+    # Логин «450», а пароль «0000000450» — тот же табельный номер. Пропусти
+    # мы его, следующий же вход узнал бы в нём временный (_is_default_password)
+    # и снова потребовал бы смены — и так по кругу.
+    if (password.isdigit() and login.isdigit()
+            and password.lstrip('0') == login.lstrip('0')):
         return 'same_as_login'
     if password.isdigit() and len(set(password)) <= 2:
         return 'too_simple'

@@ -154,7 +154,7 @@ def register(app, core):
         ids = sorted({e for e in employee_ids if e and e != actor_id})
         if ids:
             core._record_notice('payslip_q', title, body, employee_ids=ids,
-                                ref=item_id)
+                                ref=item_id, repeat=True)
 
     @app.route('/api/payslip-questions', methods=['GET'])
     @core.require_auth

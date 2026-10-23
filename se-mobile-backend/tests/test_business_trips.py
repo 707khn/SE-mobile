@@ -165,3 +165,15 @@ def test_reject_and_cancel(app, client):
         == 'cancelled'
     assert client.get(f'/api/trips/{second}',
                       headers=_auth(app, _DMTO_MANAGER)).status_code == 404
+
+
+def test_accountant_does_not_handle_own_trip(app, client, pushes):
+    # Аванс себе и приём своего отчёта — как согласовать себе поездку.
+    own = _auth(app, _ACCOUNTANT)
+    r = _ask(client, own)
+    assert r.status_code == 201, r.get_json()
+    item_id = r.get_json()['item']['id']
+    assert _act(client, _auth(app, _GD), item_id, 'approve').status_code == 200
+    item = client.get(f'/api/trips/{item_id}', headers=own).get_json()['item']
+    assert item['can_advance'] is False
+    assert _act(client, own, item_id, 'advance', amount=150000).status_code == 403

@@ -122,7 +122,7 @@ def register(app, core):
         ids = sorted({i for i in ids if i})
         if ids:
             core._record_notice('reception', title[:200], body[:500],
-                                employee_ids=ids, ref=ref)
+                                employee_ids=ids, ref=ref, repeat=True)
 
     def _reception_ids():
         return [e.employee_id for e in Employee.query.all()
