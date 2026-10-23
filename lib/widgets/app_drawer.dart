@@ -4,10 +4,17 @@ import 'package:get/get.dart';
 
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
+import '../screens/business_trips_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
+import '../screens/assignments_screen.dart';
+import '../screens/tech_screen.dart';
+import '../screens/purchases_screen.dart';
+import '../screens/reception_screen.dart';
 import '../screens/news_screen.dart';
+import '../screens/onboarding_screen.dart';
 import '../screens/main_screen_2.dart';
+import '../screens/medical_screen.dart';
 import '../screens/menu_screen.dart';
 import '../screens/settings_screen.dart';
 import '../utils/app_version.dart';
@@ -177,9 +184,44 @@ class _AppDrawerState extends State<AppDrawer> {
                   label: 'it_title'.tr,
                   onTap: () => Get.to(() => const ItRequestsScreen()),
                 ),
+                _item(
+                  icon: Icons.devices_outlined,
+                  label: 'ta_title'.tr,
+                  onTap: () => Get.to(() => const TechScreen()),
+                ),
+                _item(
+                  icon: Icons.shopping_cart_outlined,
+                  label: 'purch_title'.tr,
+                  onTap: () => Get.to(() => const PurchasesScreen()),
+                ),
+                _item(
+                  icon: Icons.task_alt,
+                  label: 'asg_title'.tr,
+                  onTap: () => Get.to(() => const AssignmentsScreen()),
+                ),
+                _item(
+                  icon: Icons.flight_takeoff,
+                  label: 'bt_title'.tr,
+                  onTap: () => Get.to(() => const BusinessTripsScreen()),
+                ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
                 const SizedBox(height: 8),
+                _item(
+                  icon: Icons.health_and_safety_outlined,
+                  label: 'md_title'.tr,
+                  onTap: () => Get.to(() => const MedicalScreen()),
+                ),
+                _item(
+                  icon: Icons.waving_hand_outlined,
+                  label: 'ob_title'.tr,
+                  onTap: () => Get.to(() => const OnboardingScreen()),
+                ),
+                _item(
+                  icon: Icons.event_seat_outlined,
+                  label: 'rc_title'.tr,
+                  onTap: () => Get.to(() => const ReceptionScreen()),
+                ),
                 // Оформление, язык, пароль, код и «О программе» — на своём
                 // экране: в меню они занимали половину списка.
                 _item(

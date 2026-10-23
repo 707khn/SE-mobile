@@ -10,11 +10,24 @@ import '../utils/notice_badge.dart';
 import '../utils/role_helper.dart';
 import '../utils/shell_tab.dart';
 import '../widgets/load_error_view.dart';
+import 'medical_screen.dart';
 import 'menu_screen.dart';
 import 'news_admin_screen.dart';
 import 'it_request_detail_screen.dart';
 import 'it_requests_screen.dart';
+import 'business_trip_detail_screen.dart';
+import 'business_trips_screen.dart';
+import 'reception_screen.dart';
+import 'tech_screen.dart';
+import 'payslip_question_detail_screen.dart';
+import 'payslip_questions_screen.dart';
+import 'purchase_detail_screen.dart';
+import 'assignment_detail_screen.dart';
+import 'assignments_screen.dart';
+import 'purchases_screen.dart';
 import 'news_screen.dart';
+import 'onboarding_detail_screen.dart';
+import 'onboarding_screen.dart';
 import 'rollout_screen.dart';
 
 /// Оповещения: что нового с прошлого раза.
@@ -86,6 +99,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const ItRequestsScreen()
             : ItRequestDetailScreen(requestId: id));
+      case 'trip':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const BusinessTripsScreen()
+            : BusinessTripDetailScreen(tripId: id));
+      case 'outage':
+      case 'itasset':
+        Get.to(() => const TechScreen());
+      case 'reception':
+        Get.to(() => const ReceptionScreen());
+      case 'medical':
+        Get.to(() => const MedicalScreen());
+      case 'onboarding':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const OnboardingScreen()
+            : OnboardingDetailScreen(onboardingId: id));
+      case 'assignment':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const AssignmentsScreen()
+            : AssignmentDetailScreen(assignmentId: id));
+      case 'payslip_q':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const PayslipQuestionsScreen()
+            : PayslipQuestionDetailScreen(questionId: id));
+      case 'purchase':
+        final id = int.tryParse(notice.ref ?? '');
+        Get.to(() => id == null
+            ? const PurchasesScreen()
+            : PurchaseDetailScreen(purchaseId: id));
     }
   }
 
@@ -186,6 +231,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'menu' => (Icons.restaurant_menu, const Color(0xFFC62828)),
       'queue' => (Icons.pending_actions, const Color(0xFF4527A0)),
       'it' => (Icons.support_agent, const Color(0xFF37474F)),
+      'purchase' => (Icons.shopping_cart_outlined, const Color(0xFFAD1457)),
+      'payslip_q' => (Icons.contact_support_outlined, context.accentColor),
+      'assignment' => (Icons.task_alt, const Color(0xFF0277BD)),
+      'onboarding' => (Icons.waving_hand_outlined, const Color(0xFF00897B)),
+      'medical' => (Icons.health_and_safety_outlined, const Color(0xFF00838F)),
+      'outage' => (Icons.power_off_outlined, const Color(0xFFE65100)),
+      'itasset' => (Icons.devices_outlined, const Color(0xFF00695C)),
+      'reception' => (Icons.event_seat_outlined, const Color(0xFF5D4037)),
+      'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(
