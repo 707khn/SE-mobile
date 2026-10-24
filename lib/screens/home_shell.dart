@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../chat/chat_bridge.dart';
+import '../chat/chat_config.dart';
 import '../services/fcm_service.dart';
 import '../utils/colors.dart';
 import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/shell_tab.dart';
+import 'chat_screen.dart';
 import 'home_screen.dart';
 import 'leave_screen.dart';
 import 'main_screen_1.dart';
@@ -54,7 +57,13 @@ class _HomeShellState extends State<HomeShell> {
     ShellTab.selected.value = widget.initialIndex;
     ShellTab.selected.addListener(_onTabChanged);
     _registerForPush();
+    // Нажатие на уведомление чата открывает вкладку «Чат».
+    ChatBridge.start();
   }
+
+  /// Вкладок пять, а с чатом — шесть. Без адреса сервера чата в сборке
+  /// (CHAT_URL) вкладки нет, и приложение выглядит как раньше.
+  int get _tabCount => chatEnabled ? 6 : 5;
 
   /// Оболочка открывается после входа — по коду или по паролю, — и это
   /// единственное место, через которое проходят все. Без Firebase это
@@ -96,6 +105,8 @@ class _HomeShellState extends State<HomeShell> {
         return LeavePage(onNavigate: _navigateTo);
       case 4:
         return MenuScreen(onNavigate: _navigateTo, job: widget.job);
+      case ChatBridge.tabIndex:
+        return ChatScreen(onNavigate: _navigateTo);
       default:
         return HomeScreen(
           fullName: widget.fullName,
@@ -112,8 +123,10 @@ class _HomeShellState extends State<HomeShell> {
       // popping would silently sign the user back out. Back returns to the
       // Home tab, and on Home it leaves the app like any other root screen.
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvoked: (didPop) async {
         if (didPop) return;
+        // В чате «Назад» сперва закрывает окно или переписку внутри него.
+        if (_selectedIndex == ChatBridge.tabIndex && await ChatBridge.back()) return;
         if (_selectedIndex != 0) {
           ShellTab.open(0);
         } else {
@@ -124,7 +137,7 @@ class _HomeShellState extends State<HomeShell> {
         body: IndexedStack(
           index: _selectedIndex,
           children: [
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < _tabCount; i++)
               _visited.contains(i)
                   ? _tab(i)
                   // Ещё не открывали — и в сеть за ней не ходим.
@@ -180,11 +193,40 @@ class _HomeShellState extends State<HomeShell> {
                   activeIcon: const Icon(Icons.restaurant_menu),
                   label: 'tab_menu'.tr,
                 ),
+                if (chatEnabled)
+                  BottomNavigationBarItem(
+                    icon: const _ChatTabIcon(active: false),
+                    activeIcon: const _ChatTabIcon(active: true),
+                    label: 'tab_chat'.tr,
+                  ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Значок вкладки «Чат» с числом непрочитанных. Число приходит из клиента
+/// чата — только число, без имён и названий.
+class _ChatTabIcon extends StatelessWidget {
+  const _ChatTabIcon({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = Icon(active ? Icons.forum : Icons.forum_outlined);
+    return ValueListenableBuilder<int>(
+      valueListenable: ChatBridge.unread,
+      builder: (context, count, _) => count == 0
+          ? icon
+          : Badge(
+              label: Text(count > 99 ? '99+' : '$count'),
+              backgroundColor: AppColors.niceRed,
+              child: icon,
+            ),
     );
   }
 }

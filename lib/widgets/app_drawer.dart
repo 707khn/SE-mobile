@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../chat/chat_bridge.dart';
+import '../chat/chat_config.dart';
 
 import '../screens/admin_panel_screen.dart';
 import '../screens/attendance_screen.dart';
@@ -153,6 +155,13 @@ class _AppDrawerState extends State<AppDrawer> {
                     index: 4,
                     onTap: () => _goToTab(4),
                   ),
+                  if (chatEnabled)
+                    _item(
+                      icon: Icons.forum_outlined,
+                      label: 'tab_chat'.tr,
+                      index: ChatBridge.tabIndex,
+                      onTap: () => _goToTab(ChatBridge.tabIndex),
+                    ),
                   if (isAdminRole(_job)) ...[
                     _section('drawer_manager'.tr),
                     _item(

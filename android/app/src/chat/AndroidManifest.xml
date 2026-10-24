@@ -1,0 +1,44 @@
+<!--
+    Уведомления конфиденциального чата (вкладка «Чат»).
+
+    Отдельным файлом, потому что в сборку для Google Play это не входит:
+    постоянную службу типа specialUse Play пропускает только с отдельным
+    обоснованием. build.gradle подмешивает файл к debug и release, только
+    когда собирается не для Play. Код службы при этом в сборке есть, но без
+    объявления в манифесте не запускается, и вкладка честно говорит, что
+    фоновых уведомлений в этой сборке нет.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <application>
+        <!--
+            Постоянное соединение с сервером чата предприятия. specialUse, а не
+            dataSync: у dataSync предел шесть часов в сутки, и уведомления
+            прекращались бы к вечеру.
+        -->
+        <service
+            android:name=".chat.ChatNotifyService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Постоянное соединение с сервером организации для доставки уведомлений о новых сообщениях" />
+        </service>
+
+        <receiver
+            android:name=".chat.ChatBootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

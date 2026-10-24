@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="400" height="220">
+  <title>Семей инжиниринг</title>
+  <g transform="skewX(-12) translate(28 0)">
+    <rect x="40" y="8" width="300" height="204" fill="#0B7A3E"/>
+    <rect x="52" y="20" width="126" height="180" fill="#FFFFFF"/>
+    <text x="115" y="152" text-anchor="middle" fill="#0B7A3E" font-family="Arial Black, Arial, sans-serif" font-size="168" font-weight="900">S</text>
+    <text x="262" y="152" text-anchor="middle" fill="#FFFFFF" font-family="Arial Black, Arial, sans-serif" font-size="168" font-weight="900">E</text>
+  </g>
+</svg>
