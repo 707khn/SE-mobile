@@ -16,6 +16,7 @@ class AdminEmployee {
     required this.department,
     required this.iin,
     required this.login,
+    this.loginActive = true,
     required this.payslipCount,
     required this.accessCount,
     required this.leaveCount,
@@ -30,6 +31,9 @@ class AdminEmployee {
   /// Empty when the person has no way to sign in to the app.
   final String login;
 
+  /// false — учётная запись отключена (сотрудник уволен): войти нельзя.
+  final bool loginActive;
+
   final int payslipCount;
   final int accessCount;
   final int leaveCount;
@@ -43,6 +47,7 @@ class AdminEmployee {
         department: (json['department'] as String?) ?? '',
         iin: (json['iin'] as String?) ?? '',
         login: (json['login'] as String?) ?? '',
+        loginActive: (json['login_active'] as bool?) ?? true,
         payslipCount: (json['payslip_count'] as num?)?.toInt() ?? 0,
         accessCount: (json['access_count'] as num?)?.toInt() ?? 0,
         leaveCount: (json['leave_count'] as num?)?.toInt() ?? 0,
