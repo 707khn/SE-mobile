@@ -223,7 +223,7 @@ def register(app, core):
         ids = sorted({i for i in ids if i and i != actor_id})
         if ids:
             core._record_notice('onboarding', title[:200], body[:500],
-                                employee_ids=ids, ref=ref)
+                                employee_ids=ids, ref=ref, repeat=True)
 
     @app.route('/api/onboarding', methods=['GET'])
     @core.require_auth

@@ -268,7 +268,7 @@ def register(app, core):
         ids = sorted({e for e in employee_ids if e and e != actor_id})
         if not ids:
             return
-        core._record_notice('it', title, body, employee_ids=ids, ref=item_id)
+        core._record_notice('it', title, body, employee_ids=ids, ref=item_id, repeat=True)
 
     def _forget_old_photos():
         """Снимки закрытых давно заявок больше не нужны."""

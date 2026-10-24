@@ -230,7 +230,7 @@ def register(app, core):
         ids = sorted({e for e in employee_ids if e and e != actor_id})
         if ids:
             core._record_notice('purchase', title, body, employee_ids=ids,
-                                ref=item_id)
+                                ref=item_id, repeat=True)
 
     def _what(lines):
         return '; '.join(f'{l.name} — {_number(l.quantity)} {l.unit}'

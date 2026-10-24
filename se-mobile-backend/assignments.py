@@ -187,7 +187,7 @@ def register(app, core):
         ids = sorted({e for e in employee_ids if e and e != actor_id})
         if ids:
             core._record_notice('assignment', title[:200], body[:500],
-                                employee_ids=ids, ref=item_id)
+                                employee_ids=ids, ref=item_id, repeat=True)
 
     def _date(raw):
         try:
