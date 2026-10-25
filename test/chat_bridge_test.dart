@@ -58,6 +58,12 @@ void main() {
     expect(answer['ok'], isFalse);
   });
 
+  test('без службы в сборке клиент чата узнаёт, что уведомлений нет', () async {
+    final answer = await call('notify.status');
+    expect(answer['ok'], isTrue);
+    expect((answer['result'] as Map)['available'], isFalse);
+  });
+
   test('имя вложения не выводит за пределы папки', () {
     expect(ChatBridge.safeFileName('../../shared_prefs/x.xml'), 'x.xml');
     expect(ChatBridge.safeFileName(r'C:\Users\a\отчёт.pdf'), 'отчёт.pdf');

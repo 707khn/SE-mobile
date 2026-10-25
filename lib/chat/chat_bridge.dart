@@ -113,7 +113,12 @@ class ChatBridge {
 
       case 'notify.status':
         if (!chatBackgroundNotifyAvailable) {
-          return {'running': false, 'permitted': false, 'batteryExempt': false};
+          return {
+            'running': false,
+            'permitted': false,
+            'batteryExempt': false,
+            'available': false,
+          };
         }
         return await _invoke<Map>('status');
       case 'notify.start':
