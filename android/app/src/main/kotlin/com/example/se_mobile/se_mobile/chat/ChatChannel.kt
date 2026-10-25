@@ -95,7 +95,17 @@ class ChatChannel(private val activity: Activity, messenger: BinaryMessenger) {
         if (intent?.getBooleanExtra(ChatNotifyService.EXTRA_OPEN_CHAT, false) != true) return
         intent.removeExtra(ChatNotifyService.EXTRA_OPEN_CHAT)
         openChatPending = true
-        channel.invokeMethod("openChat", null)
+        // Dart уже слушает — вкладка откроется сейчас, и откладывать нечего.
+        // Не слушает (приложение только запускается) — заберёт takeOpenRequest.
+        channel.invokeMethod("openChat", null, object : MethodChannel.Result {
+            override fun success(result: Any?) {
+                openChatPending = false
+            }
+
+            override fun error(code: String, message: String?, details: Any?) {}
+
+            override fun notImplemented() {}
+        })
     }
 
     fun onPause() {
