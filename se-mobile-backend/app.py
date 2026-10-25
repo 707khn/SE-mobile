@@ -2908,26 +2908,29 @@ def register_routes(app):
         logins = _login_by_employee()
         # Отключённые (уволенные) — чтобы их было видно и можно было включить
         # обратно, а не «учётной записи нет».
-        accounts = {a.login: a.is_active for a in UserAccount.query.all()}
-        disabled = {a.employee_id: a.login
-                    for a in UserAccount.query.filter_by(is_active=False).all()}
+        all_accounts = UserAccount.query.all()
+        accounts = {a.login: a.is_active for a in all_accounts}
+        disabled = {a.employee_id: a.login for a in all_accounts if not a.is_active}
 
         def login_of(employee_id):
             login = logins.get(employee_id) or disabled.get(employee_id, '')
             return login, bool(login) and accounts.get(login, True)
 
-        employees = [{
-            'employee_id': e.employee_id,
-            'full_name': e.full_name,
-            'job_title': e.job_title,
-            'department': e.department or '',
-            'iin': e.iin or '',
-            'login': login_of(e.employee_id)[0],
-            'login_active': login_of(e.employee_id)[1],
-            'payslip_count': payslip_counts.get(e.employee_id, 0),
-            'access_count': access_counts.get(e.employee_id, 0),
-            'leave_count': leave_counts.get(e.employee_id, 0),
-        } for e in Employee.query.order_by(Employee.full_name).all()]
+        employees = []
+        for e in Employee.query.order_by(Employee.full_name).all():
+            login, login_active = login_of(e.employee_id)
+            employees.append({
+                'employee_id': e.employee_id,
+                'full_name': e.full_name,
+                'job_title': e.job_title,
+                'department': e.department or '',
+                'iin': e.iin or '',
+                'login': login,
+                'login_active': login_active,
+                'payslip_count': payslip_counts.get(e.employee_id, 0),
+                'access_count': access_counts.get(e.employee_id, 0),
+                'leave_count': leave_counts.get(e.employee_id, 0),
+            })
 
         return jsonify({'message': 'Success', 'employees': employees})
 

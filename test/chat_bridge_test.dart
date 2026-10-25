@@ -58,6 +58,23 @@ void main() {
     expect(answer['ok'], isFalse);
   });
 
+  test('имя вложения не выводит за пределы папки', () {
+    expect(ChatBridge.safeFileName('../../shared_prefs/x.xml'), 'x.xml');
+    expect(ChatBridge.safeFileName(r'C:\Users\a\отчёт.pdf'), 'отчёт.pdf');
+    expect(ChatBridge.safeFileName('.hidden'), 'hidden');
+    expect(ChatBridge.safeFileName('a:b*c?.txt'), 'a_b_c_.txt');
+    expect(ChatBridge.safeFileName(''), 'файл');
+    expect(ChatBridge.safeFileName(null), 'файл');
+    final long = ChatBridge.safeFileName('${'я' * 300}.docx');
+    expect(long.length, 120);
+    expect(long, endsWith('.docx'));
+  });
+
+  test('пустое вложение отклоняется', () async {
+    final answer = await call('file.save', {'name': 'a.txt', 'data': ''});
+    expect(answer['ok'], isFalse);
+  });
+
   test('клиент чата в пакете собран для вкладки', () {
     final index = File('$kChatAssetDir/index.html');
     expect(index.existsSync(), isTrue, reason: 'tools/chat/build-chat.sh');

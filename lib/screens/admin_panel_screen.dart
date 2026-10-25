@@ -428,6 +428,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     final chatNote = switch (chat) {
       'disabled' || 'already' => 'account_chat_disabled'.tr,
       'failed' => 'account_chat_failed'.tr,
+      'privileged' => 'account_chat_privileged'.tr,
       _ => '',
     };
     Get.snackbar(
@@ -435,7 +436,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       [e.fullName, if (chatNote.isNotEmpty) chatNote].join('\n'),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
-      duration: Duration(seconds: chat == 'failed' ? 8 : 4),
+      duration: Duration(seconds: chat == 'failed' || chat == 'privileged' ? 8 : 4),
     );
     _load();
   }

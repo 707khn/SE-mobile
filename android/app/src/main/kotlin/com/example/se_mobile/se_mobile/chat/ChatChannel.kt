@@ -138,7 +138,7 @@ class ChatChannel(private val activity: Activity, messenger: BinaryMessenger) {
             // Некоторые прошивки прячут этот экран — открываем общий список.
             try {
                 activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-            } catch (_: Exception) {
+            } catch (ignored: Exception) {
             }
         }
     }

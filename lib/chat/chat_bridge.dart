@@ -1,7 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart' show InAppWebViewController, WebStorageManager;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/biometric.dart';
@@ -19,8 +25,9 @@ import 'chat_config.dart';
 ///
 /// Что сюда приходит: зашифрованные под ПИН ключи (как есть, расшифровать их
 /// здесь нечем), случайный секрет устройства для Keystore, токен канала
-/// уведомлений и число непрочитанных. Ни пароля чата, ни переписки, ни имён
-/// SE-mobile не видит — и на свой сервер ничего из этого не отправляет.
+/// уведомлений, число непрочитанных и вложение, которое сотрудник сам
+/// открыл. Ни пароля чата, ни переписки, ни имён SE-mobile не видит — и на
+/// свой сервер ничего из этого не отправляет.
 class ChatBridge {
   ChatBridge._();
 
@@ -126,6 +133,9 @@ class ChatBridge {
         await _invoke('requestBatteryExemption');
         return null;
 
+      case 'file.save':
+        return _openFile(args);
+
       case 'unread':
         final count = args['count'];
         unread.value = count is num && count > 0 ? count.toInt() : 0;
@@ -134,12 +144,16 @@ class ChatBridge {
     throw UnsupportedError('Неизвестный вызов: $method');
   }
 
-  /// Вкладка на виду: уведомление о новом сообщении не нужно, а снимок
-  /// экрана — запрещён.
+  /// Чат на экране: уведомление о новом сообщении не нужно.
   static Future<void> setVisible(bool visible) async {
     if (!chatEnabled) return;
     await _invoke('setChatVisible', {'visible': visible});
-    await _invoke('setSecure', {'secure': visible});
+  }
+
+  /// Пока выбрана вкладка «Чат», снимки и запись экрана запрещены.
+  static Future<void> setSecure(bool secure) async {
+    if (!chatEnabled) return;
+    await _invoke('setSecure', {'secure': secure});
   }
 
   /// Системная «Назад» на вкладке. true — чат обработал сам.
@@ -189,12 +203,73 @@ class ChatBridge {
         await _secure.delete(key: key);
       }
     } catch (_) {}
+    await _clearFiles();
     if (chatBackgroundNotifyAvailable) await _invoke('stop');
     // Сессия чата (refresh-токен) лежит в хранилище самой страницы.
     try {
       await WebStorageManager.instance().deleteAllData();
       await InAppWebViewController.clearAllCache();
     } catch (_) {}
+  }
+
+  /// Вложение из переписки, уже расшифрованное клиентом чата.
+  ///
+  /// Во встроенном браузере обычное «скачать» не работает: файл существует
+  /// только в памяти страницы. Поэтому клиент передаёт его сюда, а SE-mobile
+  /// открывает его в подходящей программе, а если такой нет — предлагает
+  /// «Поделиться» (сохранить в «Файлы», отправить себе).
+  ///
+  /// Лежит файл во временной папке приложения, и не дольше, чем нужно:
+  /// прежние стираются при следующем открытии и при выходе из SE-mobile.
+  static Future<Map<String, dynamic>> _openFile(Map<String, dynamic> args) async {
+    final data = args['data'];
+    if (data is! String || data.isEmpty) throw ArgumentError('Не передан файл');
+    // «Какие-то байты» — не подсказка: пусть программу выберет расширение.
+    final given = args['mime'] is String ? (args['mime'] as String).trim() : '';
+    final mime = given.isEmpty || given == 'application/octet-stream' ? null : given;
+
+    final root = await _filesDir();
+    await _clearFiles(root);
+    final dir = Directory('${root.path}/${DateTime.now().microsecondsSinceEpoch}');
+    await dir.create(recursive: true);
+    final file = File('${dir.path}/${safeFileName(args['name'])}');
+    await file.writeAsBytes(base64Decode(data), flush: true);
+
+    final opened = await OpenFile.open(file.path, type: mime);
+    if (opened.type == ResultType.done) return {'opened': true};
+    if (opened.type != ResultType.noAppToOpen) throw StateError('Не удалось открыть файл');
+    await Share.shareXFiles([XFile(file.path, mimeType: mime)]);
+    return {'opened': false, 'shared': true};
+  }
+
+  static Future<Directory> _filesDir() async =>
+      Directory('${(await getTemporaryDirectory()).path}/sechat-files');
+
+  static Future<void> _clearFiles([Directory? root]) async {
+    try {
+      final dir = root ?? await _filesDir();
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } catch (_) {
+      // Файл ещё открыт в другой программе — сотрётся в следующий раз.
+    }
+  }
+
+  /// Имя вложения пишет отправитель: от него остаётся только имя файла, без
+  /// пути и без знаков, которых не любит файловая система.
+  @visibleForTesting
+  static String safeFileName(Object? raw) {
+    var name = raw is String ? raw : '';
+    name = name.split(RegExp(r'[\\/]')).last;
+    name = name.replaceAll(RegExp(r'[\x00-\x1f:*?"<>|]'), '_').trim();
+    while (name.startsWith('.')) {
+      name = name.substring(1);
+    }
+    if (name.length > 120) {
+      final dot = name.lastIndexOf('.');
+      final ext = dot > 0 && name.length - dot <= 10 ? name.substring(dot) : '';
+      name = name.substring(0, 120 - ext.length) + ext;
+    }
+    return name.isEmpty ? 'файл' : name;
   }
 
   static String _key(Map<String, dynamic> args, String name) {

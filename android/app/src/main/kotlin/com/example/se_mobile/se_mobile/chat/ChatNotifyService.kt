@@ -8,6 +8,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -80,10 +82,17 @@ class ChatNotifyService : Service() {
                 .apply()
 
             val intent = Intent(context, ChatNotifyService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (denied: Exception) {
+                // Android 12+ не даёт запустить постоянную службу из фона, если
+                // приложение не исключено из экономии батареи. Настройки уже
+                // сохранены: служба поднимется при следующем открытии SE-mobile.
+                Log.w(TAG, "Служба уведомлений не запущена: ${denied.message}")
             }
         }
 
@@ -113,6 +122,12 @@ class ChatNotifyService : Service() {
     private var socket: WebSocket? = null
     private var reconnectDelay = RECONNECT_MIN_MS
     private var stopping = false
+    private val reconnect = Runnable { connect() }
+
+    /** Сеть, через которую сейчас идёт соединение, и была ли она потеряна. */
+    private var network: Network? = null
+    private var networkLost = false
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     /**
      * Номер поколения соединения. Закрытое соединение ещё какое-то время
@@ -129,6 +144,7 @@ class ChatNotifyService : Service() {
             .pingInterval(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
+        watchNetwork()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -149,6 +165,13 @@ class ChatNotifyService : Service() {
         stopping = true
         running = false
         handler.removeCallbacksAndMessages(null)
+        networkCallback?.let {
+            try {
+                getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(it)
+            } catch (ignored: Exception) {
+            }
+        }
+        networkCallback = null
         socket?.close(1000, "Служба остановлена")
         socket = null
         super.onDestroy()
@@ -160,6 +183,7 @@ class ChatNotifyService : Service() {
 
     private fun connect() {
         if (stopping) return
+        handler.removeCallbacks(reconnect)
 
         // Повторный запуск поверх работающей службы не должен давать второе
         // соединение: сигнал пришёл бы дважды.
@@ -180,9 +204,55 @@ class ChatNotifyService : Service() {
 
     private fun scheduleReconnect() {
         if (stopping) return
-        handler.postDelayed({ connect() }, reconnectDelay)
+        handler.removeCallbacks(reconnect)
+        handler.postDelayed(reconnect, reconnectDelay)
         // Постепенно реже: при долгом отсутствии сети не сажаем батарею.
         reconnectDelay = minOf(reconnectDelay * 2, RECONNECT_MAX_MS)
+    }
+
+    /**
+     * Сеть вернулась или сменилась (Wi-Fi предприятия → мобильный интернет) —
+     * переподключаемся сразу. Иначе после долгого отсутствия сети служба
+     * ждала бы до двух минут, а со сменой сети — пока пинг не заметит, что
+     * старое соединение мертво.
+     */
+    private fun watchNetwork() {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(available: Network) {
+                handler.post { onNetwork(available) }
+            }
+
+            override fun onLost(lost: Network) {
+                handler.post {
+                    if (lost == network) {
+                        network = null
+                        networkLost = true
+                    }
+                }
+            }
+        }
+        try {
+            manager.registerDefaultNetworkCallback(callback)
+            networkCallback = callback
+        } catch (unavailable: Exception) {
+            // Без подписки на сеть остаётся обычное переподключение с паузой.
+            Log.w(TAG, "Нет подписки на сеть: ${unavailable.message}")
+        }
+    }
+
+    private fun onNetwork(available: Network) {
+        val previous = network
+        network = available
+        if (stopping || available == previous) return
+        // Первый вызов сразу после подписки — о той сети, через которую
+        // соединение и так устанавливается.
+        val switched = previous != null || networkLost
+        networkLost = false
+        if (socket == null || switched) {
+            reconnectDelay = RECONNECT_MIN_MS
+            connect()
+        }
     }
 
     /** События OkHttp переносятся в главный поток: всё состояние живёт там. */

@@ -33,8 +33,9 @@ def offboard(login, initiated_by=''):
     """Сообщает чату об увольнении. Возвращает, что вышло.
 
     'disabled' — отключён сейчас, 'already' — уже был, 'unknown' — в чате
-    его нет, 'not_configured' — связка не настроена, 'failed' — чат не
-    ответил или отказал. Исключений не бросает: отключение здесь важнее и
+    его нет, 'privileged' — в чате он администратор или офицер ИБ (таких
+    чат по служебному токену не отключает), 'not_configured' — связка не
+    настроена, 'failed' — чат не ответил или отказал. Исключений не бросает: отключение здесь важнее и
     должно пройти, даже если чат недоступен, — а администратору ответ
     подскажет отключить человека в чате вручную.
     """
@@ -54,6 +55,9 @@ def offboard(login, initiated_by=''):
         with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
             status = json.loads(response.read() or b'{}').get('status')
     except urllib.error.HTTPError as e:
+        if e.code == 409:
+            logging.warning('В чате %r — администратор, отключать вручную', login)
+            return 'privileged'
         logging.warning('Чат отказал в отключении %r: HTTP %s', login, e.code)
         return 'failed'
     except Exception as e:      # сеть, DNS, сертификат, мусор в ответе

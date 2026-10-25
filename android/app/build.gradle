@@ -136,4 +136,7 @@ dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
     // WebSocket службы уведомлений чата (ChatNotifyService).
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    // NotificationCompat и ServiceCompat.startForeground с типом службы
+    // (Android 14) — не ниже 1.12; прежде приходило только через плагины.
+    implementation 'androidx.core:core:1.13.1'
 }

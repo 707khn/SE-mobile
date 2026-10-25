@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 
@@ -50,9 +51,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   late final Future<bool> _bundled = _hasBundle();
 
   InAppWebViewController? _controller;
+  Timer? _lockTimer;
   DateTime? _leftAt;
   bool _resumed = true;
-  bool _visible = false;
+  bool? _secure;
   bool? _dark;
   String? _loadError;
 
@@ -68,8 +70,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     ShellTab.selected.removeListener(_syncVisibility);
+    _lockTimer?.cancel();
     if (ChatBridge.controller == _controller) ChatBridge.controller = null;
     ChatBridge.setVisible(false);
+    ChatBridge.setSecure(false);
     super.dispose();
   }
 
@@ -82,11 +86,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Две разные вещи, и снимаются они в разное время.
+  ///
+  /// Запрет снимков держится, пока выбрана вкладка «Чат», — и когда
+  /// приложение свёрнуто тоже: миниатюру для списка недавних система снимает
+  /// как раз при сворачивании, и без запрета переписка была бы видна там.
+  ///
+  /// «Чат на виду» (уведомление о новом сообщении не нужно) — только пока
+  /// приложение на экране. Android сбрасывает его сам при уходе с экрана,
+  /// поэтому при возвращении отправляем заново, а не только при изменении.
   void _syncVisibility() {
-    final visible = _resumed && ShellTab.selected.value == ChatBridge.tabIndex;
-    if (visible == _visible) return;
-    _visible = visible;
-    ChatBridge.setVisible(visible);
+    final selected = ShellTab.selected.value == ChatBridge.tabIndex;
+    if (selected != _secure) {
+      _secure = selected;
+      ChatBridge.setSecure(selected);
+    }
+    ChatBridge.setVisible(selected && _resumed);
   }
 
   @override
@@ -95,23 +110,37 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
-        _leftAt ??= DateTime.now();
         _resumed = false;
+        if (_leftAt == null) {
+          _leftAt = DateTime.now();
+          // Ушли надолго — ключи стираются из памяти страницы, даже если
+          // сотрудник так и не вернётся.
+          _lockTimer?.cancel();
+          _lockTimer = Timer(_grace, _lock);
+        }
         break;
       case AppLifecycleState.resumed:
+        _lockTimer?.cancel();
         final left = _leftAt;
         _leftAt = null;
         _resumed = true;
-        if (left != null && DateTime.now().difference(left) >= _grace) {
-          // Перезагрузка страницы стирает ключи из её памяти: дальше —
-          // отпечаток или ПИН-код чата.
-          _controller?.reload();
-        }
+        // Таймер мог не сработать: Android замораживает свёрнутое приложение.
+        if (left != null && DateTime.now().difference(left) >= _grace) _lock();
         break;
       case AppLifecycleState.inactive:
+        _resumed = false;
         break;
     }
     _syncVisibility();
+  }
+
+  /// Перезагрузка страницы стирает ключи из её памяти: дальше — отпечаток
+  /// или ПИН-код чата.
+  void _lock() {
+    _lockTimer?.cancel();
+    _lockTimer = null;
+    _leftAt = null;
+    _controller?.reload();
   }
 
   @override

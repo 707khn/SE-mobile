@@ -158,7 +158,8 @@ Future<PasswordReset> resetPassword(String login) async {
 }
 
 /// Что стало с чатом после отключения учётной записи (см. chat_link.py на
-/// сервере): disabled, already, unknown, not_configured, failed или null.
+/// сервере): disabled, already, unknown, privileged, not_configured, failed
+/// или null.
 typedef AccountActiveResult = (bool ok, String? chat, LoadProblem? problem);
 
 /// Отключает учётную запись уволенного или включает обратно.

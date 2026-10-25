@@ -108,6 +108,19 @@ def test_chat_down_does_not_block_disabling(client, admin_headers, leaver, monke
         assert db.session.get(UserAccount, leaver).is_active is False
 
 
+def test_chat_admin_is_reported_not_failed(monkeypatch):
+    """Администратора чата служебный токен не отключает — и это не сбой связи."""
+    monkeypatch.setenv('CHAT_SERVICE_URL', 'https://chat.example')
+    monkeypatch.setenv('CHAT_SERVICE_TOKEN', 'service-token')
+
+    def conflict(request, timeout):
+        raise chat_link.urllib.error.HTTPError(
+            request.full_url, 409, 'Conflict', {}, io.BytesIO(b'{}'))
+
+    monkeypatch.setattr(chat_link.urllib.request, 'urlopen', conflict)
+    assert chat_link.offboard('1874') == 'privileged'
+
+
 def test_plain_http_chat_is_refused(monkeypatch):
     """Токен не уходит открытым текстом даже при ошибке в настройке."""
     monkeypatch.setenv('CHAT_SERVICE_URL', 'http://chat.example')
