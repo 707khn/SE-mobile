@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../requests/home_request.dart';
 import '../utils/app_update.dart';
+import '../utils/desktop.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
 import '../utils/notice_badge.dart';
@@ -124,6 +125,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   bool get _isAdmin => isSystemAdmin(widget.job);
+
+  /// Как ставить: apk — поверх, архив для компьютера — распаковать на место
+  /// прежнего, закрыв приложение (открытый SemEng.exe Windows не заменит).
+  String get _updateHint =>
+      isDesktop ? 'update_hint_pc'.tr : 'update_hint'.tr;
 
   // For Kazakh ФИО format (Фамилия Имя Отчество), the given name is the
   // second word. Fall back to the first word for single-word names.
@@ -388,8 +394,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 2),
                 Text(
                   update.sizeLabel.isEmpty
-                      ? 'update_hint'.tr
-                      : '${'update_hint'.tr} · ${update.sizeLabel}',
+                      ? _updateHint
+                      : '$_updateHint · ${update.sizeLabel}',
                   style: TextStyle(fontSize: 12, color: context.mutedColor),
                 ),
                 const SizedBox(height: 6),

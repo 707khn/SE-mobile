@@ -49,15 +49,15 @@ class AppUpdate {
   static Future<AppUpdate?> check() async {
     // Из Google Play обновляет только Play: своя загрузка apk там запрещена.
     if (kFromPlay) return null;
-    // На сервере лежит apk — компьютеру он ни к чему.
-    if (isDesktop) return null;
     try {
       final response = await http
           .get(Uri.parse('${AppValues.baseUrl}/api/app/latest'))
           .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) return null;
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final app = body['app'];
+      // Компьютеру — архив версии для Windows, телефону — apk: оба лежат
+      // на сервере рядом, и сервер называет каждый отдельно.
+      final app = body[isDesktop ? 'windows' : 'app'];
       if (app is! Map || app['available'] != true) return null;
 
       final build = (app['build'] as num?)?.toInt() ?? 0;

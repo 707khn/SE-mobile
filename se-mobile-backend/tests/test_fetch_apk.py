@@ -24,6 +24,8 @@ pytestmark = pytest.mark.skipif(
 
 APK = b'PK\x03\x04 fake apk ' * 1000
 NAME = 'se-mobile-1.20.0+60.apk'
+ZIP = b'PK\x03\x04 fake windows zip ' * 500
+ZIP_NAME = 'SemEng-windows-1.20.0+60.zip'
 
 
 class _GitHub(BaseHTTPRequestHandler):
@@ -64,6 +66,10 @@ class _GitHub(BaseHTTPRequestHandler):
             return self._send(302, headers=[('Location', '/blob/apk')])
         if self.path == '/blob/apk':
             return self._send(200, APK)
+        if self.path == '/assets/3':
+            return self._send(302, headers=[('Location', '/blob/zip')])
+        if self.path == '/blob/zip':
+            return self._send(200, ZIP)
         return self._send(404)
 
 
@@ -264,3 +270,47 @@ def test_server_understands_what_the_script_wrote(github, dirs, monkeypatch):
     seen = app_module._fetch_apk_state()
     assert seen['result'] == 'fail'
     assert seen['problem'].startswith('GitHub не принял токен')
+
+
+def _with_windows(github):
+    _GitHub.release['assets'].append(
+        {'name': ZIP_NAME, 'state': 'uploaded', 'url': f'{github}/assets/3',
+         'size': len(ZIP),
+         'digest': 'sha256:' + hashlib.sha256(ZIP).hexdigest()})
+
+
+def test_windows_archive_arrives_next_to_apk(github, dirs):
+    """Версия для компьютера едет тем же путём, со своим счётом сборок."""
+    apk_dir, state = dirs
+    _with_windows(github)
+    done = _run(github, dirs)
+    assert done.returncode == 0, done.stderr
+    assert _apks(apk_dir) == [ZIP_NAME, NAME]
+    assert (apk_dir / ZIP_NAME).read_bytes() == ZIP
+    assert (state / 'last-build-windows').read_text().strip() == '60'
+    assert 'компьютеры' in done.stdout
+    assert f'Забрана {NAME}; Забрана {ZIP_NAME}' in (state / 'status').read_text()
+
+    # Второй раз — ничего: обе уже есть.
+    again = _run(github, dirs)
+    assert again.returncode == 0 and again.stdout == ''
+
+
+def test_release_without_windows_keeps_the_old_archive(github, dirs):
+    """Архив собирается не с каждой версией: релиз без него — не повод
+    убирать прежний."""
+    apk_dir, _ = dirs
+    (apk_dir / 'SemEng-windows-1.19.0+59.zip').write_bytes(b'old')
+    assert _run(github, dirs).returncode == 0
+    assert _apks(apk_dir) == ['SemEng-windows-1.19.0+59.zip', NAME]
+
+
+def test_windows_archive_only_is_named_and_still_taken(github, dirs):
+    apk_dir, state = dirs
+    _GitHub.release['assets'] = [a for a in _GitHub.release['assets']
+                                 if not a['name'].endswith('.apk')]
+    _with_windows(github)
+    done = _run(github, dirs)
+    assert done.returncode == 0, done.stderr
+    assert 'нет APK' in done.stderr
+    assert _apks(apk_dir) == [ZIP_NAME]

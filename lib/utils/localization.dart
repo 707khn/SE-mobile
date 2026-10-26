@@ -136,6 +136,8 @@ class LocaleString extends Translations {
               'жасайды: сервер қайта іске қосылсын.',
           'update_available': 'Жаңа нұсқа: @version',
           'update_hint': 'Жүктеп алып, орнатыңыз',
+          'update_hint_pc': 'Жүктеп алып, қолданбаны жабыңыз да, мұрағатты '
+              'бұрынғы бумаға ауыстыра отырып ашыңыз',
           'update_download': 'Жүктеу',
           'later': 'Кейінірек',
           'rollout_outages': 'Сервердің іркілістері',
@@ -501,6 +503,8 @@ class LocaleString extends Translations {
               'не ноль — строку восстановит перезапуск сервера.',
           'update_available': 'Вышла версия @version',
           'update_hint': 'Скачайте и установите поверх',
+          'update_hint_pc': 'Скачайте, закройте приложение и распакуйте '
+              'архив в ту же папку с заменой файлов',
           'update_download': 'Скачать',
           'later': 'Позже',
           'rollout_outages': 'Перебои сервера',

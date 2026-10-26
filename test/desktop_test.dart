@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -10,10 +11,13 @@ import 'package:se_mobile/functions/export_file.dart';
 import 'package:se_mobile/functions/export_share.dart';
 import 'package:se_mobile/screens/it_request_form_screen.dart';
 import 'package:se_mobile/screens/pin_screen.dart';
+import 'package:se_mobile/utils/app_update.dart';
 import 'package:se_mobile/utils/biometric.dart';
 import 'package:se_mobile/utils/desktop.dart';
 import 'package:se_mobile/utils/localization.dart';
 import 'package:se_mobile/utils/secure_storage_helper.dart';
+
+import 'support/fake_server.dart';
 
 /// Версия для компьютера: то же приложение, но без того, чего у компьютера
 /// нет, — камеры, отпечатка, «Поделиться».
@@ -47,6 +51,58 @@ void main() {
 
   test('отпечатка на компьютере нет', () async {
     expect(await Biometric.instance.available(), isFalse);
+  });
+
+  group('обновление', () {
+    String answer(int build) => jsonEncode({
+          'message': 'Success',
+          'app': {
+            'available': true,
+            'version': '9.0.0',
+            'build': build,
+            'url': 'https://x/app/se-mobile-9.0.0+$build.apk',
+            'size': 1,
+          },
+          'windows': {
+            'available': true,
+            'version': '9.0.1',
+            'build': build + 1,
+            'url': 'https://x/app/SemEng-windows-9.0.1+${build + 1}.zip',
+            'size': 1,
+          },
+        });
+
+    test('компьютеру предлагают архив, а не apk', () async {
+      final server = FakeServer.routed(
+          (_, __, ___) => (200, answer(AppUpdate.currentBuild + 1)));
+      final update =
+          await HttpOverrides.runWithHttpOverrides(AppUpdate.check, server);
+      expect(update!.url, endsWith('.zip'));
+      expect(update.version, '9.0.1');
+    });
+
+    test('телефону — по-прежнему apk', () async {
+      debugDesktopOverride = false;
+      final server = FakeServer.routed(
+          (_, __, ___) => (200, answer(AppUpdate.currentBuild + 1)));
+      final update =
+          await HttpOverrides.runWithHttpOverrides(AppUpdate.check, server);
+      expect(update!.url, endsWith('.apk'));
+    });
+
+    test('архива на сервере нет — молчим', () async {
+      final server = FakeServer.routed((_, __, ___) => (
+            200,
+            jsonEncode({
+              'message': 'Success',
+              'app': {'available': true, 'build': 9999, 'url': 'u'},
+              'windows': {'available': false, 'reason': 'нет'},
+            })
+          ));
+      expect(
+          await HttpOverrides.runWithHttpOverrides(AppUpdate.check, server),
+          isNull);
+    });
   });
 
   Future<void> pump(WidgetTester tester, Widget home,
