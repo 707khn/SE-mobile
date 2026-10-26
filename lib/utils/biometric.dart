@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:local_auth/local_auth.dart';
 
+import 'desktop.dart';
+
 /// Отпечаток пальца (или лицо) вместо кода.
 ///
 /// Только как ускорение поверх кода: код остаётся, и если палец не читается —
@@ -31,6 +33,9 @@ class _LocalAuthBiometric implements Biometric {
 
   @override
   Future<bool> available() async {
+    // На компьютере отпечатка нет, а Windows Hello пускает и по ПИН-коду
+    // Windows — то есть ровно тем, что приложение просит не принимать.
+    if (isDesktop) return false;
     try {
       if (!await _auth.isDeviceSupported()) return false;
       final enrolled = await _auth.getAvailableBiometrics();

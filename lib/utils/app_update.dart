@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_version.dart';
+import 'desktop.dart';
 import 'store.dart';
 import 'variables.dart';
 
@@ -48,6 +49,8 @@ class AppUpdate {
   static Future<AppUpdate?> check() async {
     // Из Google Play обновляет только Play: своя загрузка apk там запрещена.
     if (kFromPlay) return null;
+    // На сервере лежит apk — компьютеру он ни к чему.
+    if (isDesktop) return null;
     try {
       final response = await http
           .get(Uri.parse('${AppValues.baseUrl}/api/app/latest'))

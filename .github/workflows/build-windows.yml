@@ -1,0 +1,73 @@
+name: Build Windows
+
+# Версия для компьютера: тот же код, что у телефона, собранный под Windows.
+# Готовый архив ложится в тот же релиз, что и APK этой версии, —
+# SemEng-windows-<версия>.zip: распаковать в любую папку и запустить
+# SemEng.exe. Установка не нужна, права администратора — тоже.
+#
+# Сама собирается только после правок окна Windows: минута машины Windows у
+# GitHub стоит вдвое дороже Linux, а каждая правка lib/ уже собирает APK.
+# Новую версию для компьютера после правок экранов — кнопкой «Run workflow».
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: 'stable'
+          cache: true
+
+      - run: flutter pub get --enforce-lockfile
+
+      # Сборка скачивает Firebase C++ SDK для Windows — большой архив: его
+      # тянет firebase_core, хотя на компьютере Firebase не поднимается.
+      # Отсюда и лишние минуты.
+      - name: Сборка
+        run: flutter build windows --release
+
+      - name: Упаковать
+        shell: pwsh
+        run: |
+          $pub = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(.+)$').Matches[0].Groups[1].Value).Trim()
+          $name = "SemEng-windows-$pub.zip"
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $name
+          Get-Item $name | Select-Object Name, Length
+          "PUB=$pub" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # В релиз той же версии, что и APK: v1.25.0-65 для 1.25.0+65. Релиза
+      # ещё нет (APK этой версии не собирался) — заводим.
+      - name: Выложить в Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${PUB/+/-}"
+          FILE="SemEng-windows-$PUB.zip"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$FILE" --clobber
+          else
+            gh release create "$TAG" "$FILE" \
+              --target "$GITHUB_SHA" --title "SE Mobile $PUB" \
+              --notes "Сборка из $GITHUB_SHA. ZIP — версия для Windows: распаковать и запустить SemEng.exe."
+          fi
+          echo "### Windows $PUB: https://github.com/${{ github.repository }}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

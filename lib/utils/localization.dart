@@ -105,6 +105,13 @@ class LocaleString extends Translations {
           'export_load_failed': 'Өтулер жүктелмеді:',
           'export_bad_period': 'Кезеңнің басы аяғынан кейін тұр',
           'export_all_sheet': 'Барлық деректер',
+          'export_saved_to': 'Файл сақталды: @path',
+          'open_folder': 'Буманы ашу',
+          'export_no_app_pc': 'Компьютерде бұл файлды ашатын бағдарлама жоқ',
+          'save report exc': 'Есепті Excel файлына сақтау',
+          'save report csv': 'Есепті CSV файлына сақтау',
+          'save_report_tooltip': 'Есепті сақтау',
+          'save_file': 'Файлды сақтау',
           'logging_in': 'Жүктелуде...',
           'loading_report': 'Есеп жүктелуде...',
           'url_error': 'Сілтемені ашу мүмкін болмады',
@@ -183,6 +190,8 @@ class LocaleString extends Translations {
           'pin_change_title': 'Кодты өзгерту',
           'pin_why': 'Бұдан әрі қолданбаға осы кодпен кіресіз — логин мен '
               'құпиясөз қажет болмайды. Код тек осы телефонда сақталады.',
+          'pin_why_pc': 'Бұдан әрі қолданбаға осы кодпен кіресіз — логин мен '
+              'құпиясөз қажет болмайды. Код тек осы компьютерде сақталады.',
           'pin_create_hint': '4 саннан тұратын код ойлап табыңыз',
           'pin_repeat_hint': 'Кодты қайталаңыз',
           'pin_unlock_hint': 'Кодты енгізіңіз',
@@ -461,6 +470,13 @@ class LocaleString extends Translations {
           'export_load_failed': 'Не загрузились проходы:',
           'export_bad_period': 'Начало периода позже его конца',
           'export_all_sheet': 'Все данные',
+          'export_saved_to': 'Файл сохранён: @path',
+          'open_folder': 'Открыть папку',
+          'export_no_app_pc': 'На компьютере нет программы, чтобы открыть этот файл',
+          'save report exc': 'Сохранить отчёт Excel',
+          'save report csv': 'Сохранить отчёт CSV',
+          'save_report_tooltip': 'Сохранить отчёт',
+          'save_file': 'Сохранить файл',
           'logging_in': 'Загрузка...',
           'loading_report': 'Загрузка отчёта...',
           'url_error': 'Не удалось открыть ссылку',
@@ -541,6 +557,9 @@ class LocaleString extends Translations {
           'pin_why': 'Дальше приложение будет открываться по этому коду — '
               'логин и пароль вводить не придётся. Код хранится только на '
               'этом телефоне.',
+          'pin_why_pc': 'Дальше приложение будет открываться по этому коду — '
+              'логин и пароль вводить не придётся. Код хранится только на '
+              'этом компьютере.',
           'pin_create_hint': 'Придумайте код из 4 цифр',
           'pin_repeat_hint': 'Повторите код',
           'pin_unlock_hint': 'Введите код',
