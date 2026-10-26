@@ -65,6 +65,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
           std::max(0, static_cast<int>(work.top / scale) +
                           (work_height - height) / 2)));
   Win32Window::Size size(width, height);
+  FlutterWindow window(project);
   if (!window.Create(L"SemEng", origin, size)) {
     return EXIT_FAILURE;
   }
