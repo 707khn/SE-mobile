@@ -45,17 +45,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
-  // Окно — высокое и узкое, как телефон на столе: все экраны свёрстаны под
-  // телефон в руке. Высота — сколько позволяет экран без панели задач, но не
-  // больше 900 точек; ставим посередине основного монитора. Растянуть или
-  // развернуть окно можно — тогда содержимое встанет колонкой посередине.
+  // Окно — 900 × 900 точек, если позволяет экран без панели задач, и
+  // посередине основного монитора: слева вкладки, справа колонка экрана,
+  // свёрстанного под телефон. Развернуть окно можно — колонка встанет
+  // посередине; сузить — вкладки уйдут вниз, как на телефоне.
   RECT work;
   ::SystemParametersInfo(SPI_GETWORKAREA, 0, &work, 0);
   HMONITOR monitor = ::MonitorFromPoint({0, 0}, MONITOR_DEFAULTTOPRIMARY);
   const double scale = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
   const int work_width = static_cast<int>((work.right - work.left) / scale);
   const int work_height = static_cast<int>((work.bottom - work.top) / scale);
-  const int width = 520;
+  const int width = std::max(380, std::min(900, work_width - 40));
   const int height = std::max(560, std::min(900, work_height - 60));
   Win32Window::Point origin(
       static_cast<unsigned int>(

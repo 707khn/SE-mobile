@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:se_mobile/functions/export_file.dart';
 import 'package:se_mobile/functions/export_share.dart';
+import 'package:se_mobile/screens/home_shell.dart';
 import 'package:se_mobile/screens/it_request_form_screen.dart';
 import 'package:se_mobile/screens/pin_screen.dart';
 import 'package:se_mobile/utils/app_update.dart';
@@ -241,5 +242,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('окно'), findsNothing);
     expect(find.text('страница'), findsOneWidget);
+  });
+
+  testWidgets('вкладки на компьютере — слева, на узком окне — внизу',
+      (tester) async {
+    await pump(tester, const HomeShell(fullName: 'Иванов Иван', job: 'Инженер'),
+        size: const Size(1400, 900));
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(BottomNavigationBar), findsNothing);
+
+    await pump(tester, const HomeShell(fullName: 'Иванов Иван', job: 'Инженер'),
+        size: const Size(500, 900));
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
   });
 }
