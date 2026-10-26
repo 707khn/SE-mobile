@@ -76,6 +76,10 @@ Future<void> loginToAccount(
     attempt = await _attemptLogin(login, password);
   }
 
+  // Пока шёл запрос (до полутора минут с повтором), человек мог уйти с
+  // экрана входа — показывать ошибку тогда не на чем.
+  if (attempt.result != _Result.success && !context.mounted) return;
+
   switch (attempt.result) {
     case _Result.success:
       final body = attempt.body!;
