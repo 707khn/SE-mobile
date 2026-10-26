@@ -15,6 +15,7 @@ import 'package:se_mobile/utils/app_update.dart';
 import 'package:se_mobile/utils/biometric.dart';
 import 'package:se_mobile/utils/desktop.dart';
 import 'package:se_mobile/utils/localization.dart';
+import 'package:se_mobile/utils/open_external.dart';
 import 'package:se_mobile/utils/secure_storage_helper.dart';
 
 import 'support/fake_server.dart';
@@ -150,6 +151,30 @@ void main() {
 
     expect(copied, 'Отпуск: 24 дня');
     expect(find.text('Скопировано'), findsOneWidget);
+  });
+
+  testWidgets('номер телефона копируется, а не набирается', (tester) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+
+    late BuildContext context;
+    await pump(tester, Scaffold(body: Builder(builder: (c) {
+      context = c;
+      return const SizedBox.shrink();
+    })));
+    await openExternal(context, 'tel:+77222123456');
+    await tester.pump();
+
+    expect(copied, '+77222123456');
+    expect(find.text('Номер скопирован: +77222123456'), findsOneWidget);
   });
 
   testWidgets('на широком окне — колонка посередине', (tester) async {
