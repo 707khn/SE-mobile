@@ -55,6 +55,16 @@ jobs:
           Get-Item $name | Select-Object Name, Length
           "PUB=$pub" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      # Установщик: ярлык в «Пуске», установка без прав администратора,
+      # новая версия — поверх (windows/installer/SemEng.iss). Inno Setup на
+      # машине GitHub не стоит — ставим.
+      - name: Установщик
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:PUB" windows\installer\SemEng.iss
+          Get-ChildItem build\installer | Select-Object Name, Length
+
       # В релиз той же версии, что и APK: v1.25.0-65 для 1.25.0+65. Релиза
       # ещё нет (APK этой версии не собирался) — заводим.
       - name: Выложить в Releases
@@ -63,11 +73,12 @@ jobs:
         run: |
           TAG="v${PUB/+/-}"
           FILE="SemEng-windows-$PUB.zip"
+          SETUP="build/installer/SemEng-setup-$PUB.exe"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$FILE" --clobber
+            gh release upload "$TAG" "$FILE" "$SETUP" --clobber
           else
-            gh release create "$TAG" "$FILE" \
+            gh release create "$TAG" "$FILE" "$SETUP" \
               --target "$GITHUB_SHA" --title "SE Mobile $PUB" \
-              --notes "Сборка из $GITHUB_SHA. ZIP — версия для Windows: распаковать и запустить SemEng.exe."
+              --notes "Сборка из $GITHUB_SHA. Версия для Windows: SemEng-setup — установщик, ZIP — распаковать и запустить SemEng.exe."
           fi
           echo "### Windows $PUB: https://github.com/${{ github.repository }}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

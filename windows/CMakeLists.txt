@@ -106,3 +106,13 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Библиотеки Visual C++ (vcruntime140.dll, msvcp140.dll…) — рядом с exe.
+# Без них на компьютере, где не ставили «Visual C++ Redistributable», SemEng
+# не запускается вовсе: Windows говорит «не найден VCRUNTIME140_1.dll», и
+# человеку с этим не справиться. Библиотеки разрешено раздавать вместе с
+# программой.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${INSTALL_BUNDLE_LIB_DIR}")
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT Runtime)
+set(CMAKE_INSTALL_UCRT_LIBRARIES FALSE)
+include(InstallRequiredSystemLibraries)
