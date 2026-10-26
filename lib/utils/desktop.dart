@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 
 /// Приложение запущено на компьютере, а не на телефоне.
 ///
@@ -74,4 +75,60 @@ class DesktopScrollBehavior extends MaterialScrollBehavior {
         PointerDeviceKind.mouse,
         PointerDeviceKind.trackpad,
       };
+}
+
+/// Esc на компьютере — «назад», как кнопка «назад» на телефоне.
+///
+/// В поле ввода первый Esc только выводит из поля: иначе человек, набравший
+/// половину заявки, одним нажатием терял бы весь текст. Открытое окно или
+/// меню — тоже маршрут, и «назад» закрывает сначала его.
+///
+/// Своё намерение, а не DismissIntent: тот на обычной странице перехватывает
+/// сам маршрут — и, раз «закрыть по фону» у страницы нет, ничего не делает.
+class DesktopBackIntent extends Intent {
+  const DesktopBackIntent();
+}
+
+class DesktopBackAction extends Action<DesktopBackIntent> {
+  DesktopBackAction(this.navigator);
+
+  final NavigatorState? Function() navigator;
+
+  @override
+  Object? invoke(DesktopBackIntent intent) {
+    final focused = FocusManager.instance.primaryFocus;
+    final editing = focused?.context
+            ?.findAncestorWidgetOfExactType<EditableText>() !=
+        null;
+    if (editing) {
+      focused!.unfocus();
+      return null;
+    }
+    navigator()?.maybePop();
+    return null;
+  }
+}
+
+/// Клавиши приложения на компьютере: Esc — «назад».
+///
+/// Ставится над навигатором (в builder приложения), так что клавиша доходит
+/// сюда с любой страницы и из любого окна.
+class DesktopKeys extends StatelessWidget {
+  const DesktopKeys({super.key, required this.navigator, required this.child});
+
+  final NavigatorState? Function() navigator;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.escape): DesktopBackIntent(),
+      },
+      child: Actions(
+        actions: {DesktopBackIntent: DesktopBackAction(navigator)},
+        child: child,
+      ),
+    );
+  }
 }

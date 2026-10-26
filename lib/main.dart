@@ -127,8 +127,8 @@ class MyApp extends StatelessWidget {
       // often enlarge it — but cap the growth, since the denser screens
       // (payslip totals, turnstile rows) start overflowing beyond this.
       //
-      // На компьютере содержимое ещё и стоит колонкой посередине окна: см.
-      // DesktopFrame.
+      // На компьютере содержимое ещё и стоит колонкой посередине окна (см.
+      // DesktopFrame), а Esc работает как «назад».
       builder: (context, child) {
         final media = MediaQuery.of(context);
         final scaled = MediaQuery(
@@ -138,7 +138,12 @@ class MyApp extends StatelessWidget {
           ),
           child: child ?? const SizedBox.shrink(),
         );
-        return isDesktop ? DesktopFrame(child: scaled) : scaled;
+        if (!isDesktop) return scaled;
+        // Esc — «назад».
+        return DesktopKeys(
+          navigator: () => Get.key.currentState,
+          child: DesktopFrame(child: scaled),
+        );
       },
       home: FutureBuilder<Map<String, String?>>(
         future: authCheck(),

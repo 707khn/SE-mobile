@@ -183,4 +183,38 @@ void main() {
     expect(find.text('pin_repeat_hint'.tr), findsOneWidget);
     expect(await SecureStorageHelper.instance.hasPin(), isFalse);
   });
+
+  testWidgets('Esc — назад, а из поля ввода сначала выводит', (tester) async {
+    tester.view.physicalSize = const Size(600, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(GetMaterialApp(
+      builder: (context, child) =>
+          DesktopKeys(navigator: () => Get.key.currentState, child: child!),
+      home: const Scaffold(body: Text('главная')),
+    ));
+    Get.to(() => const Scaffold(body: TextField(key: Key('field'))));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('field')));
+    await tester.enterText(find.byKey(const Key('field')), 'Не печатает');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('Не печатает'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('главная'), findsOneWidget);
+    expect(find.byKey(const Key('field')), findsNothing);
+
+    // Окно поверх страницы закрывается первым.
+    Get.to(() => const Scaffold(body: Text('страница')));
+    await tester.pumpAndSettle();
+    Get.dialog(const AlertDialog(content: Text('окно')));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('окно'), findsNothing);
+    expect(find.text('страница'), findsOneWidget);
+  });
 }
