@@ -150,6 +150,7 @@ class LocaleString extends Translations {
           'rollout_apk': 'Серверде жатқан жинақ',
           'rollout_apk_on_server': 'Жүктеуге дайын',
           'rollout_apk_none': 'Серверде жинақ жоқ',
+          'rollout_windows_on_server': 'Компьютерге арналған нұсқа',
           'rollout_apk_why': 'Жинақ серверде жатпаса, қызметкерлердің '
               'жаңартатын жері жоқ — ал жаңартылмағанша міндетті тексеруді '
               'қосуға болмайды.',
@@ -518,6 +519,7 @@ class LocaleString extends Translations {
           'rollout_apk': 'Сборка на сервере',
           'rollout_apk_on_server': 'Готова к скачиванию',
           'rollout_apk_none': 'Сборки на сервере нет',
+          'rollout_windows_on_server': 'Версия для компьютера',
           'rollout_apk_why': 'Пока сборки на сервере нет, сотрудникам '
               'обновляться неоткуда, а пока они не обновились, нельзя включить '
               'обязательную проверку пропуска.',

@@ -110,6 +110,10 @@ class RolloutReport {
   /// Почему её нет.
   String appProblem = '';
 
+  /// Архив версии для компьютера на сервере: «1.26.0 (66)» или пусто —
+  /// тогда строки на экране нет вовсе: версия для компьютера нужна не всем.
+  String windowsOnServer = '';
+
   /// Почему новые сборки не приезжают из GitHub Releases сами: истёк токен,
   /// таймер не запускается. Пусто — приезжают.
   String fetchProblem = '';
@@ -187,6 +191,10 @@ Future<RolloutReport> fetchRollout() async {
     report.appOnServer = '${app['version']} (${app['build']})';
   } else {
     report.appProblem = (app['reason'] as String?) ?? '';
+  }
+  final windows = (body['windows'] as Map?) ?? {};
+  if (windows['available'] == true) {
+    report.windowsOnServer = '${windows['version']} (${windows['build']})';
   }
   final fetch = (body['fetch_apk'] as Map?) ?? {};
   report.fetchProblem = (fetch['problem'] as String?) ?? '';

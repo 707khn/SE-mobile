@@ -96,6 +96,8 @@ class _RolloutScreenState extends State<RolloutScreen> {
       else
         _line(r.appProblem.isEmpty ? 'rollout_apk_none'.tr : r.appProblem, '',
             muted: true),
+      if (r.windowsOnServer.isNotEmpty)
+        _line('rollout_windows_on_server'.tr, r.windowsOnServer),
       if (r.fetchProblem.isNotEmpty) _line(r.fetchProblem, ''),
       SizedBox(height: Dimensions.height30 / 2),
       Text('rollout_apk_why'.tr,

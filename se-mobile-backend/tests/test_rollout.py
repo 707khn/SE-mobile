@@ -185,3 +185,12 @@ def test_fetch_apk_never_ran_is_shown(app, client, tmp_path, monkeypatch):
     assert answer.status_code == 200
     state = answer.get_json()['fetch_apk']
     assert not state['available'] and 'ни разу' in state['problem']
+
+
+def test_windows_archive_is_shown_next_to_apk(app, client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module, '_APK_DIR', str(tmp_path))
+    (tmp_path / 'SemEng-windows-1.26.0+66.zip').write_bytes(b'zip')
+    report = client.get('/api/admin/rollout', headers=_ADMIN).get_json()
+    assert report['windows']['available'] is True
+    assert report['windows']['build'] == 66
+    assert report['app']['available'] is False
