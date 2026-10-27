@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:share_plus/share_plus.dart';
-
+import '../functions/export_share.dart';
+import '../utils/desktop.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_update.dart';
 import '../utils/app_version.dart';
@@ -65,9 +65,9 @@ class _AboutScreenState extends State<AboutScreen> {
         title: Text('about_title'.tr),
         actions: [
           IconButton(
-            tooltip: 'about_share'.tr,
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () => Share.share(_report),
+            tooltip: isDesktop ? 'copy'.tr : 'about_share'.tr,
+            icon: Icon(isDesktop ? Icons.copy : Icons.share_outlined),
+            onPressed: () => shareText(context, _report),
           ),
         ],
       ),

@@ -246,12 +246,12 @@ class _MainPage2State extends State<MainPage2> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white),
                   )
-                : const Icon(Icons.share),
+                : Icon(exportIcon),
             enabled: employees.isNotEmpty && !_exporting,
-            tooltip: 'send_report_tooltip'.tr,
+            tooltip: exportLabel('send_report_tooltip'),
             itemBuilder: (_) => [
-              PopupMenuItem(value: 'send report exc', child: Text('send report exc'.tr)),
-              PopupMenuItem(value: 'send report csv', child: Text('send report csv'.tr)),
+              PopupMenuItem(value: 'send report exc', child: Text(exportLabel('send report exc'))),
+              PopupMenuItem(value: 'send report csv', child: Text(exportLabel('send report csv'))),
             ],
             onSelected: _export,
           ),

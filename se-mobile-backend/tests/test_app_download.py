@@ -90,3 +90,27 @@ def test_asking_about_the_build_needs_no_pass(app, client, tmp_path, monkeypatch
     answer = client.get('/api/app/latest')
     assert answer.status_code == 200
     assert answer.get_json()['app']['build'] == 20
+
+
+def test_the_windows_archive_is_offered_separately(app, client, tmp_path, monkeypatch):
+    """Версия для компьютера лежит рядом с APK, но телефону её не предлагают,
+    а компьютеру — APK."""
+    monkeypatch.setattr(app_module, '_APK_DIR', str(tmp_path))
+    _put(tmp_path, 'se-mobile-1.26.0+66.apk')
+    _put(tmp_path, 'SemEng-windows-1.25.0+65.zip')
+    _put(tmp_path, 'SemEng-windows-1.26.0+66.zip', size=2048)
+
+    body = client.get('/api/app/latest').get_json()
+    assert body['app']['file'] == 'se-mobile-1.26.0+66.apk'
+    windows = body['windows']
+    assert windows['available'] is True
+    assert windows['build'] == 66 and windows['version'] == '1.26.0'
+    assert windows['url'].endswith('/app/SemEng-windows-1.26.0+66.zip')
+    assert windows['size'] == 2048
+
+
+def test_no_windows_archive_is_said_plainly(app, client, tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module, '_APK_DIR', str(tmp_path))
+    _put(tmp_path, 'se-mobile-1.26.0+66.apk')
+    windows = client.get('/api/app/latest').get_json()['windows']
+    assert windows['available'] is False and 'SemEng-windows' in windows['reason']

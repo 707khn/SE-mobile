@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/pin_screen.dart';
 import 'utils/api.dart';
 import 'utils/app_lock.dart';
+import 'utils/desktop.dart';
 import 'utils/error_log.dart';
 import 'utils/lang.dart';
 import 'utils/secure_storage_helper.dart';
@@ -41,7 +42,11 @@ void main() {
     // лёжа набок, например, клавиатура кода не помещалась по высоте — ноль
     // и «стереть» уходили за край. Android держит то же самое в манифесте,
     // чтобы экран не повернулся и до старта Flutter.
-    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    //
+    // У окна на компьютере ориентации нет — там и спрашивать нечего.
+    if (!isDesktop) {
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
 
     // Ошибку, из-за которой приложение упало у человека в цехе, иначе не
     // узнать: телефон к отладчику не подключишь. Записываем на месте, читаем
@@ -59,11 +64,15 @@ void main() {
     await Lang.initDates();
     await initializeSharedPreferences();
 
-    try {
-      await Firebase.initializeApp();
-      FcmService.setupForegroundHandler();
-    } catch (_) {
-      // Firebase not configured yet — app works without push notifications
+    // На компьютере уведомлений Firebase нет: настроен он только под
+    // Android и iPhone, а без настройки на Windows подъём лишь ждёт отказа.
+    if (!isDesktop) {
+      try {
+        await Firebase.initializeApp();
+        FcmService.setupForegroundHandler();
+      } catch (_) {
+        // Firebase not configured yet — app works without push notifications
+      }
     }
 
     // Следим, сколько приложение пролежало в фоне: вернулись позже пяти
@@ -112,17 +121,28 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       // По умолчанию — как в телефоне; выбор переопределяется в боковом меню.
       themeMode: ThemePref.read(prefs),
+      // Мышью на компьютере страницы можно и перетаскивать, как пальцем.
+      scrollBehavior: isDesktop ? const DesktopScrollBehavior() : null,
       // Honour the phone's text-size setting — warehouse and canteen staff
       // often enlarge it — but cap the growth, since the denser screens
       // (payslip totals, turnstile rows) start overflowing beyond this.
+      //
+      // На компьютере содержимое ещё и стоит колонкой посередине окна (см.
+      // DesktopFrame), а Esc работает как «назад».
       builder: (context, child) {
         final media = MediaQuery.of(context);
-        return MediaQuery(
+        final scaled = MediaQuery(
           data: media.copyWith(
             textScaler: media.textScaler
                 .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.3),
           ),
           child: child ?? const SizedBox.shrink(),
+        );
+        if (!isDesktop) return scaled;
+        // Esc — «назад».
+        return DesktopKeys(
+          navigator: () => Get.key.currentState,
+          child: DesktopFrame(child: scaled),
         );
       },
       home: FutureBuilder<Map<String, String?>>(

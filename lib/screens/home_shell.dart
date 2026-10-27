@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import '../services/fcm_service.dart';
 import '../utils/colors.dart';
+import '../utils/desktop.dart';
 import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/shell_tab.dart';
@@ -116,12 +117,17 @@ class _HomeShellState extends State<HomeShell> {
         if (didPop) return;
         if (_selectedIndex != 0) {
           ShellTab.open(0);
-        } else {
+        } else if (!isDesktop) {
+          // На компьютере «назад» — это Esc, и на главной он не должен
+          // закрывать окно: SystemNavigator.pop там завершает приложение.
           SystemNavigator.pop();
         }
       },
-      child: Scaffold(
-        body: IndexedStack(
+      child: LayoutBuilder(builder: (context, box) {
+        // На компьютере вкладки — слева, как в любой программе для
+        // компьютера: нижняя панель на мониторе далеко от глаз и от мыши.
+        final rail = isDesktop && !_isAdmin && box.maxWidth >= 600;
+        final stack = IndexedStack(
           index: _selectedIndex,
           children: [
             for (var i = 0; i < 5; i++)
@@ -130,59 +136,89 @@ class _HomeShellState extends State<HomeShell> {
                   // Ещё не открывали — и в сеть за ней не ходим.
                   : const SizedBox.shrink(),
           ],
-        ),
-        bottomNavigationBar: _isAdmin
-            ? null
-            : Container(
-          decoration: BoxDecoration(
-            color: context.cardSurface,
-            boxShadow: context.cardShadow,
+        );
+        return Scaffold(
+          body: rail
+              ? Row(
+                  children: [
+                    _rail(context),
+                    VerticalDivider(width: 1, color: context.hairlineColor),
+                    Expanded(child: stack),
+                  ],
+                )
+              : stack,
+          bottomNavigationBar: _isAdmin || rail ? null : _bottomBar(context),
+        );
+      }),
+    );
+  }
+
+  static const List<(IconData, IconData, String)> _destinations = [
+    (Icons.home_outlined, Icons.home, 'tab_home'),
+    (Icons.sensor_door_outlined, Icons.sensor_door, 'tab_turnstile'),
+    (Icons.receipt_long_outlined, Icons.receipt_long, 'tab_payslip'),
+    (Icons.beach_access_outlined, Icons.beach_access, 'tab_leave'),
+    (Icons.restaurant_menu_outlined, Icons.restaurant_menu, 'tab_menu'),
+  ];
+
+  void _select(int index) {
+    if (index != _selectedIndex) HapticFeedback.selectionClick();
+    _navigateTo(index);
+  }
+
+  Widget _rail(BuildContext context) {
+    return NavigationRail(
+      selectedIndex: _selectedIndex,
+      onDestinationSelected: _select,
+      labelType: NavigationRailLabelType.all,
+      backgroundColor: context.cardSurface,
+      indicatorColor: AppColors.mainColor.withValues(alpha: 0.14),
+      selectedIconTheme: const IconThemeData(color: AppColors.mainColor),
+      unselectedIconTheme: IconThemeData(color: context.mutedColor),
+      selectedLabelTextStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AppColors.mainColor),
+      unselectedLabelTextStyle:
+          TextStyle(fontSize: 12, color: context.mutedColor),
+      destinations: [
+        for (final (icon, active, label) in _destinations)
+          NavigationRailDestination(
+            icon: Icon(icon),
+            selectedIcon: Icon(active),
+            label: Text(label.tr),
           ),
-          child: SafeArea(
-            top: false,
-            child: BottomNavigationBar(
-              currentIndex: _selectedIndex,
-              onTap: (index) {
-                if (index != _selectedIndex) HapticFeedback.selectionClick();
-                _navigateTo(index);
-              },
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: context.cardSurface,
-              elevation: 0,
-              selectedItemColor: AppColors.mainColor,
-              unselectedItemColor: context.mutedColor,
-              selectedFontSize: 11,
-              unselectedFontSize: 11,
-              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-              items: [
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.home_outlined),
-                  activeIcon: const Icon(Icons.home),
-                  label: 'tab_home'.tr,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.sensor_door_outlined),
-                  activeIcon: const Icon(Icons.sensor_door),
-                  label: 'tab_turnstile'.tr,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  activeIcon: const Icon(Icons.receipt_long),
-                  label: 'tab_payslip'.tr,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.beach_access_outlined),
-                  activeIcon: const Icon(Icons.beach_access),
-                  label: 'tab_leave'.tr,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.restaurant_menu_outlined),
-                  activeIcon: const Icon(Icons.restaurant_menu),
-                  label: 'tab_menu'.tr,
-                ),
-              ],
-            ),
-          ),
+      ],
+    );
+  }
+
+  Widget _bottomBar(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        boxShadow: context.cardShadow,
+      ),
+      child: SafeArea(
+        top: false,
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _select,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: context.cardSurface,
+          elevation: 0,
+          selectedItemColor: AppColors.mainColor,
+          unselectedItemColor: context.mutedColor,
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+          items: [
+            for (final (icon, active, label) in _destinations)
+              BottomNavigationBarItem(
+                icon: Icon(icon),
+                activeIcon: Icon(active),
+                label: label.tr,
+              ),
+          ],
         ),
       ),
     );

@@ -105,6 +105,14 @@ class LocaleString extends Translations {
           'export_load_failed': 'Өтулер жүктелмеді:',
           'export_bad_period': 'Кезеңнің басы аяғынан кейін тұр',
           'export_all_sheet': 'Барлық деректер',
+          'export_saved_to': 'Файл сақталды: @path',
+          'open_folder': 'Буманы ашу',
+          'export_no_app_pc': 'Компьютерде бұл файлды ашатын бағдарлама жоқ',
+          'save report exc': 'Есепті Excel файлына сақтау',
+          'save report csv': 'Есепті CSV файлына сақтау',
+          'save_report_tooltip': 'Есепті сақтау',
+          'save_file': 'Файлды сақтау',
+          'phone_copied': 'Нөмір көшірілді: @number',
           'logging_in': 'Жүктелуде...',
           'loading_report': 'Есеп жүктелуде...',
           'url_error': 'Сілтемені ашу мүмкін болмады',
@@ -129,6 +137,8 @@ class LocaleString extends Translations {
               'жасайды: сервер қайта іске қосылсын.',
           'update_available': 'Жаңа нұсқа: @version',
           'update_hint': 'Жүктеп алып, орнатыңыз',
+          'update_hint_pc': 'Жүктеп алып, қолданбаны жабыңыз да, мұрағатты '
+              'бұрынғы бумаға ауыстыра отырып ашыңыз',
           'update_download': 'Жүктеу',
           'later': 'Кейінірек',
           'rollout_outages': 'Сервердің іркілістері',
@@ -140,6 +150,7 @@ class LocaleString extends Translations {
           'rollout_apk': 'Серверде жатқан жинақ',
           'rollout_apk_on_server': 'Жүктеуге дайын',
           'rollout_apk_none': 'Серверде жинақ жоқ',
+          'rollout_windows_on_server': 'Компьютерге арналған нұсқа',
           'rollout_apk_why': 'Жинақ серверде жатпаса, қызметкерлердің '
               'жаңартатын жері жоқ — ал жаңартылмағанша міндетті тексеруді '
               'қосуға болмайды.',
@@ -183,6 +194,8 @@ class LocaleString extends Translations {
           'pin_change_title': 'Кодты өзгерту',
           'pin_why': 'Бұдан әрі қолданбаға осы кодпен кіресіз — логин мен '
               'құпиясөз қажет болмайды. Код тек осы телефонда сақталады.',
+          'pin_why_pc': 'Бұдан әрі қолданбаға осы кодпен кіресіз — логин мен '
+              'құпиясөз қажет болмайды. Код тек осы компьютерде сақталады.',
           'pin_create_hint': '4 саннан тұратын код ойлап табыңыз',
           'pin_repeat_hint': 'Кодты қайталаңыз',
           'pin_unlock_hint': 'Кодты енгізіңіз',
@@ -461,6 +474,14 @@ class LocaleString extends Translations {
           'export_load_failed': 'Не загрузились проходы:',
           'export_bad_period': 'Начало периода позже его конца',
           'export_all_sheet': 'Все данные',
+          'export_saved_to': 'Файл сохранён: @path',
+          'open_folder': 'Открыть папку',
+          'export_no_app_pc': 'На компьютере нет программы, чтобы открыть этот файл',
+          'save report exc': 'Сохранить отчёт Excel',
+          'save report csv': 'Сохранить отчёт CSV',
+          'save_report_tooltip': 'Сохранить отчёт',
+          'save_file': 'Сохранить файл',
+          'phone_copied': 'Номер скопирован: @number',
           'logging_in': 'Загрузка...',
           'loading_report': 'Загрузка отчёта...',
           'url_error': 'Не удалось открыть ссылку',
@@ -485,6 +506,8 @@ class LocaleString extends Translations {
               'не ноль — строку восстановит перезапуск сервера.',
           'update_available': 'Вышла версия @version',
           'update_hint': 'Скачайте и установите поверх',
+          'update_hint_pc': 'Скачайте, закройте приложение и распакуйте '
+              'архив в ту же папку с заменой файлов',
           'update_download': 'Скачать',
           'later': 'Позже',
           'rollout_outages': 'Перебои сервера',
@@ -496,6 +519,7 @@ class LocaleString extends Translations {
           'rollout_apk': 'Сборка на сервере',
           'rollout_apk_on_server': 'Готова к скачиванию',
           'rollout_apk_none': 'Сборки на сервере нет',
+          'rollout_windows_on_server': 'Версия для компьютера',
           'rollout_apk_why': 'Пока сборки на сервере нет, сотрудникам '
               'обновляться неоткуда, а пока они не обновились, нельзя включить '
               'обязательную проверку пропуска.',
@@ -541,6 +565,9 @@ class LocaleString extends Translations {
           'pin_why': 'Дальше приложение будет открываться по этому коду — '
               'логин и пароль вводить не придётся. Код хранится только на '
               'этом телефоне.',
+          'pin_why_pc': 'Дальше приложение будет открываться по этому коду — '
+              'логин и пароль вводить не придётся. Код хранится только на '
+              'этом компьютере.',
           'pin_create_hint': 'Придумайте код из 4 цифр',
           'pin_repeat_hint': 'Повторите код',
           'pin_unlock_hint': 'Введите код',
