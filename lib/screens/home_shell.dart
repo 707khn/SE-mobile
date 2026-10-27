@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../services/fcm_service.dart';
-import '../utils/colors.dart';
 import '../utils/desktop.dart';
 import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
@@ -14,6 +13,7 @@ import 'main_screen_1.dart';
 import 'menu_screen.dart';
 import 'payslip_screen.dart';
 import '../utils/app_theme.dart';
+import '../widgets/motion.dart';
 
 class HomeShell extends StatefulWidget {
   final String fullName;
@@ -127,15 +127,18 @@ class _HomeShellState extends State<HomeShell> {
         // На компьютере вкладки — слева, как в любой программе для
         // компьютера: нижняя панель на мониторе далеко от глаз и от мыши.
         final rail = isDesktop && !_isAdmin && box.maxWidth >= 600;
-        final stack = IndexedStack(
+        final stack = _TabFade(
           index: _selectedIndex,
-          children: [
-            for (var i = 0; i < 5; i++)
-              _visited.contains(i)
-                  ? _tab(i)
-                  // Ещё не открывали — и в сеть за ней не ходим.
-                  : const SizedBox.shrink(),
-          ],
+          child: IndexedStack(
+            index: _selectedIndex,
+            children: [
+              for (var i = 0; i < 5; i++)
+                _visited.contains(i)
+                    ? _tab(i)
+                    // Ещё не открывали — и в сеть за ней не ходим.
+                    : const SizedBox.shrink(),
+            ],
+          ),
         );
         return Scaffold(
           body: rail
@@ -167,18 +170,17 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Widget _rail(BuildContext context) {
+    final accent = context.accentColor;
     return NavigationRail(
       selectedIndex: _selectedIndex,
       onDestinationSelected: _select,
       labelType: NavigationRailLabelType.all,
       backgroundColor: context.cardSurface,
-      indicatorColor: AppColors.mainColor.withValues(alpha: 0.14),
-      selectedIconTheme: const IconThemeData(color: AppColors.mainColor),
+      indicatorColor: accent.withValues(alpha: 0.14),
+      selectedIconTheme: IconThemeData(color: accent),
       unselectedIconTheme: IconThemeData(color: context.mutedColor),
-      selectedLabelTextStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: AppColors.mainColor),
+      selectedLabelTextStyle: TextStyle(
+          fontSize: 12, fontWeight: FontWeight.w600, color: accent),
       unselectedLabelTextStyle:
           TextStyle(fontSize: 12, color: context.mutedColor),
       destinations: [
@@ -192,34 +194,76 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// Нижняя панель в духе Material 3: выбранная вкладка — на зелёной
+  /// «таблетке», которая перетекает от вкладки к вкладке. Цвета и размеры —
+  /// в теме (navigationBarTheme), чтобы панель выглядела одинаково и в
+  /// тёмной теме.
   Widget _bottomBar(BuildContext context) {
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: context.cardSurface,
-        boxShadow: context.cardShadow,
+        border: Border(top: BorderSide(color: context.hairlineColor)),
       ),
-      child: SafeArea(
-        top: false,
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _select,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: context.cardSurface,
-          elevation: 0,
-          selectedItemColor: AppColors.mainColor,
-          unselectedItemColor: context.mutedColor,
-          selectedFontSize: 11,
-          unselectedFontSize: 11,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          items: [
-            for (final (icon, active, label) in _destinations)
-              BottomNavigationBarItem(
-                icon: Icon(icon),
-                activeIcon: Icon(active),
-                label: label.tr,
-              ),
-          ],
-        ),
+      child: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _select,
+        destinations: [
+          for (final (icon, active, label) in _destinations)
+            NavigationDestination(
+              icon: Icon(icon),
+              selectedIcon: Icon(active),
+              label: label.tr,
+              tooltip: '',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Смена вкладки — мягким проявлением с лёгким подъёмом, а не скачком.
+///
+/// Сами вкладки остаются в IndexedStack и живут дальше: анимируется только
+/// то, как новая показывается. Пересоздавать их ради анимации нельзя —
+/// пропали бы открытый листок, выбранный период и прокрутка.
+class _TabFade extends StatefulWidget {
+  const _TabFade({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  State<_TabFade> createState() => _TabFadeState();
+}
+
+class _TabFadeState extends State<_TabFade>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: Motion.tab, value: 1);
+  late final Animation<double> _t =
+      CurvedAnimation(parent: _c, curve: Motion.curve);
+
+  @override
+  void didUpdateWidget(_TabFade old) {
+    super.didUpdateWidget(old);
+    if (old.index != widget.index && !Motion.reduced(context)) {
+      _c.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _t,
+      child: SlideTransition(
+        position: Tween(begin: const Offset(0, 0.015), end: Offset.zero)
+            .animate(_t),
+        child: widget.child,
       ),
     );
   }

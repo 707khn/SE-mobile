@@ -249,11 +249,11 @@ void main() {
     await pump(tester, const HomeShell(fullName: 'Иванов Иван', job: 'Инженер'),
         size: const Size(1400, 900));
     expect(find.byType(NavigationRail), findsOneWidget);
-    expect(find.byType(BottomNavigationBar), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
 
     await pump(tester, const HomeShell(fullName: 'Иванов Иван', job: 'Инженер'),
         size: const Size(500, 900));
     expect(find.byType(NavigationRail), findsNothing);
-    expect(find.byType(BottomNavigationBar), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
   });
 }
