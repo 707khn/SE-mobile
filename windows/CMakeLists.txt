@@ -128,7 +128,26 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
 # не запускается вовсе: Windows говорит «не найден VCRUNTIME140_1.dll», и
 # человеку с этим не справиться. Библиотеки разрешено раздавать вместе с
 # программой.
-set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${INSTALL_BUNDLE_LIB_DIR}")
-set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT Runtime)
+#
+# Список берём у InstallRequiredSystemLibraries, а ставим сами и только те
+# файлы, что есть на диске. CMake, не знающий свежий MSVC (Visual Studio
+# 2026 вышла новее CMake в ней), кладёт в список пути, которых нет, — и
+# тогда падает уже вся установка после успешной сборки. Пропущенное видно
+# в выводе сборки («Visual C++ runtime not found»); у кого Visual C++
+# Redistributable стоит, запустится и без этих файлов.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_NO_WARNINGS TRUE)
 set(CMAKE_INSTALL_UCRT_LIBRARIES FALSE)
 include(InstallRequiredSystemLibraries)
+set(SEMENG_RUNTIME_LIBS)
+foreach(lib IN LISTS CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+  if(EXISTS "${lib}")
+    list(APPEND SEMENG_RUNTIME_LIBS "${lib}")
+  else()
+    message(STATUS "Visual C++ runtime not found, skipped: ${lib}")
+  endif()
+endforeach()
+if(SEMENG_RUNTIME_LIBS)
+  install(PROGRAMS ${SEMENG_RUNTIME_LIBS}
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+endif()
