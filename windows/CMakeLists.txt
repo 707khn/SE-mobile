@@ -10,6 +10,13 @@ set(BINARY_NAME "SemEng")
 # versions of CMake.
 cmake_policy(VERSION 3.14...3.25)
 
+# Firebase C++ SDK, который тянет firebase_core, объявляет
+# cmake_minimum_required ниже 3.5, а CMake 4 (он идёт с Visual Studio 2026)
+# такой проект отвергает: «Compatibility with CMake < 3.5 has been removed».
+# Разрешаем ему собираться с правилами 3.5 — на старом CMake переменная
+# ничего не меняет.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 # Define build configuration option.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)
@@ -56,6 +63,15 @@ add_subdirectory("runner")
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
+
+# local_auth_windows собирается с /await и <experimental/coroutine>, а MSVC
+# из Visual Studio 2026 (14.5x) превратил устаревание в ошибку STL1011.
+# Отпечаток на компьютере не используется (utils/biometric.dart), но плагин
+# всё равно компилируется — глушим ошибку только для него.
+if(TARGET local_auth_windows_plugin)
+  target_compile_definitions(local_auth_windows_plugin PRIVATE
+    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+endif()
 
 
 # === Installation ===
@@ -112,7 +128,26 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
 # не запускается вовсе: Windows говорит «не найден VCRUNTIME140_1.dll», и
 # человеку с этим не справиться. Библиотеки разрешено раздавать вместе с
 # программой.
-set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${INSTALL_BUNDLE_LIB_DIR}")
-set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT Runtime)
+#
+# Список берём у InstallRequiredSystemLibraries, а ставим сами и только те
+# файлы, что есть на диске. CMake, не знающий свежий MSVC (Visual Studio
+# 2026 вышла новее CMake в ней), кладёт в список пути, которых нет, — и
+# тогда падает уже вся установка после успешной сборки. Пропущенное видно
+# в выводе сборки («Visual C++ runtime not found»); у кого Visual C++
+# Redistributable стоит, запустится и без этих файлов.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_NO_WARNINGS TRUE)
 set(CMAKE_INSTALL_UCRT_LIBRARIES FALSE)
 include(InstallRequiredSystemLibraries)
+set(SEMENG_RUNTIME_LIBS)
+foreach(lib IN LISTS CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+  if(EXISTS "${lib}")
+    list(APPEND SEMENG_RUNTIME_LIBS "${lib}")
+  else()
+    message(STATUS "Visual C++ runtime not found, skipped: ${lib}")
+  endif()
+endforeach()
+if(SEMENG_RUNTIME_LIBS)
+  install(PROGRAMS ${SEMENG_RUNTIME_LIBS}
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+endif()
