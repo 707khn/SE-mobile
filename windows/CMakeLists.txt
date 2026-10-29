@@ -10,6 +10,13 @@ set(BINARY_NAME "SemEng")
 # versions of CMake.
 cmake_policy(VERSION 3.14...3.25)
 
+# Firebase C++ SDK, который тянет firebase_core, объявляет
+# cmake_minimum_required ниже 3.5, а CMake 4 (он идёт с Visual Studio 2026)
+# такой проект отвергает: «Compatibility with CMake < 3.5 has been removed».
+# Разрешаем ему собираться с правилами 3.5 — на старом CMake переменная
+# ничего не меняет.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 # Define build configuration option.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)

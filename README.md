@@ -235,9 +235,11 @@ workflow) кладёт в релиз этой версии рядом с APK д�
 архивом, а не APK, обновите конфиг nginx (`deploy/README.md`, «Обновить
 конфиг nginx») — скачивается он и без этого.
 
-**Собрать у себя** (если Actions недоступны). Нужны Flutter 3.47.6 и Visual
-Studio 2022 (или Build Tools) с набором «Разработка классических приложений
-на C++». Затем в папке проекта:
+**Собрать у себя** (если Actions недоступны). Нужны 64-битная Windows 10/11,
+Flutter 3.47.6 и Visual Studio 2022 или 2026 (или Build Tools) с набором
+«Разработка классических приложений на C++». В Windows должен быть включён
+режим разработчика (`start ms-settings:developers`): без него Flutter не
+собирает плагины. Затем в папке проекта, в обычном PowerShell:
 
 ```bat
 flutter pub get --enforce-lockfile
@@ -246,6 +248,12 @@ flutter build windows --release
 
 Готовое — в `build\windows\x64\runner\Release`: эту папку целиком и
 раздают (один `SemEng.exe` без соседних файлов не запустится).
+
+Установщик — Inno Setup 6:
+`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=<версия из pubspec> windows\installer\SemEng.iss`,
+готовый файл — в `build\installer`. Чтобы сервер раздавал сборку как
+обновление, архив папки Release под именем `SemEng-windows-<версия>.zip`
+кладётся в релиз `v<версия с «-» вместо «+»>` на GitHub.
 
 **Проверить на своём сервере**, не трогая настоящий: адрес сервера
 подменяется при сборке — `--dart-define=API_BASE_URL=http://127.0.0.1:5000`.
