@@ -107,12 +107,12 @@ class _MainPage1State extends State<MainPage1> {
           ValueListenableBuilder<int>(
             valueListenable: _recordCount,
             builder: (_, count, __) => PopupMenuButton<String>(
-              icon: Icon(Icons.share, color: count > 0 ? null : Colors.white38),
+              icon: Icon(exportIcon, color: count > 0 ? null : Colors.white38),
               enabled: count > 0,
-              tooltip: 'send_report_tooltip'.tr,
+              tooltip: exportLabel('send_report_tooltip'),
               itemBuilder: (_) => [
-                PopupMenuItem(value: 'send report exc', child: Text('send report exc'.tr)),
-                PopupMenuItem(value: 'send report csv', child: Text('send report csv'.tr)),
+                PopupMenuItem(value: 'send report exc', child: Text(exportLabel('send report exc'))),
+                PopupMenuItem(value: 'send report csv', child: Text(exportLabel('send report csv'))),
               ],
               onSelected: (value) {
                 if (value == 'send report exc') {

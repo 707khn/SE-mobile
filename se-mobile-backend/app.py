@@ -1907,6 +1907,10 @@ _APK_DIR = os.environ.get('APK_DIR', '/var/www/se-mobile')
 # рано или поздно отстаёт.
 _APK_NAME = re.compile(r'^se-mobile-(\d+)\.(\d+)\.(\d+)\+(\d+)\.apk$')
 
+# Версия для компьютера — архив в той же папке: SemEng-windows-1.26.0+66.zip.
+_WINDOWS_NAME = re.compile(
+    r'^SemEng-windows-(\d+)\.(\d+)\.(\d+)\+(\d+)\.zip$')
+
 
 def _public_origin():
     """Адрес, по которому к нам пришли снаружи, — со схемой и именем."""
@@ -1926,6 +1930,15 @@ def _latest_apk():
     проверку пропуска нельзя включить — необновившиеся перестали бы
     работать, — а узнать, кто обновился, можно было только по их запросам.
     """
+    return _latest_build(_APK_NAME, 'se-mobile-1.8.2+12.apk')
+
+
+def _latest_windows():
+    """Самый свежий архив версии для компьютера — так же, как и APK."""
+    return _latest_build(_WINDOWS_NAME, 'SemEng-windows-1.26.0+66.zip')
+
+
+def _latest_build(pattern, example):
     try:
         names = os.listdir(_APK_DIR)
     except OSError as e:
@@ -1933,14 +1946,14 @@ def _latest_apk():
 
     builds = []
     for name in names:
-        found = _APK_NAME.match(name)
+        found = pattern.match(name)
         if not found:
             continue
         major, minor, patch, build = (int(x) for x in found.groups())
         builds.append((build, (major, minor, patch), name))
     if not builds:
         return {'available': False,
-                'reason': f'в {_APK_DIR} нет файлов вида se-mobile-1.8.2+12.apk'}
+                'reason': f'в {_APK_DIR} нет файлов вида {example}'}
 
     # По номеру сборки: Android ставит поверх только его, а не «1.8.2».
     build, version, name = max(builds)
@@ -2440,7 +2453,10 @@ def register_routes(app):
         Отвечаем и когда файла нет: приложение тогда просто молчит, а
         администратор видит причину на экране «Обновление».
         """
-        return jsonify({'message': 'Success', 'app': _latest_apk()})
+        # windows — архив версии для компьютера: её спрашивает сборка для
+        # Windows, телефонам этот ключ не нужен.
+        return jsonify({'message': 'Success', 'app': _latest_apk(),
+                        'windows': _latest_windows()})
 
     @app.route('/api/me', methods=['GET'])
     @require_auth
@@ -3760,6 +3776,8 @@ def register_routes(app):
             # «сколько людей на старой версии» не на что и смотреть: обновиться
             # им неоткуда.
             'app': _latest_apk(),
+            # И архив версии для компьютера — рядом.
+            'windows': _latest_windows(),
             # Приезжают ли новые сборки сами. Истёкший токен иначе виден
             # только в журнале systemd.
             'fetch_apk': _fetch_apk_state(),

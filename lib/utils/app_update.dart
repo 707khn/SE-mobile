@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_version.dart';
+import 'desktop.dart';
 import 'store.dart';
 import 'variables.dart';
 
@@ -54,7 +55,9 @@ class AppUpdate {
           .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) return null;
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final app = body['app'];
+      // Компьютеру — архив версии для Windows, телефону — apk: оба лежат
+      // на сервере рядом, и сервер называет каждый отдельно.
+      final app = body[isDesktop ? 'windows' : 'app'];
       if (app is! Map || app['available'] != true) return null;
 
       final build = (app['build'] as num?)?.toInt() ?? 0;

@@ -296,7 +296,7 @@ class _MenuEditScreenState extends State<MenuEditScreen> {
       canPop: !_dirty,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        if (await _confirmDiscard() && mounted) Navigator.pop(context);
+        if (await _confirmDiscard() && context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
         backgroundColor: context.pageColor,

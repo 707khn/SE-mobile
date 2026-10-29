@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../utils/app_theme.dart';
 import '../utils/biometric.dart';
 import '../utils/colors.dart';
+import '../utils/desktop.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
 import '../utils/secure_storage_helper.dart';
@@ -174,35 +175,41 @@ class _PinScreenState extends State<PinScreen> {
         // внизу. Когда нет (крупный шрифт на маленьком телефоне, да ещё
         // пояснение «зачем код» сверху) — экран прокручивается, а не
         // обрезает нижний ряд клавиатуры.
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, box) => SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: box.maxHeight),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (widget.mode == PinMode.create && _first == null)
-                      _why()
-                    else
-                      const SizedBox.shrink(),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                          vertical: Dimensions.height30 / 2),
-                      child: _prompt(),
-                    ),
-                    Column(
-                      children: [
-                        _keypad(),
-                        if (_unlocking)
-                          TextButton(
-                            onPressed: _busy ? null : _forgot,
-                            child: Text('pin_forgot'.tr),
-                          ),
-                        SizedBox(height: Dimensions.height30 / 2),
-                      ],
-                    ),
-                  ],
+        // На компьютере код набирают с клавиатуры — цифрами сверху или
+        // справа и Backspace; кнопки на экране мышью тоже работают.
+        body: Focus(
+          autofocus: true,
+          onKeyEvent: _onKey,
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, box) => SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: box.maxHeight),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (widget.mode == PinMode.create && _first == null)
+                        _why()
+                      else
+                        const SizedBox.shrink(),
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                            vertical: Dimensions.height30 / 2),
+                        child: _prompt(),
+                      ),
+                      Column(
+                        children: [
+                          _keypad(),
+                          if (_unlocking)
+                            TextButton(
+                              onPressed: _busy ? null : _forgot,
+                              child: Text('pin_forgot'.tr),
+                            ),
+                          SizedBox(height: Dimensions.height30 / 2),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -211,6 +218,54 @@ class _PinScreenState extends State<PinScreen> {
       ),
     );
   }
+
+  /// Цифра с клавиатуры — как нажатие на экране; Backspace стирает.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.backspace) {
+      if (!_busy) _erase();
+      return KeyEventResult.handled;
+    }
+    final digit = _digitKeys[event.logicalKey];
+    if (event is KeyDownEvent && digit != null) {
+      if (!_busy) _press(digit);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// Цифры верхнего ряда и цифрового блока — по клавише, а не по символу:
+  /// символ зависит от раскладки и от NumLock.
+  static final Map<LogicalKeyboardKey, String> _digitKeys = {
+    for (final (i, key) in const [
+      LogicalKeyboardKey.digit0,
+      LogicalKeyboardKey.digit1,
+      LogicalKeyboardKey.digit2,
+      LogicalKeyboardKey.digit3,
+      LogicalKeyboardKey.digit4,
+      LogicalKeyboardKey.digit5,
+      LogicalKeyboardKey.digit6,
+      LogicalKeyboardKey.digit7,
+      LogicalKeyboardKey.digit8,
+      LogicalKeyboardKey.digit9,
+    ].indexed)
+      key: '$i',
+    for (final (i, key) in const [
+      LogicalKeyboardKey.numpad0,
+      LogicalKeyboardKey.numpad1,
+      LogicalKeyboardKey.numpad2,
+      LogicalKeyboardKey.numpad3,
+      LogicalKeyboardKey.numpad4,
+      LogicalKeyboardKey.numpad5,
+      LogicalKeyboardKey.numpad6,
+      LogicalKeyboardKey.numpad7,
+      LogicalKeyboardKey.numpad8,
+      LogicalKeyboardKey.numpad9,
+    ].indexed)
+      key: '$i',
+  };
 
   String get _title {
     switch (widget.mode) {
@@ -246,7 +301,7 @@ class _PinScreenState extends State<PinScreen> {
           Icon(Icons.lock_outline, color: context.accentColor, size: 22),
           const SizedBox(width: 12),
           Expanded(
-            child: Text('pin_why'.tr,
+            child: Text(isDesktop ? 'pin_why_pc'.tr : 'pin_why'.tr,
                 style: const TextStyle(fontSize: 13.5, height: 1.45)),
           ),
         ],
@@ -302,14 +357,21 @@ class _PinScreenState extends State<PinScreen> {
 
   Widget _keypad() {
     const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '<'];
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Dimensions.width20 * 1.5),
-      child: GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 3,
-        childAspectRatio: 1.7,
-        children: keys.map(_key).toList(),
+    // Не шире телефонной: в окне на компьютере клавиши иначе разъезжаются на
+    // всю ширину, вырастают по высоте и сталкивают «Забыли код?» за край.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: Dimensions.width20 * 1.5),
+          child: GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            childAspectRatio: 1.7,
+            children: keys.map(_key).toList(),
+          ),
+        ),
       ),
     );
   }

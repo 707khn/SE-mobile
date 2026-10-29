@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../requests/it_request.dart';
 import '../utils/app_theme.dart';
+import '../utils/desktop.dart';
 import '../widgets/custom_text.dart';
 import 'it_requests_screen.dart';
 
@@ -201,19 +202,25 @@ class _ItRequestFormScreenState extends State<ItRequestFormScreen> {
             children: [
               for (var i = 0; i < _photos.length; i++) _thumb(i),
               if (_photos.length < _maxPhotos) ...[
-                OutlinedButton.icon(
-                  onPressed: _sending
-                      ? null
-                      : () => _addPhoto(ImageSource.camera),
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: Text('it_photo_camera'.tr),
-                ),
+                // На компьютере камеры для снимка нет — только файл: снимок
+                // экрана с ошибкой или фото, скинутое с телефона.
+                if (!isDesktop)
+                  OutlinedButton.icon(
+                    onPressed: _sending
+                        ? null
+                        : () => _addPhoto(ImageSource.camera),
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: Text('it_photo_camera'.tr),
+                  ),
                 OutlinedButton.icon(
                   onPressed: _sending
                       ? null
                       : () => _addPhoto(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: Text('it_photo_gallery'.tr),
+                  icon: Icon(isDesktop
+                      ? Icons.attach_file
+                      : Icons.photo_library_outlined),
+                  label: Text(
+                      isDesktop ? 'it_photo_file'.tr : 'it_photo_gallery'.tr),
                 ),
               ],
             ],

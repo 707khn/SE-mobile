@@ -26,6 +26,7 @@ KEEP=${APK_KEEP:-3}
 TOKEN=${GITHUB_TOKEN:-}
 
 APK_RE='^se-mobile-[0-9]+\.[0-9]+\.[0-9]+\+([0-9]+)\.apk$'
+WINDOWS_RE='^SemEng-windows-[0-9]+\.[0-9]+\.[0-9]+\+([0-9]+)\.zip$'
 
 # Чем кончился последний запуск — для экрана «Обновление» в приложении.
 # Журнал systemd читает только root, и истёкший токен две недели краснел бы
@@ -108,9 +109,10 @@ case $code in
     *) fail "GitHub ответил $code — попробую через десять минут." ;;
 esac
 
-# Имя, номер сборки, адрес, размер и контрольная сумма APK из релиза. В том
-# же релизе лежит AAB для Google Play — он телефонам не нужен.
-asset=$(python3 - "$work/release.json" <<'PY'
+# Что взять из релиза: APK и архив версии для компьютера — по строке на
+# каждый: вид, имя, номер сборки, адрес, размер и контрольная сумма. В том же
+# релизе лежит AAB для Google Play — он серверу не нужен.
+assets=$(python3 - "$work/release.json" <<'PY'
 import json, re, sys
 
 try:
@@ -119,90 +121,116 @@ except ValueError:
     sys.exit(1)
 if not isinstance(release, dict):
     sys.exit(1)
-for a in release.get('assets') or []:
-    found = re.fullmatch(r'se-mobile-\d+\.\d+\.\d+\+(\d+)\.apk', a.get('name') or '')
-    if found and a.get('state') == 'uploaded':
-        digest = (a.get('digest') or '').removeprefix('sha256:') or '-'
-        print(a['name'], found.group(1), a['url'], a['size'], digest)
-        break
+kinds = (
+    ('apk', r'se-mobile-\d+\.\d+\.\d+\+(\d+)\.apk'),
+    ('windows', r'SemEng-windows-\d+\.\d+\.\d+\+(\d+)\.zip'),
+)
+for kind, pattern in kinds:
+    for a in release.get('assets') or []:
+        found = re.fullmatch(pattern, a.get('name') or '')
+        if found and a.get('state') == 'uploaded':
+            digest = (a.get('digest') or '').removeprefix('sha256:') or '-'
+            print(kind, a['name'], found.group(1), a['url'], a['size'], digest)
+            break
 PY
 ) || fail "GitHub прислал вместо описания релиза что-то непонятное —" \
           "попробую через десять минут."
-if [ -z "$asset" ]; then
+
+# Забирает сборку одного вида, если она новее всех, что уже есть: и в
+# папке, и среди забранного раньше.
+take() {
+    local kind=$1 name=$2 build=$3 url=$4 size=$5 digest=$6
+    local re glob last who
+    case $kind in
+        apk)
+            re=$APK_RE; glob='se-mobile-*.apk'
+            last="$STATE_DIR/last-build"; who='телефоны' ;;
+        windows)
+            re=$WINDOWS_RE; glob='SemEng-windows-*.zip'
+            last="$STATE_DIR/last-build-windows"; who='компьютеры' ;;
+    esac
+
+    local have=0 file
+    if [ -r "$last" ]; then
+        have=$(tr -dc '0-9' < "$last")
+        have=${have:-0}
+    fi
+    for file in "$APK_DIR"/$glob; do
+        [ -e "$file" ] || continue
+        if [[ $(basename "$file") =~ $re ]] && (( BASH_REMATCH[1] > have )); then
+            have=${BASH_REMATCH[1]}
+        fi
+    done
+    if (( build <= have )); then
+        return 0
+    fi
+
+    echo "Забираю $name из GitHub Releases"
+    # Сначала под временным именем: сервер видит только файлы вида
+    # se-mobile-1.2.3+4.apk, и недокачанный телефонам не попадёт.
+    partial="$APK_DIR/.download-$kind-$build"
+    # Место проверяем заранее: оборванный на полном диске файл ничего не
+    # портит, но и причину curl назовёт невнятно.
+    local free
+    free=$(df -Pk "$APK_DIR" 2>/dev/null | awk 'NR == 2 {print $4}') || free=
+    if [ -n "$free" ] && (( free * 1024 < size + 50 * 1024 * 1024 )); then
+        fail "На диске под $APK_DIR осталось $((free / 1024)) МБ, а сборка" \
+             "$name весит $((size / 1024 / 1024)) МБ — освободите место."
+    fi
+
+    local rc=0
+    curl -fsS -L --max-time 900 --retry 2 \
+        -H "Authorization: Bearer $TOKEN" \
+        -H 'Accept: application/octet-stream' \
+        -o "$partial" "$url" || rc=$?
+    case $rc in
+        0) ;;
+        22) fail "GitHub не отдал файл $name (ошибка HTTP) — попробую через" \
+                 "десять минут." ;;
+        23) fail "Не удалось записать $partial — нет места или прав на $APK_DIR." ;;
+        28) fail "$name не скачался за пятнадцать минут — попробую ещё." ;;
+        *) fail "$name не скачался (curl, код $rc) — попробую через десять минут." ;;
+    esac
+
+    local got sum
+    got=$(stat -c %s "$partial")
+    if [ "$got" != "$size" ]; then
+        fail "Скачалось $got байт вместо $size — файл не беру."
+    fi
+    if [ "$digest" != "-" ]; then
+        sum=$(sha256sum "$partial" | cut -d' ' -f1)
+        if [ "$sum" != "$digest" ]; then
+            fail "Контрольная сумма не сходится ($sum, а в релизе $digest) —" \
+                 "файл не беру."
+        fi
+    fi
+
+    chmod 644 "$partial"
+    mv -f -- "$partial" "$APK_DIR/$name"
+    partial=
+    echo "$build" > "$last"
+    message="${message:+$message; }Забрана $name"
+    echo "Готово: $APK_DIR/$name, $who увидят обновление"
+
+    # Старые сборки — кроме последних $KEEP.
+    for file in "$APK_DIR"/$glob; do
+        [ -e "$file" ] || continue
+        if [[ $(basename "$file") =~ $re ]]; then
+            echo "${BASH_REMATCH[1]} $file"
+        fi
+    done | sort -rn | tail -n +$((KEEP + 1)) | while read -r _ old; do
+        rm -f -- "$old"
+        echo "Убрана старая сборка $(basename "$old")"
+    done
+}
+
+if ! grep -q '^apk ' <<<"$assets"; then
     message="В последнем релизе нет APK — жду следующего."
     echo "$message" >&2
-    exit 0
 fi
-read -r name build url size digest <<<"$asset"
-
-# Новее ли она того, что уже есть: и в папке, и среди забранного раньше.
-have=0
-if [ -r "$STATE_DIR/last-build" ]; then
-    have=$(tr -dc '0-9' < "$STATE_DIR/last-build")
-    have=${have:-0}
-fi
-for file in "$APK_DIR"/se-mobile-*.apk; do
-    [ -e "$file" ] || continue
-    if [[ $(basename "$file") =~ $APK_RE ]] && (( BASH_REMATCH[1] > have )); then
-        have=${BASH_REMATCH[1]}
-    fi
-done
-if (( build <= have )); then
-    exit 0
-fi
-
-echo "Забираю $name из GitHub Releases"
-# Сначала под временным именем: сервер видит только файлы вида
-# se-mobile-1.2.3+4.apk, и недокачанный телефонам не попадёт.
-partial="$APK_DIR/.download-$build"
-# Место проверяем заранее: оборванный на полном диске файл ничего не
-# портит, но и причину curl назовёт невнятно.
-free=$(df -Pk "$APK_DIR" 2>/dev/null | awk 'NR == 2 {print $4}') || free=
-if [ -n "$free" ] && (( free * 1024 < size + 50 * 1024 * 1024 )); then
-    fail "На диске под $APK_DIR осталось $((free / 1024)) МБ, а сборка" \
-         "$name весит $((size / 1024 / 1024)) МБ — освободите место."
-fi
-
-rc=0
-curl -fsS -L --max-time 900 --retry 2 \
-    -H "Authorization: Bearer $TOKEN" \
-    -H 'Accept: application/octet-stream' \
-    -o "$partial" "$url" || rc=$?
-case $rc in
-    0) ;;
-    22) fail "GitHub не отдал файл $name (ошибка HTTP) — попробую через" \
-             "десять минут." ;;
-    23) fail "Не удалось записать $partial — нет места или прав на $APK_DIR." ;;
-    28) fail "$name не скачался за пятнадцать минут — попробую ещё." ;;
-    *) fail "$name не скачался (curl, код $rc) — попробую через десять минут." ;;
-esac
-
-got=$(stat -c %s "$partial")
-if [ "$got" != "$size" ]; then
-    fail "Скачалось $got байт вместо $size — файл не беру."
-fi
-if [ "$digest" != "-" ]; then
-    sum=$(sha256sum "$partial" | cut -d' ' -f1)
-    if [ "$sum" != "$digest" ]; then
-        fail "Контрольная сумма не сходится ($sum, а в релизе $digest) —" \
-             "файл не беру."
-    fi
-fi
-
-chmod 644 "$partial"
-mv -f -- "$partial" "$APK_DIR/$name"
-partial=
-echo "$build" > "$STATE_DIR/last-build"
-message="Забрана $name"
-echo "Готово: $APK_DIR/$name, телефоны увидят обновление"
-
-# Старые сборки — кроме последних $KEEP.
-for file in "$APK_DIR"/se-mobile-*.apk; do
-    [ -e "$file" ] || continue
-    if [[ $(basename "$file") =~ $APK_RE ]]; then
-        echo "${BASH_REMATCH[1]} $file"
-    fi
-done | sort -rn | tail -n +$((KEEP + 1)) | while read -r _ old; do
-    rm -f -- "$old"
-    echo "Убрана старая сборка $(basename "$old")"
-done
+# Архива для компьютера в релизе может и не быть: он собирается не с каждой
+# версией. Тогда на сервере остаётся прежний.
+while read -r kind name build url size digest; do
+    [ -n "$kind" ] || continue
+    take "$kind" "$name" "$build" "$url" "$size" "$digest"
+done <<<"$assets"

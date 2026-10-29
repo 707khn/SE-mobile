@@ -16,9 +16,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/pin_screen.dart';
 import 'utils/api.dart';
 import 'utils/app_lock.dart';
+import 'utils/desktop.dart';
 import 'utils/error_log.dart';
 import 'utils/lang.dart';
 import 'utils/secure_storage_helper.dart';
+import 'widgets/motion.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
 // ignore: depend_on_referenced_packages
@@ -41,7 +43,11 @@ void main() {
     // лёжа набок, например, клавиатура кода не помещалась по высоте — ноль
     // и «стереть» уходили за край. Android держит то же самое в манифесте,
     // чтобы экран не повернулся и до старта Flutter.
-    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    //
+    // У окна на компьютере ориентации нет — там и спрашивать нечего.
+    if (!isDesktop) {
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
 
     // Ошибку, из-за которой приложение упало у человека в цехе, иначе не
     // узнать: телефон к отладчику не подключишь. Записываем на месте, читаем
@@ -59,11 +65,15 @@ void main() {
     await Lang.initDates();
     await initializeSharedPreferences();
 
-    try {
-      await Firebase.initializeApp();
-      FcmService.setupForegroundHandler();
-    } catch (_) {
-      // Firebase not configured yet — app works without push notifications
+    // На компьютере уведомлений Firebase нет: настроен он только под
+    // Android и iPhone, а без настройки на Windows подъём лишь ждёт отказа.
+    if (!isDesktop) {
+      try {
+        await Firebase.initializeApp();
+        FcmService.setupForegroundHandler();
+      } catch (_) {
+        // Firebase not configured yet — app works without push notifications
+      }
     }
 
     // Следим, сколько приложение пролежало в фоне: вернулись позже пяти
@@ -88,10 +98,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      // Smooth slide-in for pushed screens (reports, menu editor, …) instead
-      // of the abrupt default.
-      defaultTransition: Transition.cupertino,
-      transitionDuration: const Duration(milliseconds: 260),
+      // Переход страниц. На iPhone — родной купертиновский: там его ждут, и
+      // он даёт смахнуть страницу от края назад. Везде ещё — короткий сдвиг
+      // с проявлением (см. FadeThroughSlideTransition): без заданного
+      // defaultTransition GetX берёт customTransition.
+      defaultTransition: GetPlatform.isIOS ? Transition.cupertino : null,
+      customTransition: FadeThroughSlideTransition(),
+      transitionDuration: Motion.page,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -112,64 +125,84 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       // По умолчанию — как в телефоне; выбор переопределяется в боковом меню.
       themeMode: ThemePref.read(prefs),
+      // Мышью на компьютере страницы можно и перетаскивать, как пальцем.
+      scrollBehavior: isDesktop ? const DesktopScrollBehavior() : null,
       // Honour the phone's text-size setting — warehouse and canteen staff
       // often enlarge it — but cap the growth, since the denser screens
       // (payslip totals, turnstile rows) start overflowing beyond this.
+      //
+      // На компьютере содержимое ещё и стоит колонкой посередине окна (см.
+      // DesktopFrame), а Esc работает как «назад».
       builder: (context, child) {
         final media = MediaQuery.of(context);
-        return MediaQuery(
+        final scaled = MediaQuery(
           data: media.copyWith(
             textScaler: media.textScaler
                 .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.3),
           ),
           child: child ?? const SizedBox.shrink(),
         );
+        if (!isDesktop) return scaled;
+        // Esc — «назад».
+        return DesktopKeys(
+          navigator: () => Get.key.currentState,
+          child: DesktopFrame(child: scaled),
+        );
       },
       home: FutureBuilder<Map<String, String?>>(
         future: authCheck(),
-        builder: (context, res){
-          if (res.connectionState == ConnectionState.waiting){
-            return Scaffold(
-              appBar: null,
-              backgroundColor: AppColors.mainColor,
-              body: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset('assets/logo.png', height: 100, color: Colors.white),
-                    const SizedBox(height: 24),
-                    const CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          } else {
-            final data = res.data;
-            if (data != null && data['loggedIn'] == 'true'){
-              String fullName = data['fullName'] ?? '';
-              String job = data['job'] ?? '';
-              // Вход по коду: логин с паролем спрашивают только в первый раз
-              // и после выхода. Кода ещё нет — значит, приложение обновили,
-              // и придумать его нужно сейчас.
-              return PinScreen(
-                mode: data['hasPin'] == 'true' ? PinMode.unlock : PinMode.create,
-                fullName: fullName,
-                job: job,
-              );
-            } else {
-              return const StartPage();
-            }
-          }
-        },
+        // Заставка растворяется в экран кода или входа, а не сменяется
+        // им скачком.
+        builder: (context, res) => AnimatedSwitcher(
+          duration: Motion.page,
+          switchInCurve: Motion.curve,
+          child: _startScreen(res),
+        ),
       ),
       locale: Lang.locale(prefs.getString(AppValues.LANG)),
       fallbackLocale: const Locale(Lang.ru),
       translations: LocaleString(),
     );
   }
+
+  Widget _startScreen(AsyncSnapshot<Map<String, String?>> res) {
+    if (res.connectionState == ConnectionState.waiting){
+      return Scaffold(
+        appBar: null,
+        backgroundColor: AppColors.mainColor,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/logo.png', height: 100, color: Colors.white),
+              const SizedBox(height: 24),
+              const CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      final data = res.data;
+      if (data != null && data['loggedIn'] == 'true'){
+        String fullName = data['fullName'] ?? '';
+        String job = data['job'] ?? '';
+        // Вход по коду: логин с паролем спрашивают только в первый раз
+        // и после выхода. Кода ещё нет — значит, приложение обновили,
+        // и придумать его нужно сейчас.
+        return PinScreen(
+          mode: data['hasPin'] == 'true' ? PinMode.unlock : PinMode.create,
+          fullName: fullName,
+          job: job,
+        );
+      } else {
+        return const StartPage();
+      }
+    }
+  }
+
   Future<Map<String, String?>> authCheck() async {
     final secure = SecureStorageHelper.instance;
     // Пароль, оставшийся в хранилище от прежних сборок: теперь он не нужен

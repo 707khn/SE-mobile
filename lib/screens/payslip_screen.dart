@@ -8,6 +8,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../requests/payslip_request.dart';
+import '../functions/export_file.dart';
+import '../functions/export_share.dart';
+import '../utils/desktop.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
 import '../utils/dimensions.dart';
@@ -212,13 +215,23 @@ class _PayslipPageState extends State<PayslipPage> {
       );
       if (!mounted) return;
       if (bytes != null) {
+        final name =
+            'Расчетный листок ${_monthsRu[date.month - 1]} ${date.year}.xlsx';
+        // На компьютере листок ложится к выгрузкам, в «Загрузки»: отправить
+        // его оттуда — перетащить в письмо. Уборка при выходе уносит и его.
+        if (isDesktop) {
+          final dir = await exportDirectory();
+          await dir.create(recursive: true);
+          final file = File('${dir.path}${Platform.pathSeparator}$name');
+          await file.writeAsBytes(bytes, flush: true);
+          if (mounted) showSavedFile(context, file);
+          return;
+        }
         // Своя папка во временных: перед каждой отправкой она чистится,
         // чтобы чужие и старые листки не копились на телефоне.
         final dir = Directory('${(await getTemporaryDirectory()).path}/payslips');
         if (await dir.exists()) await dir.delete(recursive: true);
         await dir.create(recursive: true);
-        final name =
-            'Расчетный листок ${_monthsRu[date.month - 1]} ${date.year}.xlsx';
         final file = File('${dir.path}/$name');
         await file.writeAsBytes(bytes, flush: true);
         await Share.shareXFiles(
@@ -246,7 +259,7 @@ class _PayslipPageState extends State<PayslipPage> {
     buf.writeln('${'accruals'.tr}: ${_numberFormat.format(payslip.totalAccruals)} ₸');
     buf.writeln('${'deductions'.tr}: ${_numberFormat.format(payslip.totalDeductions)} ₸');
     buf.writeln('${'net pay'.tr}: ${_numberFormat.format(payslip.netPay)} ₸');
-    Share.share(buf.toString());
+    shareText(context, buf.toString());
   }
 
   Future<void> _pickMonth() async {
@@ -396,8 +409,8 @@ class _PayslipPageState extends State<PayslipPage> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.share),
-              tooltip: 'share'.tr,
+                  : Icon(exportIcon),
+              tooltip: isDesktop ? 'save_file'.tr : 'share'.tr,
               onPressed: _sharing ? null : _sharePayslip,
             ),
           if (widget.employeeId == null)

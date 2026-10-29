@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:share_plus/share_plus.dart';
-
+import '../functions/export_share.dart';
+import '../utils/desktop.dart';
 import '../requests/leave_request.dart';
 import '../utils/colors.dart';
 import '../utils/dimensions.dart';
@@ -87,7 +87,7 @@ class _LeavePageState extends State<LeavePage> {
       }
     }
     HapticFeedback.lightImpact();
-    Share.share(buffer.toString());
+    shareText(context, buffer.toString());
   }
 
   @override
@@ -111,8 +111,8 @@ class _LeavePageState extends State<LeavePage> {
         actions: [
           if (_leaveData != null)
             IconButton(
-              icon: const Icon(Icons.share),
-              tooltip: 'share'.tr,
+              icon: Icon(isDesktop ? Icons.copy : Icons.share),
+              tooltip: isDesktop ? 'copy'.tr : 'share'.tr,
               onPressed: _shareLeave,
             ),
           IconButton(

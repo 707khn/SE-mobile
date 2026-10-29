@@ -6,6 +6,7 @@ import '../chat/chat_bridge.dart';
 import '../chat/chat_config.dart';
 import '../services/fcm_service.dart';
 import '../utils/colors.dart';
+import '../utils/desktop.dart';
 import '../utils/role_helper.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/shell_tab.dart';
@@ -16,6 +17,7 @@ import 'main_screen_1.dart';
 import 'menu_screen.dart';
 import 'payslip_screen.dart';
 import '../utils/app_theme.dart';
+import '../widgets/motion.dart';
 
 class HomeShell extends StatefulWidget {
   final String fullName;
@@ -129,80 +131,160 @@ class _HomeShellState extends State<HomeShell> {
         if (_selectedIndex == ChatBridge.tabIndex && await ChatBridge.back()) return;
         if (_selectedIndex != 0) {
           ShellTab.open(0);
-        } else {
+        } else if (!isDesktop) {
+          // На компьютере «назад» — это Esc, и на главной он не должен
+          // закрывать окно: SystemNavigator.pop там завершает приложение.
           SystemNavigator.pop();
         }
       },
-      child: Scaffold(
-        body: IndexedStack(
+      child: LayoutBuilder(builder: (context, box) {
+        // На компьютере вкладки — слева, как в любой программе для
+        // компьютера: нижняя панель на мониторе далеко от глаз и от мыши.
+        final rail = isDesktop && !_isAdmin && box.maxWidth >= 600;
+        final stack = _TabFade(
           index: _selectedIndex,
-          children: [
-            for (var i = 0; i < _tabCount; i++)
-              _visited.contains(i)
-                  ? _tab(i)
-                  // Ещё не открывали — и в сеть за ней не ходим.
-                  : const SizedBox.shrink(),
-          ],
-        ),
-        bottomNavigationBar: _isAdmin
-            ? null
-            : Container(
-          decoration: BoxDecoration(
-            color: context.cardSurface,
-            boxShadow: context.cardShadow,
+          child: IndexedStack(
+            index: _selectedIndex,
+            children: [
+              for (var i = 0; i < _tabCount; i++)
+                _visited.contains(i)
+                    ? _tab(i)
+                    // Ещё не открывали — и в сеть за ней не ходим.
+                    : const SizedBox.shrink(),
+            ],
           ),
-          child: SafeArea(
-            top: false,
-            child: BottomNavigationBar(
-              currentIndex: _selectedIndex,
-              onTap: (index) {
-                if (index != _selectedIndex) HapticFeedback.selectionClick();
-                _navigateTo(index);
-              },
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: context.cardSurface,
-              elevation: 0,
-              selectedItemColor: AppColors.mainColor,
-              unselectedItemColor: context.mutedColor,
-              selectedFontSize: 11,
-              unselectedFontSize: 11,
-              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-              items: [
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.home_outlined),
-                  activeIcon: const Icon(Icons.home),
-                  label: 'tab_home'.tr,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.sensor_door_outlined),
-                  activeIcon: const Icon(Icons.sensor_door),
-                  label: 'tab_turnstile'.tr,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  activeIcon: const Icon(Icons.receipt_long),
-                  label: 'tab_payslip'.tr,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.beach_access_outlined),
-                  activeIcon: const Icon(Icons.beach_access),
-                  label: 'tab_leave'.tr,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.restaurant_menu_outlined),
-                  activeIcon: const Icon(Icons.restaurant_menu),
-                  label: 'tab_menu'.tr,
-                ),
-                if (chatEnabled)
-                  BottomNavigationBarItem(
-                    icon: const _ChatTabIcon(active: false),
-                    activeIcon: const _ChatTabIcon(active: true),
-                    label: 'tab_chat'.tr,
-                  ),
-              ],
+        );
+        return Scaffold(
+          body: rail
+              ? Row(
+                  children: [
+                    _rail(context),
+                    VerticalDivider(width: 1, color: context.hairlineColor),
+                    Expanded(child: stack),
+                  ],
+                )
+              : stack,
+          bottomNavigationBar: _isAdmin || rail ? null : _bottomBar(context),
+        );
+      }),
+    );
+  }
+
+  static List<(Widget, Widget, String)> get _destinations => [
+        (const Icon(Icons.home_outlined), const Icon(Icons.home), 'tab_home'),
+        (const Icon(Icons.sensor_door_outlined), const Icon(Icons.sensor_door),
+            'tab_turnstile'),
+        (const Icon(Icons.receipt_long_outlined), const Icon(Icons.receipt_long),
+            'tab_payslip'),
+        (const Icon(Icons.beach_access_outlined), const Icon(Icons.beach_access),
+            'tab_leave'),
+        (const Icon(Icons.restaurant_menu_outlined),
+            const Icon(Icons.restaurant_menu), 'tab_menu'),
+        if (chatEnabled)
+          (const _ChatTabIcon(active: false), const _ChatTabIcon(active: true),
+              'tab_chat'),
+      ];
+
+  void _select(int index) {
+    if (index != _selectedIndex) HapticFeedback.selectionClick();
+    _navigateTo(index);
+  }
+
+  Widget _rail(BuildContext context) {
+    final accent = context.accentColor;
+    return NavigationRail(
+      selectedIndex: _selectedIndex,
+      onDestinationSelected: _select,
+      labelType: NavigationRailLabelType.all,
+      backgroundColor: context.cardSurface,
+      indicatorColor: accent.withValues(alpha: 0.14),
+      selectedIconTheme: IconThemeData(color: accent),
+      unselectedIconTheme: IconThemeData(color: context.mutedColor),
+      selectedLabelTextStyle: TextStyle(
+          fontSize: 12, fontWeight: FontWeight.w600, color: accent),
+      unselectedLabelTextStyle:
+          TextStyle(fontSize: 12, color: context.mutedColor),
+      destinations: [
+        for (final (icon, active, label) in _destinations)
+          NavigationRailDestination(
+            icon: icon,
+            selectedIcon: active,
+            label: Text(label.tr),
+          ),
+      ],
+    );
+  }
+
+  /// Нижняя панель в духе Material 3: выбранная вкладка — на зелёной
+  /// «таблетке», которая перетекает от вкладки к вкладке. Цвета и размеры —
+  /// в теме (navigationBarTheme), чтобы панель выглядела одинаково и в
+  /// тёмной теме.
+  Widget _bottomBar(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.hairlineColor)),
+      ),
+      child: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _select,
+        destinations: [
+          for (final (icon, active, label) in _destinations)
+            NavigationDestination(
+              icon: icon,
+              selectedIcon: active,
+              label: label.tr,
+              tooltip: '',
             ),
-          ),
-        ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Смена вкладки — мягким проявлением с лёгким подъёмом, а не скачком.
+///
+/// Сами вкладки остаются в IndexedStack и живут дальше: анимируется только
+/// то, как новая показывается. Пересоздавать их ради анимации нельзя —
+/// пропали бы открытый листок, выбранный период и прокрутка.
+class _TabFade extends StatefulWidget {
+  const _TabFade({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  State<_TabFade> createState() => _TabFadeState();
+}
+
+class _TabFadeState extends State<_TabFade>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: Motion.tab, value: 1);
+  late final Animation<double> _t =
+      CurvedAnimation(parent: _c, curve: Motion.curve);
+
+  @override
+  void didUpdateWidget(_TabFade old) {
+    super.didUpdateWidget(old);
+    if (old.index != widget.index && !Motion.reduced(context)) {
+      _c.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _t,
+      child: SlideTransition(
+        position: Tween(begin: const Offset(0, 0.015), end: Offset.zero)
+            .animate(_t),
+        child: widget.child,
       ),
     );
   }

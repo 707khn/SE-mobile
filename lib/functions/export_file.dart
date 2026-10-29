@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../utils/desktop.dart';
+
 /// Как называется выгруженный файл.
 ///
 /// Раньше и отчёт по себе, и отчёт по отделу сохранялись под одним именем —
@@ -36,7 +38,21 @@ const int keepExports = 10;
 /// На Android — папка приложения в памяти телефона, как и прежде: там уже
 /// лежат сделанные выгрузки. На iPhone такой папки нет, и прежний вызов
 /// бросал исключение — там это документы приложения.
+///
+/// На компьютере — «Загрузки\SemEng»: туда человек и пойдёт искать
+/// скачанное, и оттуда же перетащит файл в письмо. Своя папка внутри — чтобы
+/// уборка при выходе касалась только наших файлов.
 Future<Directory> exportDirectory() async {
+  if (isDesktop) {
+    Directory? base;
+    try {
+      base = await getDownloadsDirectory();
+    } catch (_) {
+      // Linux спрашивает папку у xdg-user-dir, а его может и не быть.
+    }
+    base ??= await getApplicationDocumentsDirectory();
+    return Directory('${base.path}${Platform.pathSeparator}SemEng');
+  }
   if (Platform.isAndroid) {
     final dirs = await getExternalStorageDirectories();
     if (dirs != null && dirs.isNotEmpty) return dirs.first;
@@ -52,8 +68,8 @@ Future<File> saveExport(
     Directory dir, String? who, String extension, List<int> bytes,
     {DateTime? at}) async {
   await dir.create(recursive: true);
-  final file =
-      File('${dir.path}/${exportFileName(who, extension, at: at)}');
+  final file = File('${dir.path}${Platform.pathSeparator}'
+      '${exportFileName(who, extension, at: at)}');
   await file.writeAsBytes(bytes, flush: true);
   for (final old in _exports(dir, who, extension).skip(keepExports)) {
     try {
@@ -82,10 +98,12 @@ File? latestExport(Directory dir, String? who, String extension) {
 /// телефон, отданный другому, не должен их хранить.
 Future<void> clearExports(Directory dir) async {
   if (!await dir.exists()) return;
-  final ours = RegExp(r'(_\d{4}-\d{2}-\d{2}_\d{4}(\d{2})?|^saved_report)'
-      r'\.(xlsx|csv)$');
+  // Расчётные листки ложатся сюда только на компьютере: на телефоне они
+  // уходят через «Поделиться» из временной папки.
+  final ours = RegExp(r'(_\d{4}-\d{2}-\d{2}_\d{4}(\d{2})?|^saved_report'
+      r'|^Расчетный листок .*)\.(xlsx|csv)$');
   await for (final entity in dir.list()) {
-    if (entity is File && ours.hasMatch(entity.path.split('/').last)) {
+    if (entity is File && ours.hasMatch(baseName(entity.path))) {
       try {
         await entity.delete();
       } catch (_) {
@@ -104,7 +122,7 @@ List<File> _exports(Directory dir, String? who, String extension) {
   final found = <(String, File)>[];
   for (final entity in dir.listSync()) {
     if (entity is! File) continue;
-    final match = pattern.firstMatch(entity.path.split('/').last);
+    final match = pattern.firstMatch(baseName(entity.path));
     // Отметки прежних выгрузок — без секунд: дополняем нулями, чтобы
     // сравнивать их с новыми знак в знак.
     if (match != null) found.add((match.group(1)!.padRight(17, '0'), entity));
@@ -112,6 +130,13 @@ List<File> _exports(Directory dir, String? who, String extension) {
   found.sort((a, b) => b.$1.compareTo(a.$1));
   return [for (final (_, file) in found) file];
 }
+
+/// Имя файла без папок.
+///
+/// Делить путь только по «/» нельзя: на Windows папки разделяет «\», и
+/// тогда «имя» оказывалось всем путём целиком — выгрузки не находились ни
+/// кнопкой «Просмотреть», ни уборкой при выходе.
+String baseName(String path) => path.split(RegExp(r'[/\\]')).last;
 
 /// Имя, пригодное для файловой системы.
 ///
