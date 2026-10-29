@@ -17,6 +17,7 @@ import '../utils/dimensions.dart';
 import '../utils/role_helper.dart';
 import '../utils/variables.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/motion.dart';
 import '../widgets/notification_bell.dart';
 import 'admin_panel_screen.dart';
 import 'attendance_screen.dart';
@@ -174,11 +175,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildGreetingCard(),
-              if (_update != null) ...[
-                SizedBox(height: Dimensions.height30 / 1.5),
-                _buildUpdateCard(_update!),
-              ],
+              FadeSlideIn(child: _buildGreetingCard()),
+              // Полоса про обновление приезжает, а не выскакивает: проверка
+              // идёт в сеть и заканчивается, когда экран уже на виду.
+              AnimatedSize(
+                duration: Motion.tab,
+                curve: Motion.curve,
+                alignment: Alignment.topCenter,
+                child: _update == null
+                    ? const SizedBox(width: double.infinity)
+                    : Padding(
+                        padding:
+                            EdgeInsets.only(top: Dimensions.height30 / 1.5),
+                        child: FadeSlideIn(child: _buildUpdateCard(_update!)),
+                      ),
+              ),
               SizedBox(height: Dimensions.height30 / 1.2),
               GridView(
                 shrinkWrap: true,
@@ -196,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   mainAxisSpacing: 12,
                   mainAxisExtent: _cardHeight(context),
                 ),
-                children: [
+                children: _staggered([
                   // The admin has no attendance, payslip or leave of their own,
                   // so only the two things they actually do are shown.
                   if (_isAdmin) ...[
@@ -293,7 +304,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onTap: () => Get.to(() => const AttendanceScreen()),
                     ),
                   ],
-                ],
+                ]),
               ),
               SizedBox(height: Dimensions.height30),
             ],
@@ -302,6 +313,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
   }
+
+  /// Карточки появляются одна за другой, следом за приветствием.
+  List<Widget> _staggered(List<Widget> cards) => [
+        for (var i = 0; i < cards.length; i++)
+          FadeSlideIn(index: i + 1, child: cards[i]),
+      ];
 
   bool _isToday(DateTime day) {
     final now = DateTime.now();
@@ -545,63 +562,95 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     String? live,
   }) {
     final tone = context.readable(color);
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                  color: tone.withOpacity(0.12),
-                  shape: BoxShape.circle,
+    // Своя тень вместо elevation: мягкая и пошире, без серой «грязи» по
+    // краю; в тёмной теме тени нет, карточку отделяет тонкая рамка.
+    return PressScale(
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: context.isDark
+                ? const []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: Card(
+            elevation: 0,
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: context.isDark
+                  ? BorderSide(color: context.hairlineColor)
+                  : BorderSide.none,
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onTap();
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(
+                        color: tone.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: tone, size: 26),
+                    ),
+                    const SizedBox(height: 8),
+                    // Flexible — страховка на случай, если расчёт высоты где-то
+                    // всё-таки не сойдётся: текст ужмётся с многоточием, а красной
+                    // полосы переполнения не появится.
+                    // Название место не делит: Flexible у обоих текстов делил его
+                    // пополам, и вторая строка названия обрезалась на середине.
+                    // Ужимается только пояснение.
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Flexible(
+                      // Живая строка — цветом раздела, чтобы отличалась от
+                      // пояснения, которое стоит, пока сводки нет.
+                      child: Text(
+                        live ?? subtitle,
+                        style: live == null
+                            ? TextStyle(fontSize: 11, color: context.mutedColor)
+                            : TextStyle(
+                                fontSize: 11,
+                                color: tone,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-                child: Icon(icon, color: tone, size: 26),
               ),
-              const SizedBox(height: 8),
-              // Flexible — страховка на случай, если расчёт высоты где-то
-              // всё-таки не сойдётся: текст ужмётся с многоточием, а красной
-              // полосы переполнения не появится.
-              // Название место не делит: Flexible у обоих текстов делил его
-              // пополам, и вторая строка названия обрезалась на середине.
-              // Ужимается только пояснение.
-              Text(
-                label,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-              Flexible(
-                // Живая строка — цветом раздела, чтобы отличалась от
-                // пояснения, которое стоит, пока сводки нет.
-                child: Text(
-                  live ?? subtitle,
-                  style: live == null
-                      ? TextStyle(fontSize: 11, color: context.mutedColor)
-                      : TextStyle(
-                          fontSize: 11, color: tone, fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
-
 }

@@ -20,6 +20,7 @@ import 'utils/desktop.dart';
 import 'utils/error_log.dart';
 import 'utils/lang.dart';
 import 'utils/secure_storage_helper.dart';
+import 'widgets/motion.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
 // ignore: depend_on_referenced_packages
@@ -97,10 +98,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      // Smooth slide-in for pushed screens (reports, menu editor, …) instead
-      // of the abrupt default.
-      defaultTransition: Transition.cupertino,
-      transitionDuration: const Duration(milliseconds: 260),
+      // Переход страниц. На iPhone — родной купертиновский: там его ждут, и
+      // он даёт смахнуть страницу от края назад. Везде ещё — короткий сдвиг
+      // с проявлением (см. FadeThroughSlideTransition): без заданного
+      // defaultTransition GetX берёт customTransition.
+      defaultTransition: GetPlatform.isIOS ? Transition.cupertino : null,
+      customTransition: FadeThroughSlideTransition(),
+      transitionDuration: Motion.page,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -147,49 +151,58 @@ class MyApp extends StatelessWidget {
       },
       home: FutureBuilder<Map<String, String?>>(
         future: authCheck(),
-        builder: (context, res){
-          if (res.connectionState == ConnectionState.waiting){
-            return Scaffold(
-              appBar: null,
-              backgroundColor: AppColors.mainColor,
-              body: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset('assets/logo.png', height: 100, color: Colors.white),
-                    const SizedBox(height: 24),
-                    const CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          } else {
-            final data = res.data;
-            if (data != null && data['loggedIn'] == 'true'){
-              String fullName = data['fullName'] ?? '';
-              String job = data['job'] ?? '';
-              // Вход по коду: логин с паролем спрашивают только в первый раз
-              // и после выхода. Кода ещё нет — значит, приложение обновили,
-              // и придумать его нужно сейчас.
-              return PinScreen(
-                mode: data['hasPin'] == 'true' ? PinMode.unlock : PinMode.create,
-                fullName: fullName,
-                job: job,
-              );
-            } else {
-              return const StartPage();
-            }
-          }
-        },
+        // Заставка растворяется в экран кода или входа, а не сменяется
+        // им скачком.
+        builder: (context, res) => AnimatedSwitcher(
+          duration: Motion.page,
+          switchInCurve: Motion.curve,
+          child: _startScreen(res),
+        ),
       ),
       locale: Lang.locale(prefs.getString(AppValues.LANG)),
       fallbackLocale: const Locale(Lang.ru),
       translations: LocaleString(),
     );
   }
+
+  Widget _startScreen(AsyncSnapshot<Map<String, String?>> res) {
+    if (res.connectionState == ConnectionState.waiting){
+      return Scaffold(
+        appBar: null,
+        backgroundColor: AppColors.mainColor,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/logo.png', height: 100, color: Colors.white),
+              const SizedBox(height: 24),
+              const CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      final data = res.data;
+      if (data != null && data['loggedIn'] == 'true'){
+        String fullName = data['fullName'] ?? '';
+        String job = data['job'] ?? '';
+        // Вход по коду: логин с паролем спрашивают только в первый раз
+        // и после выхода. Кода ещё нет — значит, приложение обновили,
+        // и придумать его нужно сейчас.
+        return PinScreen(
+          mode: data['hasPin'] == 'true' ? PinMode.unlock : PinMode.create,
+          fullName: fullName,
+          job: job,
+        );
+      } else {
+        return const StartPage();
+      }
+    }
+  }
+
   Future<Map<String, String?>> authCheck() async {
     final secure = SecureStorageHelper.instance;
     // Пароль, оставшийся в хранилище от прежних сборок: теперь он не нужен

@@ -197,6 +197,32 @@ class AppTheme {
         elevation: 0,
       ),
 
+      // Нижняя панель вкладок (Material 3): выбранная вкладка — на светлой
+      // «таблетке» фирменного цвета. Ниже стандартных 80 точек: подписи
+      // короткие, а место на телефоне дорого.
+      navigationBarTheme: NavigationBarThemeData(
+        height: 66,
+        elevation: 0,
+        backgroundColor: card,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: accent.withValues(
+            alpha: brightness == Brightness.dark ? 0.24 : 0.14),
+        indicatorShape: const StadiumBorder(),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+              size: 24,
+              color: states.contains(WidgetState.selected) ? accent : muted,
+            )),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? accent : muted,
+          );
+        }),
+      ),
+
       listTileTheme: ListTileThemeData(
         selectedColor: accent,
         selectedTileColor: accent.withOpacity(0.08),
@@ -213,12 +239,50 @@ class AppTheme {
         style: TextButton.styleFrom(foregroundColor: accent),
       ),
 
+      // Кнопки одной формы: скругление как у полей ввода, без тени — плоская
+      // зелёная кнопка на карточке читается чище, чем «приподнятая».
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: accent,
           foregroundColor: Colors.white,
+          elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
+      ),
+
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: accent,
+          side: BorderSide(color: hairline),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+
+      // Вкладки внутри экранов: подчёркивание скруглённое и во всю вкладку.
+      tabBarTheme: const TabBarThemeData(
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        indicator: UnderlineTabIndicator(
+          borderSide: BorderSide(color: Colors.white, width: 3),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(3)),
+        ),
+        labelStyle: TextStyle(fontWeight: FontWeight.w600),
+      ),
+
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: onSurface.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        textStyle: TextStyle(color: page, fontSize: 12),
       ),
     );
   }
