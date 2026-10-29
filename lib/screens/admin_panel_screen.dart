@@ -283,8 +283,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 spacing: 6,
                 runSpacing: 2,
                 children: [
-                  if (e.hasLogin)
+                  if (e.hasLogin && e.loginActive)
                     _badge('${'login'.tr}: ${e.login}', AppColors.mainColor),
+                  if (e.hasLogin && !e.loginActive)
+                    _badge('account_disabled'.tr, AppColors.niceRed),
                   if (e.payslipCount > 0)
                     _badge('${'payslip'.tr}: ${e.payslipCount}',
                         Colors.blue.shade700),
@@ -300,11 +302,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Сбросить пароль можно только тому, у кого есть учётная запись.
-              if (e.hasLogin)
+              if (e.hasLogin && e.loginActive)
                 IconButton(
                   icon: const Icon(Icons.lock_reset, size: 20),
                   tooltip: 'password_reset'.tr,
                   onPressed: () => _confirmReset(e),
+                ),
+              if (e.hasLogin)
+                IconButton(
+                  icon: Icon(e.loginActive ? Icons.person_off_outlined : Icons.person_add_alt,
+                      size: 20),
+                  tooltip: e.loginActive ? 'account_disable'.tr : 'account_enable'.tr,
+                  onPressed: () => _confirmActive(e),
                 ),
               const Icon(Icons.chevron_right, size: 20),
             ],
@@ -376,6 +385,60 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         ],
       ),
     );
+  }
+
+  /// Уволен — отключить учётную запись. Пропуска гаснут сразу, а сервер
+  /// сообщает об этом конфиденциальному чату: там тоже гасятся сессии и
+  /// уведомления. Включение обратно чат не трогает.
+  Future<void> _confirmActive(AdminEmployee e) async {
+    final disabling = e.loginActive;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(disabling ? 'account_disable'.tr : 'account_enable'.tr),
+        content: Text((disabling ? 'account_disable_confirm' : 'account_enable_confirm')
+            .trParams({'name': e.fullName})),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr),
+          ),
+          ElevatedButton(
+            style: disabling
+                ? ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700)
+                : null,
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(disabling ? 'account_disable'.tr : 'account_enable'.tr,
+                style: disabling ? const TextStyle(color: Colors.white) : null),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final (done, chat, problem) = await setAccountActive(e.login, !disabling);
+    if (!mounted) return;
+    if (!done) {
+      final (title, hint) = problemTexts(problem);
+      Get.snackbar(title, hint,
+          snackPosition: SnackPosition.BOTTOM, margin: const EdgeInsets.all(12));
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    final chatNote = switch (chat) {
+      'disabled' || 'already' => 'account_chat_disabled'.tr,
+      'failed' => 'account_chat_failed'.tr,
+      'privileged' => 'account_chat_privileged'.tr,
+      _ => '',
+    };
+    Get.snackbar(
+      disabling ? 'account_disabled_done'.tr : 'account_enabled_done'.tr,
+      [e.fullName, if (chatNote.isNotEmpty) chatNote].join('\n'),
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+      duration: Duration(seconds: chat == 'failed' || chat == 'privileged' ? 8 : 4),
+    );
+    _load();
   }
 
   Widget _badge(String text, Color color) {

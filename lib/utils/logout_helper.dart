@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../chat/chat_bridge.dart';
 import '../functions/export_file.dart';
 import '../screens/start_screen.dart';
 import '../services/fcm_service.dart';
@@ -44,6 +45,9 @@ Future<void> confirmAndLogout(BuildContext context) async {
 Future<void> forceLogout({String? message}) async {
   // Сначала отвязываем телефон от уведомлений — пока пропуск ещё годен.
   await FcmService.unregisterToken();
+  // Выход из SE-mobile выводит и из чата: сессия чата отзывается, ключи под
+  // ПИН-кодом и уведомления чата стираются с телефона.
+  await ChatBridge.wipe();
   // Гасим пропуск на сервере, чтобы он не остался годным ещё месяц.
   // Не получилось — не беда: локально его всё равно стираем.
   await revokeToken();

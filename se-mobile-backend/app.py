@@ -38,6 +38,7 @@ import onboarding
 import medical_visits
 import it_assets
 import planned_outages
+import chat_link
 import reception
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
@@ -2686,6 +2687,39 @@ def register_routes(app):
         logging.info('Password reset for %r by administrator', login)
         return jsonify({'message': 'Success', 'temporary_password': temporary})
 
+    @app.route('/api/admin/accounts/<login>/active', methods=['POST'])
+    @require_auth
+    def admin_set_active(login):
+        """Отключить учётную запись уволенного — или включить обратно.
+
+        Отключённый не входит, его пропуска гаснут сразу. Заодно об этом
+        узнаёт конфиденциальный чат (chat_link.py): там тоже гасятся сессии и
+        уведомления. Включение обратно чат не трогает — доступ к переписке
+        возвращает только администратор чата.
+        """
+        if not _is_admin_account():
+            return _deny()
+        account = db.session.get(UserAccount, login)
+        if account is None:
+            return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
+        active = bool(_json_body().get('active'))
+        viewer = getattr(g, 'employee', None)
+        if not active and viewer is not None and viewer.employee_id == account.employee_id:
+            return jsonify({'message': 'Failure', 'error': 'self'}), 400
+
+        account.is_active = active
+        if not active:
+            AuthToken.query.filter_by(employee_id=account.employee_id).delete()
+        db.session.commit()
+        logging.info('Account %r %s by administrator', login,
+                     'enabled' if active else 'disabled')
+
+        chat = None
+        if not active:
+            chat = chat_link.offboard(
+                account.login, viewer.employee_id if viewer is not None else '')
+        return jsonify({'message': 'Success', 'is_active': active, 'chat': chat})
+
     @app.route('/api/admin/employees/import-excel', methods=['POST'])
     @require_auth
     def import_employees_excel():
@@ -2888,18 +2922,31 @@ def register_routes(app):
             db.session.query(LeaveBalance.employee_id, sa_func.count(LeaveBalance.id))
             .group_by(LeaveBalance.employee_id).all())
         logins = _login_by_employee()
+        # Отключённые (уволенные) — чтобы их было видно и можно было включить
+        # обратно, а не «учётной записи нет».
+        all_accounts = UserAccount.query.all()
+        accounts = {a.login: a.is_active for a in all_accounts}
+        disabled = {a.employee_id: a.login for a in all_accounts if not a.is_active}
 
-        employees = [{
-            'employee_id': e.employee_id,
-            'full_name': e.full_name,
-            'job_title': e.job_title,
-            'department': e.department or '',
-            'iin': e.iin or '',
-            'login': logins.get(e.employee_id, ''),
-            'payslip_count': payslip_counts.get(e.employee_id, 0),
-            'access_count': access_counts.get(e.employee_id, 0),
-            'leave_count': leave_counts.get(e.employee_id, 0),
-        } for e in Employee.query.order_by(Employee.full_name).all()]
+        def login_of(employee_id):
+            login = logins.get(employee_id) or disabled.get(employee_id, '')
+            return login, bool(login) and accounts.get(login, True)
+
+        employees = []
+        for e in Employee.query.order_by(Employee.full_name).all():
+            login, login_active = login_of(e.employee_id)
+            employees.append({
+                'employee_id': e.employee_id,
+                'full_name': e.full_name,
+                'job_title': e.job_title,
+                'department': e.department or '',
+                'iin': e.iin or '',
+                'login': login,
+                'login_active': login_active,
+                'payslip_count': payslip_counts.get(e.employee_id, 0),
+                'access_count': access_counts.get(e.employee_id, 0),
+                'leave_count': leave_counts.get(e.employee_id, 0),
+            })
 
         return jsonify({'message': 'Success', 'employees': employees})
 

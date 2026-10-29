@@ -156,3 +156,29 @@ Future<PasswordReset> resetPassword(String login) async {
     return (null, problemOf(e));
   }
 }
+
+/// Что стало с чатом после отключения учётной записи (см. chat_link.py на
+/// сервере): disabled, already, unknown, privileged, not_configured, failed
+/// или null.
+typedef AccountActiveResult = (bool ok, String? chat, LoadProblem? problem);
+
+/// Отключает учётную запись уволенного или включает обратно.
+Future<AccountActiveResult> setAccountActive(String login, bool active) async {
+  try {
+    final response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/api/admin/accounts/$login/active'),
+          headers: await authHeaders(),
+          body: jsonEncode({'active': active}),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (await handledUnauthorized(response)) return (false, null, null);
+    if (response.statusCode != 200) {
+      return (false, null, problemForStatus(response.statusCode));
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return (true, body['chat'] as String?, null);
+  } catch (e) {
+    return (false, null, problemOf(e));
+  }
+}
