@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'lang.dart';
 import 'localization_it.dart';
 import 'localization_payslip_q.dart';
+import 'localization_payslip_upload.dart';
 import 'localization_assign.dart';
 import 'localization_trip.dart';
 import 'localization_onboarding.dart';
@@ -18,6 +19,7 @@ class LocaleString extends Translations {
           ...itStringsKk,
           ...purchaseStringsKk,
           ...payslipQuestionStringsKk,
+          ...payslipUploadStringsKk,
           ...assignmentStringsKk,
           ...businessTripStringsKk,
           ...onboardingStringsKk,
@@ -401,6 +403,7 @@ class LocaleString extends Translations {
           ...itStringsRu,
           ...purchaseStringsRu,
           ...payslipQuestionStringsRu,
+          ...payslipUploadStringsRu,
           ...assignmentStringsRu,
           ...businessTripStringsRu,
           ...onboardingStringsRu,
