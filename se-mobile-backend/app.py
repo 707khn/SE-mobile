@@ -22,6 +22,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
                     AuthMiss, Notification)
 from parser_1c_xml import parse_1c_xml
+from parser_payslip_excel import parse_payslip_excel
 from parser_menu_excel import parse_menu_excel
 from parser_directory_excel import (parse_directory_excel, split_phones,
                                     split_emails, join_contacts)
@@ -3102,34 +3103,17 @@ def register_routes(app):
         response.headers['Cache-Control'] = 'no-store'
         return response
 
-    @app.route('/api/admin/upload-payslip-xml', methods=['POST'])
-    def upload_payslip_xml():
-        admin_token = os.environ.get('ADMIN_TOKEN', '')
-        # Как и у турникета: незаданный секрет — не повод пускать всех.
-        # Иначе этот путь заводит сотрудников и грузит расчётные листки
-        # вообще без спроса.
-        provided = request.headers.get('X-Admin-Token', '')
-        # Сравнение за одно и то же время, как у секрета турникета: по
-        # обычному `!=` секрет можно подбирать знак за знаком по задержке.
-        if not admin_token or not hmac.compare_digest(
-                provided.encode(), admin_token.encode()):
-            if not admin_token:
-                logging.error('ADMIN_TOKEN не задан — загрузка расчётных листков '
-                              'отклоняется. Проверьте /etc/se-mobile.env')
-            return jsonify({'message': 'Forbidden'}), 403
+    def _store_payslips(payslips, update_employees=True):
+        """Записать разобранные листки и оповестить их хозяев.
 
-        if 'file' not in request.files:
-            return jsonify({'message': 'Файл не передан', 'error': True}), 400
+        Листок за тот же месяц заменяется целиком: бухгалтерия перевыгружает
+        месяц с поправками. Кого нет в базе — заводится по данным листка.
 
-        file = request.files['file']
-        if not file.filename.lower().endswith('.xml'):
-            return jsonify({'message': 'Ожидается XML файл', 'error': True}), 400
-
-        try:
-            payslips = parse_1c_xml(file.read())
-        except ValueError as e:
-            return jsonify({'message': str(e), 'error': True}), 422
-
+        `update_employees=False` — ФИО и должность уже заведённых сотрудников
+        не трогать. Должность из листка решает и права в приложении
+        («главный бухгалтер», «администратор системы»), а листки загружает
+        бухгалтер — менять ими чужие права незачем.
+        """
         imported = []
         latest = {}
         for slip in payslips:
@@ -3145,7 +3129,7 @@ def register_routes(app):
                 )
                 db.session.add(emp)
                 db.session.flush()
-            else:
+            elif update_employees:
                 if slip['full_name']:
                     emp.full_name = slip['full_name']
                 if slip['position']:
@@ -3244,12 +3228,108 @@ def register_routes(app):
                            employee_ids=employee_ids)
             _notify_later(app, _push_to, employee_ids, 'Зарплата', text,
                           {'type': 'payslip'})
+        return imported
+
+    @app.route('/api/admin/upload-payslip-xml', methods=['POST'])
+    def upload_payslip_xml():
+        admin_token = os.environ.get('ADMIN_TOKEN', '')
+        # Как и у турникета: незаданный секрет — не повод пускать всех.
+        # Иначе этот путь заводит сотрудников и грузит расчётные листки
+        # вообще без спроса.
+        provided = request.headers.get('X-Admin-Token', '')
+        # Сравнение за одно и то же время, как у секрета турникета: по
+        # обычному `!=` секрет можно подбирать знак за знаком по задержке.
+        if not admin_token or not hmac.compare_digest(
+                provided.encode(), admin_token.encode()):
+            if not admin_token:
+                logging.error('ADMIN_TOKEN не задан — загрузка расчётных листков '
+                              'отклоняется. Проверьте /etc/se-mobile.env')
+            return jsonify({'message': 'Forbidden'}), 403
+
+        if 'file' not in request.files:
+            return jsonify({'message': 'Файл не передан', 'error': True}), 400
+
+        file = request.files['file']
+        if not file.filename.lower().endswith('.xml'):
+            return jsonify({'message': 'Ожидается XML файл', 'error': True}), 400
+
+        try:
+            payslips = parse_1c_xml(file.read())
+        except ValueError as e:
+            return jsonify({'message': str(e), 'error': True}), 422
+
+        imported = _store_payslips(payslips)
 
         return jsonify({
             'message': 'Success',
             'imported': len(imported),
             'employees': imported,
         })
+
+    @app.route('/api/payslips/import-excel', methods=['POST'])
+    @require_auth
+    def import_payslips_excel():
+        """Расчётные листки за месяц из отчёта 1С, сохранённого в Excel.
+
+        Загружает бухгалтер расчётной группы из версии для компьютера, своим
+        обычным входом — общий ADMIN_TOKEN ей не нужен. `dry_run=1` — только
+        показать, что в файле: период, сколько листков, кого из сотрудников
+        в приложении нет. Без него — записать и разослать «расчётный лист
+        готов».
+        """
+        viewer = getattr(g, 'employee', None)
+        # Даже пока REQUIRE_AUTH выключен: зарплаты пятисот человек без входа
+        # не пишутся.
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        if not (payslip_questions.is_payroll(viewer)
+                or _is_system_admin(viewer.job_title)):
+            return jsonify({
+                'message': 'Загружать расчётные листки может расчётная группа',
+                'error': True,
+            }), 403
+
+        upload = request.files.get('file')
+        if upload is None:
+            return jsonify({'message': 'Файл не передан', 'error': True}), 400
+        if not (upload.filename or '').lower().endswith(('.xls', '.xlsx')):
+            return jsonify({'message': 'Ожидается файл Excel (.xls или .xlsx)',
+                            'error': True}), 400
+        try:
+            payslips = parse_payslip_excel(upload.read())
+        except ValueError as e:
+            return jsonify({'message': str(e), 'error': True}), 422
+
+        ids = {p['employee_1c_id'] for p in payslips}
+        known = {e.employee_id for e in
+                 Employee.query.filter(Employee.employee_id.in_(ids))}
+        periods = sorted({(p['period_year'], p['period_month'],
+                           p['period_display']) for p in payslips})
+        existing = set()
+        for year, month, _ in periods:
+            existing |= {(ps.employee_id, year, month) for ps in
+                         Payslip.query.filter_by(period_year=year,
+                                                 period_month=month)}
+        replaced = sum(1 for p in payslips if (
+            p['employee_1c_id'], p['period_year'], p['period_month']) in existing)
+        summary = {
+            'periods': [display for _, _, display in periods],
+            'count': len(payslips),
+            'replaced': replaced,
+            'new': len(payslips) - replaced,
+            'unknown': [{'employee_id': p['employee_1c_id'],
+                         'full_name': p['full_name']}
+                        for p in payslips if p['employee_1c_id'] not in known],
+        }
+        if (request.form.get('dry_run') or '').strip() in ('1', 'true'):
+            return jsonify({'message': 'Success', 'dry_run': True, **summary})
+
+        _store_payslips(payslips, update_employees=False)
+        logging.info('Расчётные листки (%s): %d шт., загрузил %s',
+                     ', '.join(summary['periods']), len(payslips),
+                     viewer.employee_id)
+        return jsonify({'message': 'Success', 'imported': len(payslips),
+                        **summary})
 
     @app.route('/leaves', methods=['POST'])
     @require_auth

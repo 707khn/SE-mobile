@@ -19,3 +19,14 @@ bool isCanteenTech(String job) {
   final lower = job.toLowerCase();
   return lower.contains('технолог') && lower.contains('столов');
 }
+
+/// Расчётная группа бухгалтерии: она загружает расчётные листки из 1С. Так
+/// же решает и сервер (payslip_questions.is_payroll), а он — последнее слово:
+/// кого он добавил списком PAYROLL_STAFF, приложение по должности не узнает.
+bool isPayroll(String job) {
+  final lower = job.toLowerCase().replaceAll('ё', 'е').trim();
+  return lower.contains('расчетн') || lower.startsWith('главный бухгалтер');
+}
+
+/// Кому в версии для компьютера показывать «Загрузить расчётные листки».
+bool canUploadPayslips(String job) => isPayroll(job) || isSystemAdmin(job);

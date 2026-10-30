@@ -152,6 +152,13 @@ def test_ordinary_requests_are_not_limited(nginx):
     assert set(_statuses(f'{nginx}/api/home', 300, 'POST')) == {200}
 
 
+def test_payslips_of_whole_plant_fit(nginx):
+    """Листки всего предприятия из 1С (.xls, 25 МБ) проходят; прочим — 12 МБ."""
+    big = b'x' * (30 * 1024 * 1024)
+    assert _hit(f'{nginx}/api/payslips/import-excel', 'POST', data=big)[0] == 200
+    assert _hit(f'{nginx}/api/menu/import-excel', 'POST', data=big)[0] == 413
+
+
 def test_no_more_than_two_uploads_at_once_from_one_address(nginx):
     """Третья одновременная загрузка не занимает последний процесс gunicorn."""
     url = f'{nginx}/api/directory/import-excel'
