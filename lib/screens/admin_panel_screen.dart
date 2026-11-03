@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../utils/desktop.dart';
 
 import '../requests/admin_request.dart';
 import '../requests/account_request.dart';
@@ -100,9 +101,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     final list = _filtered;
     return Scaffold(
       backgroundColor: context.pageColor,
-      drawer: const AppDrawer(),
+      drawer: sidebarShown(context) ? null : const AppDrawer(),
       appBar: AppBar(
-        leading: Builder(
+        leading: sidebarShown(context)
+            ? null
+            : Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
             tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,

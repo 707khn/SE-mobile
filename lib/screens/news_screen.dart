@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../utils/desktop.dart';
 import 'package:intl/intl.dart';
 
 import '../requests/news_request.dart';
@@ -76,7 +77,7 @@ class _NewsScreenState extends State<NewsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.pageColor,
-      drawer: const AppDrawer(),
+      drawer: sidebarShown(context) ? null : const AppDrawer(),
       appBar: AppBar(
         title: BigText(content: 'news'.tr, color: Colors.white),
         actions: [

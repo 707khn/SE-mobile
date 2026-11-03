@@ -18,6 +18,9 @@ import 'package:se_mobile/utils/desktop.dart';
 import 'package:se_mobile/utils/localization.dart';
 import 'package:se_mobile/utils/open_external.dart';
 import 'package:se_mobile/utils/secure_storage_helper.dart';
+import 'package:se_mobile/utils/shell_tab.dart';
+import 'package:se_mobile/widgets/app_drawer.dart';
+import 'package:se_mobile/widgets/desktop_layout.dart';
 
 import 'support/fake_server.dart';
 
@@ -255,5 +258,66 @@ void main() {
         size: const Size(500, 900));
     expect(find.byType(NavigationRail), findsNothing);
     expect(find.byType(NavigationBar), findsOneWidget);
+  });
+
+  Future<void> pumpLayout(WidgetTester tester, Size size) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues(
+        {'fullName': 'Иванов Иван', 'job': 'Инженер'});
+    await tester.pumpWidget(GetMaterialApp(
+      translations: LocaleString(),
+      locale: const Locale('ru'),
+      builder: (context, child) => DesktopLayout(child: child!),
+      home: const HomeShell(fullName: 'Иванов Иван', job: 'Инженер'),
+    ));
+    await tester.pump();
+    await tester.pump();
+  }
+
+  testWidgets('на мониторе разделы — панелью слева, без «≡» и полоски вкладок',
+      (tester) async {
+    await pumpLayout(tester, const Size(1920, 1000));
+    expect(find.byWidgetPredicate((w) => w is AppDrawer && w.permanent),
+        findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byIcon(Icons.menu), findsNothing);
+    // Раздел — справа от панели и не шире положенного.
+    final scaffold = tester.getRect(find.byType(Scaffold).first);
+    expect(scaffold.left, greaterThan(kDesktopSidebarWidth));
+    expect(scaffold.width, kDesktopWideContentWidth);
+
+    await tester.tap(find.text('Отпуск').first);
+    await tester.pump();
+    expect(ShellTab.selected.value, 3);
+    ShellTab.open(0);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('узкое окно — без панели, с полоской вкладок; экраны не теряются',
+      (tester) async {
+    await pumpLayout(tester, const Size(1920, 1000));
+    Get.to(() => const Scaffold(body: Text('Открытый экран')));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100),
+        EnginePhase.sendSemanticsUpdate, const Duration(seconds: 5));
+    expect(find.text('Открытый экран'), findsOneWidget);
+
+    tester.view.physicalSize = const Size(900, 1000);
+    await tester.pump();
+    expect(find.byWidgetPredicate((w) => w is AppDrawer && w.permanent),
+        findsNothing);
+    // Навигатор переехал, а не создан заново: открытый экран на месте.
+    expect(find.text('Открытый экран'), findsOneWidget);
+    Get.back();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(NavigationRail), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
   });
 }

@@ -152,12 +152,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.pageColor,
-      drawer: AppDrawer(onNavigate: widget.onNavigate, currentIndex: 0),
+      drawer: sidebarShown(context)
+          ? null
+          : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 0),
       appBar: AppBar(
         // Explicit leading: the shell sits on top of the login screen, so an
         // implied leading would be a back arrow that signs the user out.
         automaticallyImplyLeading: false,
-        leading: Builder(
+        leading: sidebarShown(context)
+            ? null
+            : Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
             tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
@@ -210,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   // The admin's few cards read better as full-width banners than
                   // as squares in a two-column grid.
-                  crossAxisCount: _isAdmin ? 1 : 2,
+                  crossAxisCount: _columns(context),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   mainAxisExtent: _cardHeight(context),
@@ -332,6 +336,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  /// Сколько карточек в ряд. На телефоне — две (у администратора одна, во
+  /// всю ширину); на мониторе места больше, и в два столбца карточки
+  /// вытягивались в широкие пустые плитки.
+  int _columns(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (_isAdmin) return width >= 700 ? 2 : 1;
+    if (width >= 1000) return 4;
+    if (width >= 700) return 3;
+    return 2;
   }
 
   /// Карточки появляются одна за другой, следом за приветствием.

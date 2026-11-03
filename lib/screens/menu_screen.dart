@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../utils/desktop.dart';
 import 'package:intl/intl.dart';
 
 import '../requests/menu_request.dart';
@@ -92,11 +93,11 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.pageColor,
-      drawer: widget.onNavigate == null
+      drawer: widget.onNavigate == null || sidebarShown(context)
           ? null
           : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 4),
       appBar: AppBar(
-        leading: widget.onNavigate == null
+        leading: widget.onNavigate == null || sidebarShown(context)
             ? null
             : Builder(
                 builder: (context) => IconButton(

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:get/get.dart';
+import '../utils/desktop.dart';
 
 import '../chat/chat_bridge.dart';
 import '../chat/chat_config.dart';
@@ -183,11 +184,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.pageColor,
-      drawer: widget.onNavigate == null
+      drawer: widget.onNavigate == null || sidebarShown(context)
           ? null
           : AppDrawer(onNavigate: widget.onNavigate, currentIndex: ChatBridge.tabIndex),
       appBar: AppBar(
-        leading: widget.onNavigate == null
+        leading: widget.onNavigate == null || sidebarShown(context)
             ? null
             : Builder(
                 builder: (context) => IconButton(

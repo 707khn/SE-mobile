@@ -22,6 +22,7 @@ import 'utils/error_log.dart';
 import 'utils/lang.dart';
 import 'utils/secure_storage_helper.dart';
 import 'widgets/motion.dart';
+import 'widgets/desktop_layout.dart';
 
 // Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
 // ignore: depend_on_referenced_packages
@@ -132,8 +133,8 @@ class MyApp extends StatelessWidget {
       // often enlarge it — but cap the growth, since the denser screens
       // (payslip totals, turnstile rows) start overflowing beyond this.
       //
-      // На компьютере содержимое ещё и стоит колонкой посередине окна (см.
-      // DesktopFrame), а Esc работает как «назад».
+      // На компьютере после входа разделы — панелью слева, а раздел — справа
+      // (см. DesktopLayout), а Esc работает как «назад».
       builder: (context, child) {
         final media = MediaQuery.of(context);
         final scaled = MediaQuery(
@@ -147,7 +148,7 @@ class MyApp extends StatelessWidget {
         // Esc — «назад».
         return DesktopKeys(
           navigator: () => Get.key.currentState,
-          child: DesktopFrame(child: scaled),
+          child: DesktopLayout(child: scaled),
         );
       },
       home: FutureBuilder<Map<String, String?>>(

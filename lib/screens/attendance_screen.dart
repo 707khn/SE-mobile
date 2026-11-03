@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../utils/desktop.dart';
 import 'package:intl/intl.dart';
 
 import '../requests/attendance_request.dart';
@@ -88,9 +89,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.pageColor,
-      drawer: const AppDrawer(),
+      drawer: sidebarShown(context) ? null : const AppDrawer(),
       appBar: AppBar(
-        leading: Builder(
+        leading: sidebarShown(context)
+            ? null
+            : Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
             tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,

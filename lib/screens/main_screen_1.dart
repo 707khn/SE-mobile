@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../utils/desktop.dart';
 import 'package:intl/intl.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/report_request.dart';
@@ -80,7 +81,7 @@ class _MainPage1State extends State<MainPage1> {
       backgroundColor: context.pageColor,
       appBar: AppBar(
         centerTitle: true,
-        leading: widget.onNavigate == null
+        leading: widget.onNavigate == null || sidebarShown(context)
             ? null
             : Builder(
                 builder: (context) => IconButton(
@@ -127,7 +128,7 @@ class _MainPage1State extends State<MainPage1> {
           // viewing somebody else) gets neither, since it is not their session.
         ],
       ),
-      drawer: widget.onNavigate == null
+      drawer: widget.onNavigate == null || sidebarShown(context)
           ? null
           : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 1),
       body: MainMenu1(
