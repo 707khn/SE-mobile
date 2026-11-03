@@ -62,9 +62,19 @@ def staff(app, remove_employee):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _post(client, path, body):
+def _post(client, path, body, headers=None):
     return client.post(path, data=json.dumps(body),
-                       content_type='application/json')
+                       content_type='application/json', headers=headers)
+
+
+def _as_admin(client):
+    """Пропуск администратора системы.
+
+    Начальнику, технологу и админу без пропуска отказывают даже в переходном
+    режиме (REQUIRE_AUTH=0): иначе любой из интернета был бы админом.
+    """
+    with client.application.app_context():
+        return {'Authorization': f'Bearer {app_module._issue_token("ADMIN")}'}
 
 
 _ADMIN_HEADERS = {'X-Admin-Token': os.environ['ADMIN_TOKEN']}
@@ -230,7 +240,7 @@ def test_director_report_success(client, staff):
         'emp_sname': _WORKER_SURNAME,
         'start_date': '2024-01-01',
         'end_date': '2024-01-31',
-    })
+    }, headers=_as_admin(client))
     body = r.get_json()
     assert body['message'] == 'Success'
     assert len(body['director_report']) > 0
@@ -250,7 +260,8 @@ def test_director_report_failure(client):
 # ---------------------------------------------------------------------------
 
 def test_get_sname_list(client):
-    r = _post(client, '/get_sname', {'key_suffix': _SARSEKEN})
+    r = _post(client, '/get_sname', {'key_suffix': _SARSEKEN},
+              headers=_as_admin(client))
     body = r.get_json()
     assert 'fio' in body
     assert len(body['fio']) >= 3
@@ -437,13 +448,15 @@ def test_menu_get_empty(client):
 
 
 def test_menu_post(client):
-    r = _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
+    r = _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS},
+          headers=_as_admin(client))
     assert r.status_code == 200
     assert r.get_json()['message'] == 'Success'
 
 
 def test_menu_get_after_post(client):
-    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
+    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS},
+          headers=_as_admin(client))
     r = client.get(f'/api/menu?date={_MENU_DATE}')
     body = r.get_json()
     assert body['message'] == 'Success'
@@ -453,15 +466,18 @@ def test_menu_get_after_post(client):
 
 
 def test_menu_post_idempotent(client):
-    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
-    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
+    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS},
+          headers=_as_admin(client))
+    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS},
+          headers=_as_admin(client))
     r = client.get(f'/api/menu?date={_MENU_DATE}')
     assert len(r.get_json()['items']) == 3
 
 
 def test_menu_delete(client):
-    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS})
-    r = client.delete(f'/api/menu/{_MENU_DATE}')
+    _post(client, '/api/menu', {'date': _MENU_DATE, 'items': _MENU_ITEMS},
+          headers=_as_admin(client))
+    r = client.delete(f'/api/menu/{_MENU_DATE}', headers=_as_admin(client))
     assert r.status_code == 200
     assert r.get_json()['message'] == 'Success'
     r2 = client.get(f'/api/menu?date={_MENU_DATE}')

@@ -192,15 +192,16 @@ def test_queued_announcement_is_shown_to_admins_only(app, client, clean_notices)
 def test_new_menu_day_is_announced_once(app, client, clean_notices):
     day = '2031-01-15'
     items = [{'category': 'Первое блюдо', 'name': 'Шорпа', 'price': 700.0}]
-    client.post('/api/menu', json={'date': day, 'items': items})
+    admin = _bearer(app, 'ADMIN')
+    client.post('/api/menu', json={'date': day, 'items': items}, headers=admin)
     # Поправили цену — того же дня второй раз не объявляем.
-    client.post('/api/menu', json={'date': day, 'items': items})
+    client.post('/api/menu', json={'date': day, 'items': items}, headers=admin)
 
     with app.app_context():
         notices = Notification.query.filter_by(kind='menu', ref=day).all()
         assert len(notices) == 1
         assert notices[0].body == 'Меню на 15.01 опубликовано'
-    client.delete(f'/api/menu/{day}')
+    client.delete(f'/api/menu/{day}', headers=admin)
 
 
 def test_menu_notice_names_the_day(monkeypatch):
