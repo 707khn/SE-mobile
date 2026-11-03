@@ -110,6 +110,22 @@ class PayslipReference(db.Model):
     amount = db.Column(db.Float)
 
 
+class PayslipUpload(db.Model):
+    """Кто и когда загрузил расчётные листки — по строке на загрузку.
+
+    Листки за месяц перезагружают с поправками, и в разделе «Расчётные листы»
+    бухгалтер должна видеть, какой файл лёг последним и кем.
+    """
+    __tablename__ = 'payslip_uploads'
+    id = db.Column(db.Integer, primary_key=True)
+    period_year = db.Column(db.Integer, nullable=False)
+    period_month = db.Column(db.Integer, nullable=False)
+    count = db.Column(db.Integer, nullable=False)
+    file_name = db.Column(db.String(255))
+    uploaded_by = db.Column(db.String(10), db.ForeignKey('employees.employee_id'))
+    at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class LeaveBalance(db.Model):
     __tablename__ = 'leave_balances'
     id = db.Column(db.Integer, primary_key=True)

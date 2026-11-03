@@ -12,7 +12,7 @@ import pytest
 from openpyxl import Workbook
 
 import app as app_module
-from models import db, Employee, Notification, Payslip
+from models import db, Employee, Notification, Payslip, PayslipUpload
 from parser_payslip_excel import parse_payslip_excel
 
 _PAYROLL = '0000001469'     # бухгалтер расчётной группы
@@ -98,6 +98,7 @@ def clean(app):
             if ps.employee_id in (_KNOWN, _NEW, '9999990002'):
                 db.session.delete(ps)
         Notification.query.filter_by(kind='payslip').delete()
+        PayslipUpload.query.delete()
         for emp_id in (_NEW, '9999990002'):
             emp = db.session.get(Employee, emp_id)
             if emp:
@@ -246,4 +247,77 @@ def test_upload_stores_and_notifies(app, client):
 
 def test_wrong_file_type(app, client):
     r = _upload(client, _auth(app, _PAYROLL), name='Июль.pdf')
+    assert r.status_code == 400
+
+
+# --- Раздел «Расчётные листы»: месяцы, сотрудники, удаление ---------------
+
+
+def test_sections_closed_to_others(app, client):
+    for method, url in (('get', '/api/payslips/periods'),
+                        ('get', '/api/payslips/periods/2026/7'),
+                        ('delete', '/api/payslips/periods/2026/7')):
+        assert getattr(client, method)(url).status_code == 401
+        assert getattr(client, method)(
+            url, headers=_auth(app, _ACCOUNTANT)).status_code == 403
+
+
+def test_periods_show_upload(app, client):
+    headers = _auth(app, _PAYROLL)
+    assert _upload(client, headers).status_code == 200
+
+    items = client.get('/api/payslips/periods', headers=headers).get_json()['items']
+    july = next(i for i in items if (i['year'], i['month']) == (2026, 7))
+    assert july['title'] == 'Июль 2026'
+    assert july['count'] >= 3
+    assert july['uploaded']['file'] == 'Июль.xls'
+    assert july['uploaded']['count'] == 3
+    with app.app_context():
+        assert july['uploaded']['by'] == db.session.get(
+            Employee, _PAYROLL).full_name
+
+    body = client.get('/api/payslips/periods/2026/7', headers=headers).get_json()
+    mine = next(i for i in body['items'] if i['employee_id'] == _KNOWN)
+    assert mine['net_pay'] == 245000.0
+    assert mine['department'] == 'Отдел тестирования'
+
+
+def test_payroll_opens_anyones_payslip(app, client):
+    headers = _auth(app, _PAYROLL)
+    assert _upload(client, headers).status_code == 200
+    r = client.post('/payslip', json={'key_suffix': _KNOWN, 'month': '07',
+                                      'year': '2026'}, headers=headers)
+    assert r.status_code == 200
+    assert r.get_json()['payslip']['net_pay'] == 245000.0
+    # Рядовой бухгалтер — нет.
+    r = client.post('/payslip', json={'key_suffix': _KNOWN, 'month': '07',
+                                      'year': '2026'},
+                    headers=_auth(app, _ACCOUNTANT))
+    assert r.status_code == 403
+
+
+def test_delete_one_then_month(app, client):
+    headers = _auth(app, _PAYROLL)
+    assert _upload(client, headers).status_code == 200
+
+    r = client.delete(f'/api/payslips/periods/2026/7/{_NEW}', headers=headers)
+    assert r.get_json()['deleted'] == 1
+    with app.app_context():
+        left = {p.employee_id for p in
+                Payslip.query.filter_by(period_year=2026, period_month=7)}
+        assert _NEW not in left and _KNOWN in left
+    assert client.delete(f'/api/payslips/periods/2026/7/{_NEW}',
+                         headers=headers).status_code == 404
+
+    assert client.delete('/api/payslips/periods/2026/7',
+                         headers=headers).status_code == 200
+    with app.app_context():
+        assert Payslip.query.filter_by(period_year=2026,
+                                       period_month=7).count() == 0
+    items = client.get('/api/payslips/periods', headers=headers).get_json()['items']
+    assert not any((i['year'], i['month']) == (2026, 7) for i in items)
+
+
+def test_bad_month(app, client):
+    r = client.get('/api/payslips/periods/2026/13', headers=_auth(app, _PAYROLL))
     assert r.status_code == 400

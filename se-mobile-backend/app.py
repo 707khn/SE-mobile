@@ -20,7 +20,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
-                    AuthMiss, Notification)
+                    AuthMiss, Notification, PayslipUpload)
 from parser_1c_xml import parse_1c_xml
 from parser_payslip_excel import parse_payslip_excel
 from parser_menu_excel import parse_menu_excel
@@ -1211,6 +1211,16 @@ def _may_view(target_employee_id):
         return True
     allowed = _visible_employee_ids()
     return allowed is None or target_employee_id in allowed
+
+
+def _may_view_payslip(target_employee_id):
+    """Листок — как _may_view, и вдобавок расчётной группе: любой.
+
+    Листки она и загружает, и в разделе «Расчётные листы» должна видеть, что
+    именно легло каждому.
+    """
+    return (_may_view(target_employee_id)
+            or payslip_questions.is_payroll(getattr(g, 'employee', None)))
 
 
 def _is_manager():
@@ -3005,7 +3015,7 @@ def register_routes(app):
         if not key_suffix:
             viewer = getattr(g, 'employee', None)
             key_suffix = viewer.employee_id if viewer is not None else ''
-        if not key_suffix or not _may_view(key_suffix):
+        if not key_suffix or not _may_view_payslip(key_suffix):
             return _deny()
 
         rows = (db.session.query(Payslip.period_year, Payslip.period_month)
@@ -3023,7 +3033,7 @@ def register_routes(app):
         """
         data = _json_body()
         key_suffix = _text(data, 'key_suffix')
-        if not _may_view(key_suffix):
+        if not _may_view_payslip(key_suffix):
             return None, _deny()
         # Месяц и год приходят снаружи. int('август') — это ValueError и
         # пятисотый ответ, который приложение показывает как «ошибка сети».
@@ -3266,6 +3276,24 @@ def register_routes(app):
             'employees': imported,
         })
 
+    def _payroll_viewer():
+        """Расчётная группа или администратор — иначе отказ.
+
+        Даже пока REQUIRE_AUTH выключен: зарплаты пятисот человек без входа
+        не пишутся и не показываются списком.
+        """
+        viewer = getattr(g, 'employee', None)
+        if viewer is None:
+            return None, (jsonify({'message': 'Failure',
+                                   'error': 'unauthorized'}), 401)
+        if not (payslip_questions.is_payroll(viewer)
+                or _is_system_admin(viewer.job_title)):
+            return None, (jsonify({
+                'message': 'Раздел только для расчётной группы',
+                'error': True,
+            }), 403)
+        return viewer, None
+
     @app.route('/api/payslips/import-excel', methods=['POST'])
     @require_auth
     def import_payslips_excel():
@@ -3277,17 +3305,9 @@ def register_routes(app):
         в приложении нет. Без него — записать и разослать «расчётный лист
         готов».
         """
-        viewer = getattr(g, 'employee', None)
-        # Даже пока REQUIRE_AUTH выключен: зарплаты пятисот человек без входа
-        # не пишутся.
-        if viewer is None:
-            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
-        if not (payslip_questions.is_payroll(viewer)
-                or _is_system_admin(viewer.job_title)):
-            return jsonify({
-                'message': 'Загружать расчётные листки может расчётная группа',
-                'error': True,
-            }), 403
+        viewer, refusal = _payroll_viewer()
+        if refusal is not None:
+            return refusal
 
         upload = request.files.get('file')
         if upload is None:
@@ -3325,11 +3345,131 @@ def register_routes(app):
             return jsonify({'message': 'Success', 'dry_run': True, **summary})
 
         _store_payslips(payslips, update_employees=False)
+        for year, month, _ in periods:
+            db.session.add(PayslipUpload(
+                period_year=year, period_month=month,
+                count=sum(1 for p in payslips if (p['period_year'],
+                          p['period_month']) == (year, month)),
+                file_name=(upload.filename or '')[:255],
+                uploaded_by=viewer.employee_id))
+        db.session.commit()
         logging.info('Расчётные листки (%s): %d шт., загрузил %s',
                      ', '.join(summary['periods']), len(payslips),
                      viewer.employee_id)
         return jsonify({'message': 'Success', 'imported': len(payslips),
                         **summary})
+
+    _PERIOD_NAMES = ('Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                     'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь',
+                     'Декабрь')
+
+    def _period_name(year, month):
+        return f'{_PERIOD_NAMES[month - 1]} {year}'
+
+    @app.route('/api/payslips/periods', methods=['GET'])
+    @require_auth
+    def payslip_admin_periods():
+        """Раздел «Расчётные листы»: какие месяцы загружены.
+
+        По месяцу — сколько листков и последняя загрузка: когда, кем, каким
+        файлом. Свежие месяцы сверху.
+        """
+        _, refusal = _payroll_viewer()
+        if refusal is not None:
+            return refusal
+        counts = (db.session.query(Payslip.period_year, Payslip.period_month,
+                                   db.func.count(Payslip.id))
+                  .group_by(Payslip.period_year, Payslip.period_month).all())
+        last = {}
+        for up in PayslipUpload.query.order_by(PayslipUpload.at).all():
+            last[(up.period_year, up.period_month)] = up
+        names = _employee_names()
+        items = []
+        for year, month, count in sorted(counts, reverse=True):
+            up = last.get((year, month))
+            items.append({
+                'year': year, 'month': month,
+                'title': _period_name(year, month),
+                'count': count,
+                'uploaded': None if up is None else {
+                    'at': up.at.replace(tzinfo=timezone.utc).isoformat(),
+                    'by': names.get(up.uploaded_by, up.uploaded_by or ''),
+                    'file': up.file_name or '',
+                    'count': up.count,
+                },
+            })
+        return jsonify({'message': 'Success', 'items': items})
+
+    def _period_args(year, month):
+        if not (2000 <= year <= 2100 and 1 <= month <= 12):
+            return jsonify({'message': 'Неверный месяц', 'error': True}), 400
+        return None
+
+    @app.route('/api/payslips/periods/<int:year>/<int:month>',
+               methods=['GET'])
+    @require_auth
+    def payslip_admin_period(year, month):
+        """Листки месяца списком: кто, отдел, начислено, удержано, к выплате."""
+        _, refusal = _payroll_viewer()
+        if refusal is not None:
+            return refusal
+        bad = _period_args(year, month)
+        if bad is not None:
+            return bad
+        rows = (db.session.query(Payslip, Employee.full_name)
+                .join(Employee, Employee.employee_id == Payslip.employee_id)
+                .filter(Payslip.period_year == year,
+                        Payslip.period_month == month)
+                .order_by(Employee.full_name).all())
+        return jsonify({
+            'message': 'Success',
+            'title': _period_name(year, month),
+            'items': [{
+                'employee_id': ps.employee_id,
+                'full_name': name,
+                'department': ps.department or '',
+                'position': ps.position or '',
+                'total_accruals': ps.total_accruals,
+                'total_deductions': ps.total_deductions,
+                'net_pay': ps.net_pay,
+            } for ps, name in rows],
+        })
+
+    @app.route('/api/payslips/periods/<int:year>/<int:month>',
+               methods=['DELETE'])
+    @app.route('/api/payslips/periods/<int:year>/<int:month>/<employee_id>',
+               methods=['DELETE'])
+    @require_auth
+    def payslip_admin_delete(year, month, employee_id=None):
+        """Убрать ошибочно загруженный месяц целиком или листок одного человека.
+
+        Удаляем через ORM, по листку: строки начислений и удержаний уходят
+        вместе с ним (cascade), а SQLite без включённых внешних ключей сам их
+        не удалил бы.
+        """
+        viewer, refusal = _payroll_viewer()
+        if refusal is not None:
+            return refusal
+        bad = _period_args(year, month)
+        if bad is not None:
+            return bad
+        query = Payslip.query.filter_by(period_year=year, period_month=month)
+        if employee_id is not None:
+            query = query.filter_by(employee_id=employee_id)
+        slips = query.all()
+        if not slips:
+            return jsonify({'message': 'Листков нет', 'error': True}), 404
+        for ps in slips:
+            db.session.delete(ps)
+        if employee_id is None:
+            PayslipUpload.query.filter_by(period_year=year,
+                                          period_month=month).delete()
+        db.session.commit()
+        logging.info('Расчётные листки %s удалены (%d шт.%s), удалил %s',
+                     _period_name(year, month), len(slips),
+                     f', {employee_id}' if employee_id else '',
+                     viewer.employee_id)
+        return jsonify({'message': 'Success', 'deleted': len(slips)})
 
     @app.route('/leaves', methods=['POST'])
     @require_auth

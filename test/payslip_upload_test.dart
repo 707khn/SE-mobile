@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:se_mobile/screens/payslip_upload_screen.dart';
+import 'package:se_mobile/screens/payslips_admin_screen.dart';
 import 'package:se_mobile/utils/lang.dart';
 import 'package:se_mobile/utils/localization.dart';
 import 'package:se_mobile/utils/role_helper.dart';
@@ -65,8 +66,9 @@ void main() {
 
   test('надписи в обоих языках', () {
     final keys = LocaleString().keys;
-    final ru = keys[Lang.ru]!.keys.where((k) => k.startsWith('psu_')).toSet();
-    final kk = keys[Lang.kk]!.keys.where((k) => k.startsWith('psu_')).toSet();
+    bool ours(String k) => k.startsWith('psu_') || k.startsWith('psa_');
+    final ru = keys[Lang.ru]!.keys.where(ours).toSet();
+    final kk = keys[Lang.kk]!.keys.where(ours).toSet();
     expect(kk, ru);
   });
 
@@ -126,5 +128,82 @@ void main() {
     expect(find.byKey(const Key('psu_error')), findsOneWidget);
     expect(find.text('В файле нет расчётных листков.'), findsOneWidget);
     expect(find.byKey(const Key('psu_publish')), findsNothing);
+  });
+
+  testWidgets('раздел: месяцы → листки месяца → удалить листок',
+      (tester) async {
+    final calls = <String>[];
+    final server = FakeServer.routed((method, url, body) {
+      calls.add('$method ${url.path}');
+      if (method == 'DELETE') {
+        return (200, jsonEncode({'message': 'Success', 'deleted': 1}));
+      }
+      if (url.path.endsWith('/periods')) {
+        return (
+          200,
+          jsonEncode({
+            'message': 'Success',
+            'items': [
+              {
+                'year': 2026,
+                'month': 7,
+                'title': 'Июль 2026',
+                'count': 374,
+                'uploaded': {
+                  'at': '2026-10-30T11:40:00+00:00',
+                  'by': 'Бухгалтер Тест',
+                  'file': 'Июль.xls',
+                  'count': 374
+                }
+              }
+            ]
+          })
+        );
+      }
+      return (
+        200,
+        jsonEncode({
+          'message': 'Success',
+          'items': [
+            {
+              'employee_id': '0000001874',
+              'full_name': 'Тестов Тест Тестович',
+              'department': 'Отдел тестирования',
+              'net_pay': 245000.0
+            },
+            {
+              'employee_id': '0000002002',
+              'full_name': 'Другой Друг Другович',
+              'department': 'АУП',
+              'net_pay': 100000.0
+            },
+          ]
+        })
+      );
+    });
+    await HttpOverrides.runWithHttpOverrides(() async {
+      await pump(tester, const PayslipsAdminScreen());
+      expect(find.text('Июль 2026'), findsOneWidget);
+      expect(find.textContaining('Листков: 374'), findsOneWidget);
+      expect(find.byKey(const Key('psa_add')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('psa_period_2026_7')));
+      await settle(tester);
+      await tester.pumpAndSettle();
+      expect(find.text('Тестов Тест Тестович'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('psa_search')), 'друг');
+      await tester.pump();
+      expect(find.text('Тестов Тест Тестович'), findsNothing);
+      expect(find.text('Другой Друг Другович'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('psa_menu_0000002002')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Удалить листок'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('psa_confirm')));
+      await settle(tester);
+    }, server);
+    expect(calls, contains('DELETE /api/payslips/periods/2026/7/0000002002'));
   });
 }
