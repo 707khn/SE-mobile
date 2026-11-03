@@ -3,7 +3,7 @@ name: Build Windows
 # Версия для компьютера: тот же код, что у телефона, собранный под Windows.
 # Готовый архив ложится в тот же релиз, что и APK этой версии, —
 # SemEng-windows-<версия>.zip: распаковать в любую папку и запустить
-# SemEng.exe. Установка не нужна, права администратора — тоже.
+# SE-mobile.exe. Установка не нужна, права администратора — тоже.
 #
 # Сама собирается только после правок окна Windows: минута машины Windows у
 # GitHub стоит вдвое дороже Linux, а каждая правка lib/ уже собирает APK.
@@ -50,19 +50,22 @@ jobs:
         shell: pwsh
         run: |
           $pub = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(.+)$').Matches[0].Groups[1].Value).Trim()
+          # Архив пока под прежним именем SemEng-windows: по нему его узнают
+          # сервер (app.py) и deploy/fetch-apk.sh на сервере. Переименовывать —
+          # только вместе с ними, иначе компьютерам перестанут приезжать версии.
           $name = "SemEng-windows-$pub.zip"
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $name
           Get-Item $name | Select-Object Name, Length
           "PUB=$pub" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # Установщик: ярлык в «Пуске», установка без прав администратора,
-      # новая версия — поверх (windows/installer/SemEng.iss). Inno Setup на
+      # новая версия — поверх (windows/installer/SE-mobile.iss). Inno Setup на
       # машине GitHub не стоит — ставим.
       - name: Установщик
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:PUB" windows\installer\SemEng.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$env:PUB" windows\installer\SE-mobile.iss
           Get-ChildItem build\installer | Select-Object Name, Length
 
       # В релиз той же версии, что и APK: v1.25.0-65 для 1.25.0+65. Релиза
@@ -73,12 +76,12 @@ jobs:
         run: |
           TAG="v${PUB/+/-}"
           FILE="SemEng-windows-$PUB.zip"
-          SETUP="build/installer/SemEng-setup-$PUB.exe"
+          SETUP="build/installer/SE-mobile-setup-$PUB.exe"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$FILE" "$SETUP" --clobber
           else
             gh release create "$TAG" "$FILE" "$SETUP" \
-              --target "$GITHUB_SHA" --title "SE Mobile $PUB" \
-              --notes "Сборка из $GITHUB_SHA. Версия для Windows: SemEng-setup — установщик, ZIP — распаковать и запустить SemEng.exe."
+              --target "$GITHUB_SHA" --title "SE-mobile $PUB" \
+              --notes "Сборка из $GITHUB_SHA. Версия для Windows: SE-mobile-setup — установщик, ZIP — распаковать и запустить SE-mobile.exe."
           fi
           echo "### Windows $PUB: https://github.com/${{ github.repository }}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
