@@ -20,6 +20,8 @@ class AdminEmployee {
     required this.payslipCount,
     required this.accessCount,
     required this.leaveCount,
+    this.payroll = false,
+    this.payrollByTitle = false,
   });
 
   final String employeeId;
@@ -38,6 +40,11 @@ class AdminEmployee {
   final int accessCount;
   final int leaveCount;
 
+  /// Открыт ли раздел «Расчётные листы». [payrollByTitle] — открыт по
+  /// должности, из админ-панели его не закрыть.
+  final bool payroll;
+  final bool payrollByTitle;
+
   bool get hasLogin => login.isNotEmpty;
 
   factory AdminEmployee.fromJson(Map<String, dynamic> json) => AdminEmployee(
@@ -51,7 +58,30 @@ class AdminEmployee {
         payslipCount: (json['payslip_count'] as num?)?.toInt() ?? 0,
         accessCount: (json['access_count'] as num?)?.toInt() ?? 0,
         leaveCount: (json['leave_count'] as num?)?.toInt() ?? 0,
+        payroll: json['payroll'] == true,
+        payrollByTitle: json['payroll_by_title'] == true,
       );
+}
+
+/// Открыть или закрыть человеку раздел «Расчётные листы». Возвращает, открыт
+/// ли он теперь; null — не вышло.
+Future<bool?> setPayrollAccess(String employeeId, bool payroll) async {
+  try {
+    final response = await http
+        .post(
+          Uri.parse(
+              '${AppValues.baseUrl}/api/admin/employees/$employeeId/payroll'),
+          headers: await authHeaders(),
+          body: jsonEncode({'payroll': payroll}),
+        )
+        .timeout(const Duration(seconds: 20));
+    if (await handledUnauthorized(response)) return null;
+    if (response.statusCode != 200) return null;
+    final body = jsonDecode(utf8.decode(response.bodyBytes));
+    return body is Map && body['payroll'] is bool ? body['payroll'] as bool : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Returns every employee on record. Throws on failure so the screen can tell

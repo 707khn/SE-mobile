@@ -42,20 +42,75 @@ void main() {
         home: screen,
       ));
       for (var i = 0; i < 5; i++) {
-        await tester.runAsync(
-            () => Future.delayed(const Duration(milliseconds: 60)));
+        await tester
+            .runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
         await tester.pump();
       }
     },
-        FakeServer(200, jsonEncode({'employees': [row]}),
+        FakeServer(
+            200,
+            jsonEncode({
+              'employees': [row]
+            }),
             contentType: 'application/json; charset=utf-8'));
   }
 
   testWidgets('карточка сотрудника', (tester) async {
-    await open(tester,
-        AdminEmployeeScreen(employee: AdminEmployee.fromJson(row)));
+    await open(
+        tester, AdminEmployeeScreen(employee: AdminEmployee.fromJson(row)));
     expect(find.byType(ListTile), findsWidgets);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('admin открывает сотруднику «Расчётные листы»', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.runAsync(Lang.initDates);
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+    final server = FakeServer.routed((_, __, ___) =>
+        (200, jsonEncode({'message': 'Success', 'payroll': true})));
+    await HttpOverrides.runWithHttpOverrides(() async {
+      await tester.pumpWidget(GetMaterialApp(
+        translations: LocaleString(),
+        locale: const Locale('ru'),
+        home: AdminEmployeeScreen(employee: AdminEmployee.fromJson(row)),
+      ));
+      await tester.pump();
+      final tile = find.byKey(const Key('admin_payroll'));
+      await tester.ensureVisible(tile);
+      await tester.pump();
+      expect(tester.widget<SwitchListTile>(tile).value, isFalse);
+      await tester.tap(tile);
+      for (var i = 0; i < 5; i++) {
+        await tester
+            .runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
+        await tester.pump();
+      }
+      expect(server.requests, [
+        jsonEncode({'payroll': true})
+      ]);
+      expect(tester.widget<SwitchListTile>(tile).value, isTrue);
+    }, server);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('расчётчика по должности не выключить', (tester) async {
+    await open(
+        tester,
+        AdminEmployeeScreen(
+            employee: AdminEmployee.fromJson({
+          ...row,
+          'job_title': 'Бухгалтер расчетной группы',
+          'payroll': true,
+          'payroll_by_title': true,
+        })));
+    final tile = find.byKey(const Key('admin_payroll'));
+    await tester.scrollUntilVisible(tile, 200);
+    final sw = tester.widget<SwitchListTile>(tile);
+    expect(sw.value, isTrue);
+    expect(sw.onChanged, isNull);
   });
 
   testWidgets('список сотрудников', (tester) async {

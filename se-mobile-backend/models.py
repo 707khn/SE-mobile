@@ -126,6 +126,20 @@ class PayslipUpload(db.Model):
     at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class PayrollGrant(db.Model):
+    """Кому администратор открыл раздел «Расчётные листы» вручную.
+
+    По должности расчётную группу видно не всегда: в справочнике из 1С
+    бухгалтер расчётной группы бывает записана просто «Бухгалтер». Здесь —
+    кому доступ дали из админ-панели, без правки справочника и сервера.
+    """
+    __tablename__ = 'payroll_grants'
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'),
+                            primary_key=True)
+    granted_by = db.Column(db.String(10))
+    at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class LeaveBalance(db.Model):
     __tablename__ = 'leave_balances'
     id = db.Column(db.Integer, primary_key=True)

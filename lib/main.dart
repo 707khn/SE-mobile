@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'utils/role_helper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
@@ -210,6 +211,7 @@ class MyApp extends StatelessWidget {
     await secure.forgetStoredPassword();
     final isLogged = await secure.isLoggedIn();
     if (isLogged) {
+      await PayrollAccess.load();
       // Always re-read the profile: job title and department drive which
       // screens a user sees, and HR edits them server-side. Offline, the
       // cached values below are used unchanged.
@@ -254,6 +256,7 @@ class MyApp extends StatelessWidget {
         job: (b['job'] as String?) ?? '',
         employeeId: (b['employee_id'] as String?) ?? '',
       );
+      await PayrollAccess.save(b['payroll'] == true);
       return b['must_change_password'] == true;
     } catch (_) {
       // Без связи работаем на сохранённом: код и пропуск лежат на телефоне.

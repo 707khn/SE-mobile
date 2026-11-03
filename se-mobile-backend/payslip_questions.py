@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from flask import g, jsonify, request
 
 from it_requests import _norm, _utc
-from models import db
+from models import db, PayrollGrant
 
 STATUSES = ('open', 'answered', 'closed')
 
@@ -66,12 +66,27 @@ def _env_ids(name):
     return {p.strip() for p in os.environ.get(name, '').split(',') if p.strip()}
 
 
+def payroll_by_title(employee):
+    """Расчётная группа по должности — это не снять из админ-панели."""
+    title = _norm(employee.job_title)
+    return 'расчетн' in title or title.startswith('главный бухгалтер')
+
+
+def payroll_grants():
+    """Табельные номера, кому расчётную группу открыли вручную: списком
+    PAYROLL_STAFF на сервере или из админ-панели."""
+    return (_env_ids('PAYROLL_STAFF')
+            | {row.employee_id for row in PayrollGrant.query.all()})
+
+
 def is_payroll(employee):
     if employee is None:
         return False
-    title = _norm(employee.job_title)
-    return ('расчетн' in title or title.startswith('главный бухгалтер')
-            or employee.employee_id in _env_ids('PAYROLL_STAFF'))
+    if payroll_by_title(employee):
+        return True
+    if employee.employee_id in _env_ids('PAYROLL_STAFF'):
+        return True
+    return db.session.get(PayrollGrant, employee.employee_id) is not None
 
 
 _MONTHS = ('январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль',

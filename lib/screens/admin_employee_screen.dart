@@ -65,8 +65,12 @@ class AdminEmployeeScreen extends StatelessWidget {
             color: const Color(0xFFE65100),
             label: 'leave_sick_days'.tr,
             count: employee.leaveCount,
-            onTap: () => Get.to(() => LeavePage(employeeId: employee.employeeId)),
+            onTap: () =>
+                Get.to(() => LeavePage(employeeId: employee.employeeId)),
           ),
+          SizedBox(height: Dimensions.height30 * 0.5),
+          _sectionTitle(context, 'admin_access'.tr),
+          _PayrollSwitch(employee: employee),
         ],
       ),
     );
@@ -77,8 +81,8 @@ class AdminEmployeeScreen extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20,
-          Dimensions.height30 * 0.7),
+      padding: EdgeInsets.fromLTRB(
+          Dimensions.width20, 0, Dimensions.width20, Dimensions.height30 * 0.7),
       color: AppColors.mainColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,7 +173,8 @@ class AdminEmployeeScreen extends StatelessWidget {
 
   Widget _sectionTitle(BuildContext context, String text) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20, 6),
+      padding:
+          EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20, 6),
       child: Text(
         text,
         style: TextStyle(
@@ -201,7 +206,8 @@ class AdminEmployeeScreen extends StatelessWidget {
       child: Material(
         type: MaterialType.transparency,
         child: ListTile(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           leading: Container(
             padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
@@ -211,12 +217,15 @@ class AdminEmployeeScreen extends StatelessWidget {
             child: Icon(icon, color: color, size: 22),
           ),
           title: Text(label,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           subtitle: Text(
             empty ? 'no_data'.tr : '${'records_count'.tr}: $count',
             style: TextStyle(
               fontSize: 12,
-              color: empty ? context.mutedColor.withOpacity(0.7) : context.mutedColor,
+              color: empty
+                  ? context.mutedColor.withOpacity(0.7)
+                  : context.mutedColor,
             ),
           ),
           trailing: const Icon(Icons.chevron_right, size: 20),
@@ -224,6 +233,70 @@ class AdminEmployeeScreen extends StatelessWidget {
             HapticFeedback.selectionClick();
             onTap();
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// «Расчётная группа»: доступ к расчётным листам всего предприятия.
+///
+/// Кому он положен по должности, тому переключатель включён и не
+/// выключается — это решает справочник. Остальным администратор открывает
+/// его здесь, например бухгалтеру, записанной в 1С просто «Бухгалтер».
+class _PayrollSwitch extends StatefulWidget {
+  const _PayrollSwitch({required this.employee});
+
+  final AdminEmployee employee;
+
+  @override
+  State<_PayrollSwitch> createState() => _PayrollSwitchState();
+}
+
+class _PayrollSwitchState extends State<_PayrollSwitch> {
+  late bool _on = widget.employee.payroll;
+  bool _saving = false;
+
+  Future<void> _set(bool value) async {
+    setState(() => _saving = true);
+    final result = await setPayrollAccess(widget.employee.employeeId, value);
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (result != null) _on = result;
+    });
+    if (result == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('admin_payroll_failed'.tr)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fixed = widget.employee.payrollByTitle;
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: context.cardShadow,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: SwitchListTile(
+          key: const Key('admin_payroll'),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          secondary: const Icon(Icons.receipt_long_outlined),
+          title: Text('admin_payroll'.tr,
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          subtitle: Text(
+            fixed ? 'admin_payroll_by_title'.tr : 'admin_payroll_hint'.tr,
+            style: TextStyle(fontSize: 12, color: context.mutedColor),
+          ),
+          value: _on,
+          onChanged: fixed || _saving ? null : _set,
         ),
       ),
     );
