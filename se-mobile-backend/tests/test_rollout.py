@@ -13,7 +13,11 @@ from models import db, UserAccount, AuthMiss
 # Тот же пароль, что conftest кладёт в окружение до создания приложения.
 ADMIN_PASSWORD = os.environ['ADMIN_PASSWORD']
 
-_ADMIN = {'X-Admin-Token': os.environ['ADMIN_TOKEN']}
+
+
+def _admin_headers(app):
+    """Пропуск администратора системы: без входа админских прав нет никогда."""
+    return {'Authorization': f'Bearer {_token(app, "ADMIN")}'}
 
 
 def _token(app, employee_id):
@@ -181,7 +185,7 @@ def test_fetch_apk_silent_timer_is_shown(tmp_path, monkeypatch):
 def test_fetch_apk_never_ran_is_shown(app, client, tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, '_FETCH_APK_STATUS',
                         str(tmp_path / 'нет-такого'))
-    answer = client.get('/api/admin/rollout', headers=_ADMIN)
+    answer = client.get('/api/admin/rollout', headers=_admin_headers(app))
     assert answer.status_code == 200
     state = answer.get_json()['fetch_apk']
     assert not state['available'] and 'ни разу' in state['problem']
@@ -190,7 +194,8 @@ def test_fetch_apk_never_ran_is_shown(app, client, tmp_path, monkeypatch):
 def test_windows_archive_is_shown_next_to_apk(app, client, tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, '_APK_DIR', str(tmp_path))
     (tmp_path / 'SemEng-windows-1.26.0+66.zip').write_bytes(b'zip')
-    report = client.get('/api/admin/rollout', headers=_ADMIN).get_json()
+    report = client.get('/api/admin/rollout',
+                        headers=_admin_headers(app)).get_json()
     assert report['windows']['available'] is True
     assert report['windows']['build'] == 66
     assert report['app']['available'] is False

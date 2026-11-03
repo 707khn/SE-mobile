@@ -1231,14 +1231,22 @@ def _is_manager():
     """
     viewer = getattr(g, 'employee', None)
     if viewer is None:
-        return not _AUTH_REQUIRED
+        # Без пропуска — не начальник, даже пока REQUIRE_AUTH выключен.
+        # Раньше здесь стояло `not _AUTH_REQUIRED`, и запрос без входа видел
+        # табель всего предприятия. Переходный режим нужен старым сборкам
+        # рядовых сотрудников, чтобы они видели своё; начальникам и админу
+        # хватает новой сборки, которая пропуск присылает.
+        return False
     return _is_system_admin(viewer.job_title) or _is_admin_role(viewer.job_title)
 
 
 def _is_admin_account():
     viewer = getattr(g, 'employee', None)
     if viewer is None:
-        return not _AUTH_REQUIRED
+        # Никогда не админ без пропуска. При `not _AUTH_REQUIRED` здесь любой
+        # из интернета мог сбросить пароль «admin» — новый сервер присылал
+        # прямо в ответе, — включить себе расчётную группу и отключать учётки.
+        return False
     return _is_system_admin(viewer.job_title)
 
 
@@ -1246,7 +1254,8 @@ def _may_edit_menu():
     """Меню столовой пишет технолог; админ — чтобы починить, когда она не может."""
     viewer = getattr(g, 'employee', None)
     if viewer is None:
-        return not _AUTH_REQUIRED
+        # Меню без входа не правят: технолог работает в новой сборке.
+        return False
     job = (viewer.job_title or '').lower()
     return ('технолог' in job and 'столов' in job) or _is_system_admin(job)
 
@@ -2895,6 +2904,12 @@ def register_routes(app):
         end_date = _iso_date(data.get('end_date'))
         if start_date is None or end_date is None:
             return _bad_period()
+
+        # Отчёт ищет сотрудника по ФИО — это инструмент начальника. Без
+        # пропуска _may_view в переходном режиме пускает к любому, и по
+        # фамилии отдавались проходы кого угодно.
+        if getattr(g, 'employee', None) is None:
+            return _deny()
 
         emp = _find_reportable(emp_sname)
         if not emp:

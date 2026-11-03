@@ -207,6 +207,9 @@ def test_resetting_the_admin_does_not_hand_back_the_word_admin(app, client):
         # Табельному номеру временным остаётся он сам: его человек знает.
         account = db.session.get(UserAccount, '1874')
         assert account is not None
+        # Сброс гасит все пропуска администратора, в том числе тот, которым
+        # сбрасывали. Дальше — с новым, выданным по временному паролю.
+        admin_token = app_module._issue_token('ADMIN')
 
     numeric = client.post('/api/admin/accounts/1874/reset',
                           headers={'Authorization': f'Bearer {admin_token}'})
