@@ -21,10 +21,8 @@ import 'reception_screen.dart';
 import 'tech_screen.dart';
 import 'payslip_question_detail_screen.dart';
 import 'payslip_questions_screen.dart';
-import 'purchase_detail_screen.dart';
 import 'assignment_detail_screen.dart';
 import 'assignments_screen.dart';
-import 'purchases_screen.dart';
 import 'news_screen.dart';
 import 'rollout_screen.dart';
 
@@ -119,11 +117,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => id == null
             ? const PayslipQuestionsScreen()
             : PayslipQuestionDetailScreen(questionId: id));
-      case 'purchase':
-        final id = int.tryParse(notice.ref ?? '');
-        Get.to(() => id == null
-            ? const PurchasesScreen()
-            : PurchaseDetailScreen(purchaseId: id));
     }
   }
 
@@ -224,7 +217,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'menu' => (Icons.restaurant_menu, const Color(0xFFC62828)),
       'queue' => (Icons.pending_actions, const Color(0xFF4527A0)),
       'it' => (Icons.support_agent, const Color(0xFF37474F)),
-      'purchase' => (Icons.shopping_cart_outlined, const Color(0xFFAD1457)),
       'payslip_q' => (Icons.contact_support_outlined, context.accentColor),
       'assignment' => (Icons.task_alt, const Color(0xFF0277BD)),
       'medical' => (Icons.health_and_safety_outlined, const Color(0xFF00838F)),
