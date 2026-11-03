@@ -27,7 +27,7 @@ Future<PickedFile?> pickExcelFile() async {
 /// Бухгалтер формирует в 1С отчёт «Расчетный листок» на всё предприятие и
 /// сохраняет его в Excel. Здесь — выбрать этот файл, посмотреть, что в нём
 /// нашлось (месяц, сколько листков, кого нет в приложении), и только потом
-/// опубликовать: опубликованный листок сразу уходит пятистам людям
+/// отправить: отправленный листок сразу уходит пятистам людям
 /// уведомлением, и ошибиться месяцем или файлом тут дорого.
 class PayslipUploadScreen extends StatefulWidget {
   const PayslipUploadScreen({Key? key, this.pick = pickExcelFile})
@@ -261,6 +261,9 @@ class _PayslipUploadScreenState extends State<PayslipUploadScreen> {
         children: [
           FilledButton.icon(
             key: const Key('psu_publish'),
+            // Фокус сразу на «Отправить»: Enter отправляет и тогда, когда
+            // мышь после окна выбора файла Windows ещё не ожила.
+            autofocus: true,
             icon: const Icon(Icons.send),
             label: Text('psu_publish'.tr),
             onPressed: _publish,

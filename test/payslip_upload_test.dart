@@ -15,7 +15,7 @@ import 'package:se_mobile/utils/role_helper.dart';
 
 import 'support/fake_server.dart';
 
-/// Загрузка листков из 1С: файл → что в нём → «Опубликовать» → готово.
+/// Загрузка листков из 1С: файл → что в нём → «Отправить» → готово.
 void main() {
   Map<String, dynamic> summary({bool dryRun = true, int replaced = 0}) => {
         'message': 'Success',
@@ -104,7 +104,7 @@ void main() {
     }, server);
     expect(server.requests, hasLength(2));
     expect(server.requests.last, isNot(contains('name="dry_run"')));
-    expect(find.text('Июль 2026: опубликовано 374 листков'), findsOneWidget);
+    expect(find.text('Июль 2026: отправлено 374 листков'), findsOneWidget);
   });
 
   testWidgets('перевыгрузка месяца — предупреждение о замене', (tester) async {
