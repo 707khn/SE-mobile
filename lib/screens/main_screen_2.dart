@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../utils/desktop.dart';
 import 'package:intl/intl.dart';
 import 'package:se_mobile/functions/generate_excel.dart';
 import 'package:se_mobile/requests/employeedate_request.dart';
@@ -217,7 +218,9 @@ class _MainPage2State extends State<MainPage2> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: Builder(
+        leading: sidebarShown(context)
+            ? null
+            : Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
             tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
@@ -257,7 +260,7 @@ class _MainPage2State extends State<MainPage2> {
           ),
         ],
       ),
-      drawer: const AppDrawer(),
+      drawer: sidebarShown(context) ? null : const AppDrawer(),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(12.0),

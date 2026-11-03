@@ -396,11 +396,11 @@ class _PayslipPageState extends State<PayslipPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: widget.onNavigate == null
+      drawer: widget.onNavigate == null || sidebarShown(context)
           ? null
           : AppDrawer(onNavigate: widget.onNavigate, currentIndex: 2),
       appBar: AppBar(
-        leading: widget.onNavigate == null
+        leading: widget.onNavigate == null || sidebarShown(context)
             ? null
             : Builder(
                 builder: (context) => IconButton(

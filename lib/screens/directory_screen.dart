@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../utils/desktop.dart';
 
 import '../requests/directory_request.dart';
 import '../utils/app_theme.dart';
@@ -106,7 +107,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.pageColor,
-      drawer: const AppDrawer(),
+      drawer: sidebarShown(context) ? null : const AppDrawer(),
       appBar: AppBar(
         title: BigText(content: 'directory'.tr, color: Colors.white),
         actions: [

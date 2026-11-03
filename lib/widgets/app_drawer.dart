@@ -37,7 +37,14 @@ import '../utils/app_theme.dart';
 /// Reads the signed-in user's profile itself, so screens that never receive a
 /// name or job title (payslip, leave, canteen menu…) can use it as-is.
 class AppDrawer extends StatefulWidget {
-  const AppDrawer({Key? key, this.onNavigate, this.currentIndex}) : super(key: key);
+  const AppDrawer(
+      {Key? key, this.onNavigate, this.currentIndex, this.permanent = false})
+      : super(key: key);
+
+  /// Постоянная панель слева на компьютере (см. DesktopLayout), а не
+  /// выдвижное меню. Стоит над навигатором: закрывать ей нечего, выбранный
+  /// раздел она узнаёт сама, а открытые поверх экраны сворачивает.
+  final bool permanent;
 
   /// Supplied by the tabs inside the shell to switch tab directly. When null
   /// the drawer is on a pushed screen and rebuilds the shell instead.
@@ -95,15 +102,32 @@ class _AppDrawerState extends State<AppDrawer> {
   /// стопку экранов, открытых поверх неё.
   void _goToTab(int index) {
     ShellTab.open(index);
-    if (widget.onNavigate == null) {
+    if (widget.onNavigate == null && !widget.permanent) {
       Get.until((route) => route.isFirst);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      child: Column(
+    if (!widget.permanent) return Drawer(child: _buildContent());
+    // На панели выбранный раздел подсвечен всегда — тот, что открыт сейчас.
+    return Material(
+      color: context.cardSurface,
+      child: ValueListenableBuilder<int>(
+        valueListenable: ShellTab.selected,
+        builder: (context, _, __) => _buildContent(),
+      ),
+    );
+  }
+
+  /// Вкладка, открытая сейчас: у выдвижного меню её называет экран, у
+  /// постоянной панели — оболочка. У администратора вкладок нет.
+  int? get _currentIndex => widget.permanent
+      ? (_isAdmin ? null : ShellTab.selected.value)
+      : widget.currentIndex;
+
+  Widget _buildContent() {
+    return Column(
         children: [
           _buildHeader(),
           Expanded(
@@ -263,13 +287,17 @@ class _AppDrawerState extends State<AppDrawer> {
               icon: Icons.logout,
               label: 'log_out_title'.tr,
               color: Colors.red.shade700,
-              onTap: () => confirmAndLogout(context),
+              // Выход спрашивает подтверждение: открытые экраны до ответа
+              // не трогаем.
+              navigates: false,
+              // Панель стоит над навигатором: окно открываем через него.
+              onTap: () => confirmAndLogout(
+                  widget.permanent ? (Get.context ?? context) : context),
             ),
           ),
           _buildSocial(),
           _buildVersion(),
         ],
-      ),
     );
   }
 
@@ -309,10 +337,18 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
+  // Размеры Dimensions берутся от экрана навигатора. Постоянная панель стоит
+  // вне его, и когда навигатор при входе переезжает к ней в соседи, спросить
+  // его о размере в этот момент нельзя. Да и на мониторе масштаб под
+  // телефон не нужен.
+  double get _side => widget.permanent ? 20 : Dimensions.width20;
+  double get _headerTop => widget.permanent ? 18 : Dimensions.height30 / 2;
+  double? get _socialSize => widget.permanent ? 28 : null;
+
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(Dimensions.width20, 0, Dimensions.width20, 16),
+      padding: EdgeInsets.fromLTRB(_side, 0, _side, 16),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.mainColor, AppColors.gradientColor2],
@@ -325,7 +361,7 @@ class _AppDrawerState extends State<AppDrawer> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: EdgeInsets.only(top: Dimensions.height30 / 2),
+          padding: EdgeInsets.only(top: _headerTop),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -397,24 +433,28 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Widget _buildSocial() {
     return SizedBox(
-      height: Dimensions.height60,
+      height: widget.permanent ? 60 : Dimensions.height60,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           IconButtonDrawer(
             icon: Image.asset('assets/youtube.png'),
+            size: _socialSize,
             function: () => _open('https://www.youtube.com/@semeyengineering4367'),
           ),
           IconButtonDrawer(
             icon: Image.asset('assets/instagram.png'),
+            size: _socialSize,
             function: () => _open('https://www.instagram.com/jscsemeyengineering/'),
           ),
           IconButtonDrawer(
             icon: Image.asset('assets/facebook.png'),
+            size: _socialSize,
             function: () => _open('https://www.facebook.com/semeybtrz/'),
           ),
           IconButtonDrawer(
             icon: Image.asset('assets/web.png'),
+            size: _socialSize,
             function: () => _open('https://se-btrz.com/'),
           ),
         ],
@@ -433,8 +473,9 @@ class _AppDrawerState extends State<AppDrawer> {
     int? index,
     Color? color,
     String? value,
+    bool navigates = true,
   }) {
-    final selected = index != null && index == widget.currentIndex;
+    final selected = index != null && index == _currentIndex;
     final tint = color ?? (selected ? AppColors.mainColor : context.mutedColor);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
@@ -461,8 +502,16 @@ class _AppDrawerState extends State<AppDrawer> {
             : Text(value,
                 style: TextStyle(fontSize: 13, color: context.mutedColor)),
         onTap: () {
-          Navigator.pop(context);
           HapticFeedback.selectionClick();
+          if (widget.permanent) {
+            // Раздел из панели открывается вместо того, что открыто сейчас,
+            // а не стопкой поверх: иначе после десятка переходов «назад»
+            // пришлось бы нажимать десять раз.
+            if (navigates) Get.until((route) => route.isFirst);
+            if (!selected) onTap();
+            return;
+          }
+          Navigator.pop(context);
           // Re-tapping the section you are already on should just close.
           if (selected) return;
           onTap();

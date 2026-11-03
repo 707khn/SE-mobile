@@ -58,6 +58,8 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     ShellTab.selected.value = widget.initialIndex;
     ShellTab.selected.addListener(_onTabChanged);
+    // На компьютере разделы встают постоянной панелью слева.
+    DesktopSession.enter();
     _registerForPush();
     // Нажатие на уведомление чата открывает вкладку «Чат».
     ChatBridge.start();
@@ -78,6 +80,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     ShellTab.selected.removeListener(_onTabChanged);
+    DesktopSession.leave();
     super.dispose();
   }
 
@@ -140,7 +143,11 @@ class _HomeShellState extends State<HomeShell> {
       child: LayoutBuilder(builder: (context, box) {
         // На компьютере вкладки — слева, как в любой программе для
         // компьютера: нижняя панель на мониторе далеко от глаз и от мыши.
-        final rail = isDesktop && !_isAdmin && box.maxWidth >= 600;
+        // На широком окне разделы и так стоят панелью слева (DesktopLayout),
+        // и узкая полоска вкладок рядом с ней только повторяла бы её.
+        final sidebar = sidebarShown(context);
+        final rail =
+            isDesktop && !_isAdmin && !sidebar && box.maxWidth >= 600;
         final stack = _TabFade(
           index: _selectedIndex,
           child: IndexedStack(
@@ -164,7 +171,8 @@ class _HomeShellState extends State<HomeShell> {
                   ],
                 )
               : stack,
-          bottomNavigationBar: _isAdmin || rail ? null : _bottomBar(context),
+          bottomNavigationBar:
+              _isAdmin || rail || sidebar ? null : _bottomBar(context),
         );
       }),
     );
