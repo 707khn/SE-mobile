@@ -49,7 +49,7 @@
         расшифровывается, и приложение падает при запуске, а не просит
         войти. allowBackup — до Android 12, dataExtractionRules — после. -->
    <application
-        android:label="SE Mobile"
+        android:label="SE-mobile"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"

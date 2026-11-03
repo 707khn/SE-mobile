@@ -136,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool get _isAdmin => isSystemAdmin(widget.job);
 
   /// Как ставить: apk — поверх, архив для компьютера — распаковать на место
-  /// прежнего, закрыв приложение (открытый SemEng.exe Windows не заменит).
+  /// прежнего, закрыв приложение (открытый SE-mobile.exe Windows не заменит).
   String get _updateHint =>
       isDesktop ? 'update_hint_pc'.tr : 'update_hint'.tr;
 

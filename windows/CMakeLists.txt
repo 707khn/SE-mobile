@@ -4,7 +4,7 @@ project(se_mobile LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "SemEng")
+set(BINARY_NAME "SE-mobile")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -125,7 +125,7 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   COMPONENT Runtime)
 
 # Библиотеки Visual C++ (vcruntime140.dll, msvcp140.dll…) — рядом с exe.
-# Без них на компьютере, где не ставили «Visual C++ Redistributable», SemEng
+# Без них на компьютере, где не ставили «Visual C++ Redistributable», SE-mobile
 # не запускается вовсе: Windows говорит «не найден VCRUNTIME140_1.dll», и
 # человеку с этим не справиться. Библиотеки разрешено раздавать вместе с
 # программой.

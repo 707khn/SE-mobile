@@ -32,9 +32,9 @@ void main() {
 
   group('пути Windows', () {
     test('имя файла — и через «\\», и через «/»', () {
-      expect(baseName(r'C:\Users\ivanov\Downloads\SemEng\a_2026.xlsx'),
+      expect(baseName(r'C:\Users\ivanov\Downloads\SE-mobile\a_2026.xlsx'),
           'a_2026.xlsx');
-      expect(baseName('/home/ivanov/Загрузки/SemEng/a.csv'), 'a.csv');
+      expect(baseName('/home/ivanov/Загрузки/SE-mobile/a.csv'), 'a.csv');
       expect(baseName('a.csv'), 'a.csv');
     });
 

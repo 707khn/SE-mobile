@@ -39,7 +39,7 @@ const int keepExports = 10;
 /// лежат сделанные выгрузки. На iPhone такой папки нет, и прежний вызов
 /// бросал исключение — там это документы приложения.
 ///
-/// На компьютере — «Загрузки\SemEng»: туда человек и пойдёт искать
+/// На компьютере — «Загрузки\SE-mobile»: туда человек и пойдёт искать
 /// скачанное, и оттуда же перетащит файл в письмо. Своя папка внутри — чтобы
 /// уборка при выходе касалась только наших файлов.
 Future<Directory> exportDirectory() async {
@@ -51,7 +51,7 @@ Future<Directory> exportDirectory() async {
       // Linux спрашивает папку у xdg-user-dir, а его может и не быть.
     }
     base ??= await getApplicationDocumentsDirectory();
-    return Directory('${base.path}${Platform.pathSeparator}SemEng');
+    return Directory('${base.path}${Platform.pathSeparator}SE-mobile');
   }
   if (Platform.isAndroid) {
     final dirs = await getExternalStorageDirectories();
