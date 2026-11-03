@@ -11,7 +11,7 @@
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Чтобы приложить фото из галереи к заявке в ОИТиС.</string>
 		<key>CFBundleDisplayName</key>
-		<string>Se Mobile</string>
+		<string>SE-mobile</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>

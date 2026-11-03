@@ -18,7 +18,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   if (single_instance != nullptr &&
       ::GetLastError() == ERROR_ALREADY_EXISTS) {
     HWND existing =
-        ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"SemEng");
+        ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"SE-mobile");
     if (existing != nullptr) {
       if (::IsIconic(existing)) {
         ::ShowWindow(existing, SW_RESTORE);
@@ -66,7 +66,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                           (work_height - height) / 2)));
   Win32Window::Size size(width, height);
   FlutterWindow window(project);
-  if (!window.Create(L"SemEng", origin, size)) {
+  if (!window.Create(L"SE-mobile", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

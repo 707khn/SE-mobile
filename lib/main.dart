@@ -122,7 +122,7 @@ class MyApp extends StatelessWidget {
       // MaterialLocalizations.of. Не знает — эти надписи останутся русскими,
       // а текст самого приложения всё равно казахский.
       supportedLocales: Lang.supported,
-      title: 'SemEng',
+      title: 'SE-mobile',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       // По умолчанию — как в телефоне; выбор переопределяется в боковом меню.

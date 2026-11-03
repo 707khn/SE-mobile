@@ -90,11 +90,15 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "AO Semey Engineering" "\0"
-            VALUE "FileDescription", "SemEng" "\0"
+            VALUE "FileDescription", "SE-mobile" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "SemEng" "\0"
+            VALUE "InternalName", "SE-mobile" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 AO Semey Engineering" "\0"
-            VALUE "OriginalFilename", "SemEng.exe" "\0"
+            VALUE "OriginalFilename", "SE-mobile.exe" "\0"
+            // Остаётся прежним намеренно: из CompanyName и ProductName Windows
+            // собирает папку %APPDATA%\AO Semey Engineering\SemEng, где лежат
+            // вход, код и настройки. Другое имя — новая пустая папка, и все
+            // обновившиеся оказались бы разлогинены.
             VALUE "ProductName", "SemEng" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
