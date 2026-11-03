@@ -158,6 +158,21 @@ class _RolloutScreenState extends State<RolloutScreen> {
             'rollout_restore_test_last'
                 .trParams({'days': '${r.restoreTestDaysAgo}'}),
             ''),
+      if (r.pushEnabled != null) ...[
+        SizedBox(height: Dimensions.height30 / 1.5),
+        _section('rollout_push'.tr),
+        // Ноль здесь не «всё хорошо», как в счётчиках бед ниже, — поэтому
+        // не зелёным числом, а словами.
+        if (r.pushEnabled! && r.pushDevices == 0)
+          _line('rollout_push_no_devices'.tr, '', muted: true)
+        else if (r.pushEnabled!) ...[
+          _line('rollout_push_devices'.tr, '${r.pushDevices}'),
+          _line('rollout_push_people'.tr, '${r.pushPeople}'),
+        ] else
+          _line(r.pushProblem.isEmpty ? 'rollout_push_off'.tr : r.pushProblem,
+              '',
+              muted: true),
+      ],
       SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_without_pass'.tr),
       if (r.withoutPass.isEmpty)

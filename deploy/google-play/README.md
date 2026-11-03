@@ -151,12 +151,13 @@ sudo bash -c 'set -a; . /etc/se-mobile.env; set +a; \
 `.aab` из верхнего релиза в Releases и загрузить его как новый выпуск. Тот же номер сборки
 уходит и в `.apk` для сервера — расходиться им незачем.
 
-## Когда подключат Firebase
+## Firebase
 
-Уведомления привязаны к имени пакета. В проекте Firebase нужно будет завести
-**два** Android-приложения — `com.sebtrz.mobile` (Play) и
-`com.example.se_mobile.se_mobile` (сервер) — и положить общий
-`android/app/google-services.json` с обоими.
+Уведомления привязаны к имени пакета. В проекте Firebase заводятся **два**
+Android-приложения — `com.sebtrz.mobile` (Play) и
+`com.example.se_mobile.se_mobile` (сервер), — а общий `google-services.json`
+с обоими лежит в секрете `GOOGLE_SERVICES_JSON`; сборка кладёт его в
+`android/app/` сама. По шагам — `deploy/README.md`, «Уведомления».
 
 ## Что проверить на телефоне перед первой загрузкой
 

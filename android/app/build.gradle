@@ -4,6 +4,16 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// Уведомления на телефон (Firebase Cloud Messaging). Настройки проекта
+// Firebase — в android/app/google-services.json; в репозитории его нет, на
+// сборочной машине его кладёт build-apk.yml из секрета GOOGLE_SERVICES_JSON.
+// Файла нет — плагин не подключаем: без файла он роняет сборку, а
+// приложение и без уведомлений работает (FcmService молчит). Так собирается
+// и проверка PR, и копия репозитория у того, у кого секрета нет.
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {

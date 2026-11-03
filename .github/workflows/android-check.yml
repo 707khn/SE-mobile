@@ -97,6 +97,31 @@ jobs:
       - name: Пропустит ли Google Play
         run: .github/scripts/check-play-bundle.sh build/app/outputs/bundle/release/app-release.aab
 
+      # Сборка выше — без google-services.json, как у того, у кого нет
+      # секрета. Эта — с ним: подключение плагина Firebase (app/build.gradle)
+      # иначе проверялось бы только после слияния, в build-apk.yml. Настройки
+      # выдуманные: собрать они дают, а уведомлений с ними не будет — APK
+      # отсюда никуда не идёт.
+      - name: Выдуманные настройки Firebase
+        run: |
+          client() {
+            printf '{"client_info":{"mobilesdk_app_id":"1:000000000000:android:%s","android_client_info":{"package_name":"%s"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyA-not-a-real-key-for-ci-000000000"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}' "$1" "$2"
+          }
+          printf '{"project_info":{"project_number":"000000000000","project_id":"se-mobile-ci","storage_bucket":"se-mobile-ci.appspot.com"},"client":[%s,%s],"configuration_version":"1"}' \
+            "$(client 0000000000000001 com.example.se_mobile.se_mobile)" \
+            "$(client 0000000000000002 com.sebtrz.mobile)" \
+            | jq . > android/app/google-services.json
+
       # И обычная сборка для раздачи с сервера: у неё старое имя пакета.
       - name: APK для сервера
         run: flutter build apk --release
+
+      - name: Настройки Firebase попали в сборку
+        run: |
+          RES=$(grep -rl --include='*.xml' 'name="google_app_id"' build/app/generated build/app/intermediates 2>/dev/null | head -1)
+          if [ -z "$RES" ]; then
+            echo "::error::Плагин google-services не сработал: в ресурсах сборки нет google_app_id"
+            exit 1
+          fi
+          echo "$RES"
+          grep 'google_app_id\|project_id' "$RES"
