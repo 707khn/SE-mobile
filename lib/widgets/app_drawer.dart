@@ -15,7 +15,7 @@ import '../screens/purchases_screen.dart';
 import '../screens/reception_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/onboarding_screen.dart';
-import '../screens/payslip_upload_screen.dart';
+import '../screens/payslips_admin_screen.dart';
 import '../screens/main_screen_2.dart';
 import '../screens/medical_screen.dart';
 import '../screens/menu_screen.dart';
@@ -184,9 +184,9 @@ class _AppDrawerState extends State<AppDrawer> {
                 if (isDesktop && canUploadPayslips(_job)) ...[
                   _section('drawer_payroll'.tr),
                   _item(
-                    icon: Icons.upload_file,
-                    label: 'psu_title'.tr,
-                    onTap: () => Get.to(() => const PayslipUploadScreen()),
+                    icon: Icons.receipt_long_outlined,
+                    label: 'psa_title'.tr,
+                    onTap: () => Get.to(() => const PayslipsAdminScreen()),
                   ),
                 ],
                 _section('drawer_company'.tr),

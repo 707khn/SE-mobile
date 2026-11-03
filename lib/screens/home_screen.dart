@@ -26,6 +26,7 @@ import 'assignments_screen.dart';
 import 'purchases_screen.dart';
 import 'menu_screen.dart';
 import 'main_screen_2.dart';
+import 'payslips_admin_screen.dart';
 import '../utils/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -208,6 +209,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   mainAxisExtent: _cardHeight(context),
                 ),
                 children: _staggered([
+                  // Расчётной группе — первой карточкой: ради неё она и
+                  // открывает программу на компьютере. На телефоне файла из
+                  // 1С нет, поэтому только в версии для компьютера.
+                  if (isDesktop && canUploadPayslips(widget.job))
+                    _buildActionCard(
+                      icon: Icons.upload_file,
+                      label: 'psa_title'.tr,
+                      subtitle: 'psa_home_subtitle'.tr,
+                      color: const Color(0xFF2E7D32),
+                      onTap: () =>
+                          Get.to(() => const PayslipsAdminScreen()),
+                    ),
                   // The admin has no attendance, payslip or leave of their own,
                   // so only the two things they actually do are shown.
                   if (_isAdmin) ...[

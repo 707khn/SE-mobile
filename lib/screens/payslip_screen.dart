@@ -22,7 +22,12 @@ import '../widgets/skeleton.dart';
 import '../utils/app_theme.dart';
 
 class PayslipPage extends StatefulWidget {
-  const PayslipPage({Key? key, this.onNavigate, this.employeeId, this.employeeName})
+  const PayslipPage(
+      {Key? key,
+      this.onNavigate,
+      this.employeeId,
+      this.employeeName,
+      this.initialMonth})
       : super(key: key);
 
   /// Supplied inside the bottom-nav shell: enables the shared drawer and
@@ -32,6 +37,10 @@ class PayslipPage extends StatefulWidget {
   /// Set by the admin panel to show somebody else's payslip.
   final String? employeeId;
   final String? employeeName;
+
+  /// Открыть на этом месяце, если листок за него есть, — из раздела
+  /// «Расчётные листы», где бухгалтер выбрала месяц и человека.
+  final DateTime? initialMonth;
 
   @override
   State<PayslipPage> createState() => _PayslipPageState();
@@ -78,7 +87,10 @@ class _PayslipPageState extends State<PayslipPage> {
     if (!mounted) return;
     setState(() {
       _periods = periods;
-      if (periods != null && periods.isNotEmpty) {
+      final wanted = widget.initialMonth;
+      if (wanted != null && _hasSlip(wanted)) {
+        _selectedDate = DateTime(wanted.year, wanted.month);
+      } else if (periods != null && periods.isNotEmpty) {
         _selectedDate = periods.first;
       }
     });

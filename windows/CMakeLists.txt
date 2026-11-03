@@ -64,14 +64,15 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
-# local_auth_windows собирается с /await и <experimental/coroutine>, а MSVC
-# из Visual Studio 2026 (14.5x) превратил устаревание в ошибку STL1011.
-# Отпечаток на компьютере не используется (utils/biometric.dart), но плагин
-# всё равно компилируется — глушим ошибку только для него.
-if(TARGET local_auth_windows_plugin)
-  target_compile_definitions(local_auth_windows_plugin PRIVATE
-    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
-endif()
+# local_auth_windows и flutter_inappwebview_windows собираются с /await и
+# <experimental/coroutine>, а MSVC из Visual Studio 2026 (14.5x) превратил
+# устаревание в ошибку STL1011. Глушим ошибку только для этих плагинов.
+foreach(plugin local_auth_windows_plugin flutter_inappwebview_windows_plugin)
+  if(TARGET ${plugin})
+    target_compile_definitions(${plugin} PRIVATE
+      _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+  endif()
+endforeach()
 
 
 # === Installation ===
