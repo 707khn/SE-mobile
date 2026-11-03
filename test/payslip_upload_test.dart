@@ -62,6 +62,12 @@ void main() {
     expect(isPayroll('Бухгалтер'), isFalse);
     expect(isPayroll('Заместитель главного бухгалтера'), isFalse);
     expect(canUploadPayslips('Администратор системы'), isTrue);
+
+    // Открыли списком на сервере — должность в справочнике та же.
+    expect(canUploadPayslips('Бухгалтер'), isFalse);
+    PayrollAccess.granted.value = true;
+    addTearDown(() => PayrollAccess.granted.value = false);
+    expect(canUploadPayslips('Бухгалтер'), isTrue);
   });
 
   test('надписи в обоих языках', () {

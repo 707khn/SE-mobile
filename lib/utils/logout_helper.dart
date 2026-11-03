@@ -9,6 +9,7 @@ import '../screens/start_screen.dart';
 import '../services/fcm_service.dart';
 import '../variables.dart';
 import 'notice_badge.dart';
+import 'role_helper.dart';
 import 'secure_storage_helper.dart';
 import 'api.dart';
 
@@ -54,6 +55,7 @@ Future<void> forceLogout({String? message}) async {
   await SecureStorageHelper.instance.clearCredentials();
   final prefs = await SharedPreferences.getInstance();
   await prefs.clear();
+  PayrollAccess.granted.value = false;
   try {
     await clearExports(await exportDirectory());
   } catch (_) {

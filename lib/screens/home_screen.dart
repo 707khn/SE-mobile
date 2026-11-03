@@ -71,10 +71,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkForUpdate();
     _loadSummary();
     _startNoticeTimer();
+    PayrollAccess.granted.addListener(_onPayrollAccess);
+  }
+
+  // Ответ /api/me приходит уже после того, как главная построена.
+  void _onPayrollAccess() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    PayrollAccess.granted.removeListener(_onPayrollAccess);
     WidgetsBinding.instance.removeObserver(this);
     _noticeTimer?.cancel();
     super.dispose();

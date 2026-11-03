@@ -321,3 +321,52 @@ def test_delete_one_then_month(app, client):
 def test_bad_month(app, client):
     r = client.get('/api/payslips/periods/2026/13', headers=_auth(app, _PAYROLL))
     assert r.status_code == 400
+
+
+def test_me_tells_app_about_payroll(app, client, monkeypatch):
+    """Бухгалтера из PAYROLL_STAFF приложение по должности не узнает —
+    об этом ему говорит /api/me."""
+    me = lambda emp: client.get('/api/me', headers=_auth(app, emp)).get_json()
+    assert me(_PAYROLL)['payroll'] is True
+    assert me(_ACCOUNTANT)['payroll'] is False
+
+    monkeypatch.setenv('PAYROLL_STAFF', _ACCOUNTANT)
+    assert me(_ACCOUNTANT)['payroll'] is True
+    assert client.get('/api/payslips/periods',
+                      headers=_auth(app, _ACCOUNTANT)).status_code == 200
+
+
+def test_admin_opens_payroll_section(app, client):
+    """Администратор открывает раздел «Расчётные листы» без правки справочника."""
+    import os
+    with app.app_context():
+        admin_id = app_module._authenticate('admin', os.environ['ADMIN_PASSWORD'])
+    admin = _auth(app, admin_id)
+    url = f'/api/admin/employees/{_ACCOUNTANT}/payroll'
+    try:
+        # Не администратору — нельзя, даже расчётной группе.
+        assert client.post(url, json={'payroll': True},
+                           headers=_auth(app, _PAYROLL)).status_code == 403
+
+        r = client.post(url, json={'payroll': True}, headers=admin)
+        assert r.get_json() == {'message': 'Success', 'payroll': True,
+                                'payroll_by_title': False}
+        assert client.get('/api/me', headers=_auth(
+            app, _ACCOUNTANT)).get_json()['payroll'] is True
+        assert client.get('/api/payslips/periods', headers=_auth(
+            app, _ACCOUNTANT)).status_code == 200
+
+        people = {e['employee_id']: e for e in client.get(
+            '/api/admin/employees', headers=admin).get_json()['employees']}
+        assert people[_ACCOUNTANT]['payroll'] is True
+        assert people[_PAYROLL]['payroll_by_title'] is True
+
+        r = client.post(url, json={'payroll': False}, headers=admin)
+        assert r.get_json()['payroll'] is False
+        assert client.get('/api/payslips/periods', headers=_auth(
+            app, _ACCOUNTANT)).status_code == 403
+    finally:
+        with app.app_context():
+            from models import PayrollGrant
+            PayrollGrant.query.delete()
+            db.session.commit()

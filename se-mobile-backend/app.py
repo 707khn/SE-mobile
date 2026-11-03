@@ -20,7 +20,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
-                    AuthMiss, Notification, PayslipUpload)
+                    AuthMiss, Notification, PayslipUpload, PayrollGrant)
 from parser_1c_xml import parse_1c_xml
 from parser_payslip_excel import parse_payslip_excel
 from parser_menu_excel import parse_menu_excel
@@ -2494,6 +2494,10 @@ def register_routes(app):
             'job': viewer.job_title,
             'department': viewer.department or '',
             'must_change_password': bool(account and account.must_change_password),
+            # Раздел «Расчётные листы» на компьютере: по должности приложение
+            # узнаёт не всех, кого сервер считает расчётной группой
+            # (PAYROLL_STAFF).
+            'payroll': payslip_questions.is_payroll(viewer),
         })
 
     # ── Оповещения в приложении ───────────────────────────────────────────────
@@ -2943,9 +2947,11 @@ def register_routes(app):
             login = logins.get(employee_id) or disabled.get(employee_id, '')
             return login, bool(login) and accounts.get(login, True)
 
+        grants = payslip_questions.payroll_grants()
         employees = []
         for e in Employee.query.order_by(Employee.full_name).all():
             login, login_active = login_of(e.employee_id)
+            by_title = payslip_questions.payroll_by_title(e)
             employees.append({
                 'employee_id': e.employee_id,
                 'full_name': e.full_name,
@@ -2957,9 +2963,43 @@ def register_routes(app):
                 'payslip_count': payslip_counts.get(e.employee_id, 0),
                 'access_count': access_counts.get(e.employee_id, 0),
                 'leave_count': leave_counts.get(e.employee_id, 0),
+                # Раздел «Расчётные листы»: по должности (не снять) или
+                # открыт вручную.
+                'payroll': by_title or e.employee_id in grants,
+                'payroll_by_title': by_title,
             })
 
         return jsonify({'message': 'Success', 'employees': employees})
+
+    @app.route('/api/admin/employees/<employee_id>/payroll', methods=['POST'])
+    @require_auth
+    def admin_set_payroll(employee_id):
+        """Открыть или закрыть человеку раздел «Расчётные листы».
+
+        Это доступ к зарплатам всего предприятия, поэтому — только
+        администратору системы. Тем, кто в расчётной группе по должности,
+        закрыть нельзя: это решает справочник.
+        """
+        if not _is_admin_account():
+            return _deny()
+        emp = db.session.get(Employee, employee_id)
+        if emp is None:
+            return jsonify({'message': 'Сотрудник не найден', 'error': True}), 404
+        on = _json_body().get('payroll') is True
+        grant = db.session.get(PayrollGrant, employee_id)
+        if on and grant is None:
+            viewer = getattr(g, 'employee', None)
+            db.session.add(PayrollGrant(
+                employee_id=employee_id,
+                granted_by=viewer.employee_id if viewer else None))
+        elif not on and grant is not None:
+            db.session.delete(grant)
+        db.session.commit()
+        logging.info('Расчётная группа: %s %s', employee_id,
+                     'открыта' if on else 'закрыта')
+        return jsonify({'message': 'Success',
+                        'payroll': payslip_questions.is_payroll(emp),
+                        'payroll_by_title': payslip_questions.payroll_by_title(emp)})
 
     @app.route('/get_sname', methods=['POST'])
     @require_auth
