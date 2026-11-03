@@ -9,14 +9,12 @@ import 'localization_trip.dart';
 import 'localization_medical.dart';
 import 'localization_tech.dart';
 import 'localization_reception.dart';
-import 'localization_purchase.dart';
 
 class LocaleString extends Translations {
   @override
   Map<String, Map<String, String>> get keys => {
         Lang.kk: {
           ...itStringsKk,
-          ...purchaseStringsKk,
           ...payslipQuestionStringsKk,
           ...payslipUploadStringsKk,
           ...assignmentStringsKk,
@@ -399,7 +397,6 @@ class LocaleString extends Translations {
         },
         Lang.ru: {
           ...itStringsRu,
-          ...purchaseStringsRu,
           ...payslipQuestionStringsRu,
           ...payslipUploadStringsRu,
           ...assignmentStringsRu,
