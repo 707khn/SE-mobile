@@ -26,8 +26,6 @@ import 'assignment_detail_screen.dart';
 import 'assignments_screen.dart';
 import 'purchases_screen.dart';
 import 'news_screen.dart';
-import 'onboarding_detail_screen.dart';
-import 'onboarding_screen.dart';
 import 'rollout_screen.dart';
 
 /// Оповещения: что нового с прошлого раза.
@@ -111,11 +109,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => const ReceptionScreen());
       case 'medical':
         Get.to(() => const MedicalScreen());
-      case 'onboarding':
-        final id = int.tryParse(notice.ref ?? '');
-        Get.to(() => id == null
-            ? const OnboardingScreen()
-            : OnboardingDetailScreen(onboardingId: id));
       case 'assignment':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -234,7 +227,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'purchase' => (Icons.shopping_cart_outlined, const Color(0xFFAD1457)),
       'payslip_q' => (Icons.contact_support_outlined, context.accentColor),
       'assignment' => (Icons.task_alt, const Color(0xFF0277BD)),
-      'onboarding' => (Icons.waving_hand_outlined, const Color(0xFF00897B)),
       'medical' => (Icons.health_and_safety_outlined, const Color(0xFF00838F)),
       'outage' => (Icons.power_off_outlined, const Color(0xFFE65100)),
       'itasset' => (Icons.devices_outlined, const Color(0xFF00695C)),

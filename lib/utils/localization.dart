@@ -6,7 +6,6 @@ import 'localization_payslip_q.dart';
 import 'localization_payslip_upload.dart';
 import 'localization_assign.dart';
 import 'localization_trip.dart';
-import 'localization_onboarding.dart';
 import 'localization_medical.dart';
 import 'localization_tech.dart';
 import 'localization_reception.dart';
@@ -22,7 +21,6 @@ class LocaleString extends Translations {
           ...payslipUploadStringsKk,
           ...assignmentStringsKk,
           ...businessTripStringsKk,
-          ...onboardingStringsKk,
           ...medicalStringsKk,
           ...techStringsKk,
           ...receptionStringsKk,
@@ -406,7 +404,6 @@ class LocaleString extends Translations {
           ...payslipUploadStringsRu,
           ...assignmentStringsRu,
           ...businessTripStringsRu,
-          ...onboardingStringsRu,
           ...medicalStringsRu,
           ...techStringsRu,
           ...receptionStringsRu,
