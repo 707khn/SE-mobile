@@ -1289,13 +1289,25 @@ def _may_view(target_employee_id):
 
 
 def _may_view_payslip(target_employee_id):
-    """Листок — как _may_view, и вдобавок расчётной группе: любой.
+    """Чужой листок — только расчётной группе и администратору системы.
 
-    Листки она и загружает, и в разделе «Расчётные листы» должна видеть, что
-    именно легло каждому.
+    Прежде здесь стояло правило проходов (_may_view): начальник, «главный»,
+    директор или заместитель видел зарплату всего своего отдела, а
+    заместитель по экономике и финансам — всего предприятия. Проходы
+    начальнику нужны, зарплата подчинённых — нет. Теперь руководитель видит
+    только свой листок.
+
+    Расчётная группа листки загружает и в разделе «Расчётные листы» должна
+    видеть, что именно легло каждому. Администратор системы открывает листок
+    из админ-панели, когда разбирается с жалобой «листок не тот».
     """
-    return (_may_view(target_employee_id)
-            or payslip_questions.is_payroll(getattr(g, 'employee', None)))
+    viewer = getattr(g, 'employee', None)
+    if viewer is None:
+        return not _AUTH_REQUIRED
+    if viewer.employee_id == target_employee_id:
+        return True
+    return (_is_system_admin(viewer.job_title)
+            or payslip_questions.is_payroll(viewer))
 
 
 def _is_manager():
