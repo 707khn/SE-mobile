@@ -97,6 +97,9 @@ if (Test-Path $statePath) {
 
 function Set-Done($key, $result) {
     $script:done[$key] = $result
+    # Отказ запоминаем только до перезапуска: исправили settings.txt, снова
+    # нажали «Включить автозагрузку» — и тот же файл уходит ещё раз.
+    if ($result -ne 'ok') { return }
     try { Add-Content -Path $statePath -Value "$key`t$result" -Encoding UTF8 } catch { }
 }
 
@@ -207,7 +210,7 @@ function Send-File($file, $key) {
         # Неверный пароль, чужой логин, файл без блюд — повтор не поможет, а
         # повтор с неверным паролем ещё и закроет вход на время.
         Set-Done $key 'failed'
-        Show-Note 'Меню НЕ загружено' "$($file.Name)`n$($r.Text)" 'Error'
+        Show-Note 'Меню НЕ загружено' "$($file.Name)`n$($r.Text)`nИсправьте settings.txt и снова запустите «Включить автозагрузку»." 'Error'
         return
     }
 
