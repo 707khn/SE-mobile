@@ -24,6 +24,9 @@ plugins {
     // остаёмся на последней 8.x.
     id "com.android.application" version "8.13.0" apply false
     id "org.jetbrains.kotlin.android" version "2.2.20" apply false
+    // Уведомления через Firebase: переводит google-services.json в ресурсы
+    // приложения. Подключается в app/build.gradle, только когда файл есть.
+    id "com.google.gms.google-services" version "4.4.2" apply false
 }
 
 include ":app"

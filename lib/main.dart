@@ -24,15 +24,11 @@ import 'utils/secure_storage_helper.dart';
 import 'widgets/motion.dart';
 import 'widgets/desktop_layout.dart';
 
-// Firebase imports — only active when google-services.json / GoogleService-Info.plist are present
+// Firebase поднимается, только когда сборка настроена: google-services.json
+// кладёт в android/app сборочная машина из секрета GOOGLE_SERVICES_JSON.
 // ignore: depend_on_referenced_packages
 import 'package:firebase_core/firebase_core.dart';
 import 'services/fcm_service.dart';
-
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(dynamic message) async {
-  await Firebase.initializeApp();
-}
 
 void main() {
   // Всё, включая поднятие привязки Flutter, происходит внутри одной зоны:
@@ -72,9 +68,11 @@ void main() {
     if (!isDesktop) {
       try {
         await Firebase.initializeApp();
-        FcmService.setupForegroundHandler();
+        // Не ждём: каналы уведомлений создаются, пока рисуется первый экран.
+        unawaited(FcmService.setup());
       } catch (_) {
-        // Firebase not configured yet — app works without push notifications
+        // Сборка без google-services.json — приложение работает без
+        // уведомлений на телефон; колокольчик внутри есть всегда.
       }
     }
 

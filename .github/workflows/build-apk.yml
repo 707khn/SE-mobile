@@ -140,6 +140,43 @@ jobs:
           PROPS
           echo "Ключ подписи на месте, хранилище открывается"
 
+      # Уведомления на телефон. google-services.json — из консоли Firebase
+      # (Настройки проекта → Общие → Ваши приложения → google-services.json),
+      # целиком в секрет GOOGLE_SERVICES_JSON: как есть или в base64. В нём
+      # должны быть оба приложения: com.example.se_mobile.se_mobile (раздача
+      # с сервера) и com.sebtrz.mobile (Google Play) — иначе плагин Google
+      # уронит одну из сборок через десять минут на «No matching client
+      # found». Пусть падает здесь, за секунду и по делу.
+      #
+      # Секрета нет — собираем как раньше, без уведомлений: колокольчик в
+      # приложении работает и так.
+      - name: Настройки Firebase
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::Нет секрета GOOGLE_SERVICES_JSON — сборка без уведомлений на телефон"
+            exit 0
+          fi
+          FILE=android/app/google-services.json
+          if printf '%s' "$GOOGLE_SERVICES_JSON" | jq -e . >/dev/null 2>&1; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > "$FILE"
+          elif printf '%s' "$GOOGLE_SERVICES_JSON" | base64 -d 2>/dev/null | jq -e . >/dev/null 2>&1; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" | base64 -d > "$FILE"
+          else
+            echo "::error::GOOGLE_SERVICES_JSON — не JSON и не base64 от JSON. Вставьте в секрет содержимое google-services.json целиком."
+            exit 1
+          fi
+          for pkg in com.example.se_mobile.se_mobile com.sebtrz.mobile; do
+            if ! jq -e --arg p "$pkg" \
+                 '[.client[]?.client_info.android_client_info.package_name] | index($p) != null' \
+                 "$FILE" >/dev/null; then
+              echo "::error::В google-services.json нет приложения $pkg. В консоли Firebase: Настройки проекта → Добавить приложение → Android, имя пакета $pkg; затем скачайте google-services.json заново и замените секрет."
+              exit 1
+            fi
+          done
+          echo "Firebase: проект $(jq -r .project_info.project_id "$FILE"), уведомления в сборке будут"
+
       # Все платформы, включая x86_64. Ограничение экономило минуту-две, но
       # на устройстве, которого нет в списке, приложение падает при запуске:
       # своей библиотеки в файле просто нет. Минуты столько не стоят.

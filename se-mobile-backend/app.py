@@ -70,19 +70,59 @@ except ImportError:
 _fb_app = None
 
 
+def _firebase_key_path():
+    return os.environ.get('FIREBASE_CREDENTIALS_PATH', 'firebase-credentials.json')
+
+
 def _get_firebase():
+    """Firebase для отправки уведомлений — или None, пока ключа нет.
+
+    Ключ (служебный аккаунт проекта Firebase) кладут на сервер руками, см.
+    deploy/README.md, «Уведомления». До тех пор всё, что шлёт уведомления,
+    молча ничего не делает: колокольчик в приложении работает и без них.
+    """
     global _fb_app
     if not _FIREBASE_AVAILABLE:
         return None
     if _fb_app is None:
-        cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH', 'firebase-credentials.json')
+        cred_path = _firebase_key_path()
         if os.path.exists(cred_path):
             try:
                 cred = credentials.Certificate(cred_path)
                 _fb_app = firebase_admin.initialize_app(cred)
+                logging.info('Firebase подключён: уведомления на телефоны идут')
             except Exception as e:
                 logging.warning(f'Firebase init failed: {e}')
     return _fb_app
+
+
+def _push_state():
+    """Работают ли уведомления на телефоны — для экрана «Обновление».
+
+    Без этого единственный способ проверить — ждать, придёт ли что-нибудь,
+    а не пришло — гадать: ключа нет, ключ не читается или телефоны не
+    привязались.
+    """
+    if not _FIREBASE_AVAILABLE:
+        return {'enabled': False,
+                'problem': 'Уведомления выключены: на сервере не установлен '
+                           'firebase-admin (pip install -r requirements.txt)'}
+    path = _firebase_key_path()
+    if not os.path.exists(path):
+        return {'enabled': False,
+                'problem': f'Уведомления выключены: нет ключа Firebase ({path})'}
+    if not _get_firebase():
+        return {'enabled': False,
+                'problem': f'Ключ Firebase не читается ({path}) — права на файл '
+                           'или не тот файл, подробности в журнале'}
+    try:
+        devices = FcmToken.query.count()
+        people = db.session.query(
+            db.func.count(db.distinct(FcmToken.employee_id))).scalar() or 0
+    except Exception:
+        db.session.rollback()
+        devices = people = 0
+    return {'enabled': True, 'devices': devices, 'people': people}
 
 
 def _is_admin_role(job_title: str) -> bool:
@@ -93,6 +133,18 @@ def _is_admin_role(job_title: str) -> bool:
 # FCM принимает не больше 500 адресатов за раз, а на предприятии их ровно
 # столько же — шлём частями.
 _PUSH_BATCH = 450
+
+# Канал уведомления на телефоне — по поводу. Те же каналы создаёт приложение
+# (lib/services/fcm_service.dart), и человек выключает «Столовую», не
+# выключая «Зарплату». Без канала Android, пока приложение закрыто, кладёт
+# всё в общий «Прочее» — и выключить можно только всё сразу.
+_PUSH_CHANNELS = {
+    'payslip': 'payslip_channel',
+    'menu': 'menu_channel',
+    'news': 'news_channel',
+    'turnstile': 'turnstile_channel',
+}
+_PUSH_DEFAULT_CHANNEL = 'general_channel'
 
 
 def _push_to(employee_ids, title, body, data=None):
@@ -113,14 +165,27 @@ def _push_to(employee_ids, title, body, data=None):
     if not tokens:
         return 0
 
+    data = {k: str(v) for k, v in (data or {}).items()}
+    channel = _PUSH_CHANNELS.get(data.get('type'), _PUSH_DEFAULT_CHANNEL)
+
     sent = 0
+    failed = 0
+    first_error = None
     invalid = set()
     for start in range(0, len(tokens), _PUSH_BATCH):
         chunk = tokens[start:start + _PUSH_BATCH]
         message = fb_messaging.MulticastMessage(
             tokens=chunk,
             notification=fb_messaging.Notification(title=title, body=body),
-            data={k: str(v) for k, v in (data or {}).items()},
+            data=data,
+            # high — чтобы телефон в режиме экономии показал сразу, а не
+            # когда проснётся сам. Уведомление при этом всегда видно
+            # человеку, и Android за такое приоритет не урезает.
+            android=fb_messaging.AndroidConfig(
+                priority='high',
+                notification=fb_messaging.AndroidNotification(
+                    channel_id=channel),
+            ),
         )
         try:
             response = fb_messaging.send_each_for_multicast(message)
@@ -131,11 +196,27 @@ def _push_to(employee_ids, title, body, data=None):
             if result.success:
                 sent += 1
                 continue
-            code = getattr(result.exception, 'code', '')
-            # Приложение снесли или переустановили — держать такой пропуск
-            # незачем, иначе список адресатов растёт без конца.
-            if code in ('registration-token-not-registered', 'invalid-argument'):
+            # Приложение снесли или переустановили (Unregistered), или токен
+            # выдан другим проектом Firebase (SenderIdMismatch) — держать
+            # такой незачем, иначе список адресатов растёт без конца.
+            #
+            # По классу, а не по коду: прежде здесь сравнивали с
+            # «registration-token-not-registered» — так ошибку называл
+            # firebase-admin до шестой версии, а в нынешней это NOT_FOUND, и
+            # мёртвые токены не убирались бы никогда. INVALID_ARGUMENT
+            # нарочно не трогаем: так же отвечают и на ошибку в самом
+            # сообщении, и тогда стёрлись бы токены у всех.
+            if isinstance(result.exception, (fb_messaging.UnregisteredError,
+                                             fb_messaging.SenderIdMismatchError)):
                 invalid.add(chunk[index])
+            else:
+                failed += 1
+                first_error = first_error or result.exception
+
+    if failed:
+        logging.warning('Уведомление «%s»: не доставлено на %d из %d '
+                        'устройств, например: %s', title, failed,
+                        len(tokens), first_error)
 
     if invalid:
         try:
@@ -197,6 +278,14 @@ def _notify_loop(app):
             logging.warning('Уведомление не отправлено: %s', e)
         finally:
             _notify_queue.task_done()
+
+
+# Что видит Google. Уведомление на телефон идёт через Firebase, то есть
+# через серверы Google, и всё, что в нём написано, проходит через них. Поэтому
+# в пуше — только повод: «расчётный лист готов», «меню выложено», заголовок
+# новости с открытого сайта. Ни сумм, ни имён, ни текста внутренних
+# объявлений: их приложение берёт с нашего сервера, в ленте под колокольчиком.
+_ANNOUNCEMENT_PUSH_TEXT = 'Новое объявление — откройте SE-mobile'
 
 
 def _push_to_everyone(title, body, data=None):
@@ -342,43 +431,29 @@ def _notify_menu_published(text='Меню опубликовано'):
     _push_to_everyone('Столовая', f'{text} 🍽️', {'type': 'menu'})
 
 
+def _turnstile_push_recipients():
+    """Кому слать проходы через турникет: табельные из TURNSTILE_PUSH_TO.
+
+    Прежде проход уходил всем, у кого в должности «начальник», «главный»,
+    «директор»: на предприятии их десятки, и в пересменку каждый получил бы
+    по пятьсот уведомлений — ровно столько, чтобы уведомления выключили
+    совсем, вместе с зарплатой. Пока Firebase не был настроен, этого никто не
+    видел. Теперь — только тем, кого назвали явно (охрана, дежурный), а по
+    умолчанию никому: табель и так виден в приложении.
+    """
+    raw = os.environ.get('TURNSTILE_PUSH_TO', '')
+    return [_resolve_employee_id(n) for n in re.split(r'[\s,;]+', raw) if n]
+
+
 def _send_turnstile_notification(employee_name: str, direction: str, timestamp_str: str, employee_id: str):
-    if not _get_firebase():
-        return
-    admin_employee_ids = [
-        e.employee_id for e in Employee.query.all() if _is_admin_role(e.job_title)
-    ]
-    if not admin_employee_ids:
-        return
-    tokens = [
-        t.token for t in FcmToken.query.filter(
-            FcmToken.employee_id.in_(admin_employee_ids)
-        ).all()
-    ]
-    if not tokens:
-        return
+    recipients = _turnstile_push_recipients()
+    if not recipients:
+        return 0
     direction_text = 'вошёл' if direction == 'in' else 'вышел'
-    message = fb_messaging.MulticastMessage(
-        tokens=tokens,
-        notification=fb_messaging.Notification(
-            title='СКУД — проход сотрудника',
-            body=f'{employee_name} {direction_text} в {timestamp_str}',
-        ),
-        data={'type': 'turnstile', 'employee_id': employee_id, 'direction': direction},
-    )
-    try:
-        resp = fb_messaging.send_each_for_multicast(message)
-        invalid_tokens = set()
-        for i, r in enumerate(resp.responses):
-            if not r.success and r.exception:
-                code = getattr(r.exception, 'code', '')
-                if code in ('registration-token-not-registered', 'invalid-argument'):
-                    invalid_tokens.add(tokens[i])
-        if invalid_tokens:
-            FcmToken.query.filter(FcmToken.token.in_(invalid_tokens)).delete(synchronize_session=False)
-            db.session.commit()
-    except Exception as e:
-        logging.warning(f'FCM send failed: {e}')
+    return _push_to(recipients, 'Проходная',
+                    f'{employee_name} {direction_text} в {timestamp_str}',
+                    {'type': 'turnstile', 'employee_id': employee_id,
+                     'direction': direction})
 
 
 def _update_employee_names():
@@ -3568,18 +3643,27 @@ def register_routes(app):
     @app.route('/api/fcm-token', methods=['POST'])
     @require_auth
     def register_fcm_token():
+        """Привязать телефон к вошедшему — по пропуску, а не по номеру в теле.
+
+        Прежде телефон привязывался к табельному из тела запроса, а пускал
+        _may_view: без пропуска, пока REQUIRE_AUTH выключен, — любого, и кто
+        угодно из интернета мог подписать свой телефон на чужие уведомления.
+        А начальник — на уведомления любого из отдела. Теперь хозяин токена —
+        тот, чей пропуск. Сборки, которые вообще шлют токен, шлют его с
+        пропуском: до них эту функцию никто не вызывал.
+
+        Номер в теле больше ни на что не влияет: и после склейки записей
+        сотрудника, когда сохранённый на телефоне номер устарел, телефон
+        привязывается к тому, кто на самом деле вошёл.
+        """
         data = _json_body()
-        employee_id = _text(data, 'employee_id')
         token = _text(data, 'token')
-        if not employee_id or not token:
-            return jsonify({'message': 'Failure', 'error': 'employee_id and token required'}), 400
-        # Подписаться можно только на свои уведомления: иначе чужой телефон
-        # начнёт получать проходы сотрудников вместе с их именами.
-        if not _may_view(employee_id):
-            return _deny()
-        emp = Employee.query.get(employee_id)
-        if not emp:
-            return jsonify({'message': 'Failure', 'error': 'Employee not found'}), 404
+        if not token or len(token) > 512:
+            return jsonify({'message': 'Failure', 'error': 'token required'}), 400
+        viewer = getattr(g, 'employee', None)
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        employee_id = viewer.employee_id
         existing = FcmToken.query.filter_by(token=token).first()
         if existing:
             existing.employee_id = employee_id
@@ -4060,6 +4144,9 @@ def register_routes(app):
             'restore_test': _restore_test_state(),
             # Что сторож записал о перебоях. Пусто — сервер не падал.
             'outages': _outage_state(),
+            # Уведомления на телефоны: включены ли и сколько телефонов
+            # привязано.
+            'push': _push_state(),
         })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])
@@ -4106,8 +4193,8 @@ def register_routes(app):
         # Раньше набранное здесь объявление молча ложилось в ленту, и узнавал
         # о нём только тот, кто сам открыл «Новости». А это как раз важное.
         _record_notice('news', 'Объявление', item.title, ref=item.id)
-        _notify_later(app, _push_to_everyone, 'Объявление', item.title,
-                      {'type': 'news', 'id': item.id})
+        _notify_later(app, _push_to_everyone, 'Объявление',
+                      _ANNOUNCEMENT_PUSH_TEXT, {'type': 'news', 'id': item.id})
         return jsonify({'message': 'Success', 'item': _news_json(item)})
 
     @app.route('/api/admin/news/<int:item_id>', methods=['POST', 'DELETE'])
@@ -4139,7 +4226,8 @@ def register_routes(app):
 
         if item.is_published and not was_published:
             _record_notice('news', 'Объявление', item.title, ref=item.id)
-            _notify_later(app, _push_to_everyone, 'Объявление', item.title,
+            _notify_later(app, _push_to_everyone, 'Объявление',
+                          _ANNOUNCEMENT_PUSH_TEXT,
                           {'type': 'news', 'id': item.id})
         return jsonify({'message': 'Success', 'item': _news_json(item)})
 

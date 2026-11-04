@@ -177,6 +177,13 @@ class RolloutReport {
 
   /// Что не так с пробным восстановлением: не было, не удалось, давно.
   String restoreTestProblem = '';
+
+  /// Уведомления на телефоны: включены ли (null — сервер старый и не
+  /// говорит), почему выключены и сколько телефонов и людей привязано.
+  bool? pushEnabled;
+  String pushProblem = '';
+  int pushDevices = 0;
+  int pushPeople = 0;
 }
 
 List<MapEntry<String, int>> _days(dynamic raw) {
@@ -243,6 +250,14 @@ Future<RolloutReport> fetchRollout() async {
   final restore = (body['restore_test'] as Map?) ?? {};
   report.restoreTestDaysAgo = (restore['days_ago'] as num?)?.toInt();
   report.restoreTestProblem = (restore['problem'] as String?) ?? '';
+  // Сервер без этого поля — старый: молчим, а не пугаем «выключено».
+  final push = body['push'];
+  if (push is Map) {
+    report.pushEnabled = push['enabled'] == true;
+    report.pushProblem = (push['problem'] as String?) ?? '';
+    report.pushDevices = (push['devices'] as num?)?.toInt() ?? 0;
+    report.pushPeople = (push['people'] as num?)?.toInt() ?? 0;
+  }
   return report;
 }
 

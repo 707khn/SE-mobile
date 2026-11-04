@@ -11,3 +11,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Настройки Firebase: на сборочной машине их кладёт build-apk.yml из секрета
+# GOOGLE_SERVICES_JSON. Сам по себе файл не тайна, но в репозитории ему
+# делать нечего — пусть будет одно место, где его меняют.
+/app/google-services.json

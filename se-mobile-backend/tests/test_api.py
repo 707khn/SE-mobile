@@ -370,19 +370,61 @@ def test_upload_xml_no_file(client):
 _FCM_TOKEN = 'test-fcm-token-abc123'
 
 
+def _pass(client, employee_id):
+    with client.application.app_context():
+        token = app_module._issue_token(employee_id)
+    return {'Authorization': f'Bearer {token}'}
+
+
 def test_fcm_register(client):
     r = _post(client, '/api/fcm-token', {
         'employee_id': _SARSEKEN,
         'token': _FCM_TOKEN,
-    })
+    }, headers=_pass(client, _SARSEKEN))
     assert r.status_code == 200
     assert r.get_json()['message'] == 'Success'
 
 
+def test_fcm_register_needs_a_pass(client):
+    """Без пропуска телефон не привязать ни к кому — даже пока REQUIRE_AUTH
+    выключен: иначе кто угодно подписал бы свой телефон на чужие
+    уведомления, зная один табельный."""
+    r = _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN,
+                                          'token': 'fcm-anonymous'})
+    assert r.status_code == 401
+    from models import FcmToken
+    with client.application.app_context():
+        assert FcmToken.query.filter_by(token='fcm-anonymous').count() == 0
+
+
+def test_fcm_token_belongs_to_the_pass_not_the_body(app, client,
+                                                    remove_employee):
+    """Чужой номер в теле ничего не даёт: телефон достаётся тому, чей пропуск."""
+    from models import db, Employee, FcmToken
+    with app.app_context():
+        remove_employee('FCM00003')
+        db.session.add(Employee(employee_id='FCM00003',
+                                full_name='Пуш Тест Тестович',
+                                job_title='Слесарь'))
+        db.session.commit()
+    r = _post(client, '/api/fcm-token',
+              {'employee_id': _SARSEKEN, 'token': 'fcm-not-yours'},
+              headers=_pass(client, 'FCM00003'))
+    assert r.status_code == 200
+    with app.app_context():
+        row = FcmToken.query.filter_by(token='fcm-not-yours').one()
+        assert row.employee_id == 'FCM00003'
+        db.session.delete(row)
+        db.session.commit()
+
+
 def test_fcm_register_idempotent(client):
     """Re-registering the same token must not create duplicates."""
-    _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN})
-    r = _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN})
+    headers = _pass(client, _SARSEKEN)
+    _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN},
+          headers=headers)
+    r = _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN},
+              headers=headers)
     assert r.status_code == 200
 
     from models import FcmToken
@@ -392,7 +434,8 @@ def test_fcm_register_idempotent(client):
 
 
 def test_fcm_delete(client):
-    _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN})
+    _post(client, '/api/fcm-token', {'employee_id': _SARSEKEN, 'token': _FCM_TOKEN},
+          headers=_pass(client, _SARSEKEN))
     r = client.delete('/api/fcm-token',
                       data=json.dumps({'employee_id': _SARSEKEN, 'token': _FCM_TOKEN}),
                       content_type='application/json')
