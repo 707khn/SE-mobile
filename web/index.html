@@ -8,6 +8,12 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <!--
+    Без этого iPhone рисует заставку на ширину 980 точек и ужимает её до
+    экрана: логотип и колечко выходили в два с половиной раза мельче. Когда
+    поднимется приложение, Flutter поставит свою такую же строку.
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="SE-mobile — приложение сотрудников Semey Engineering">
 
@@ -34,16 +40,19 @@
     html, body { margin: 0; height: 100%; background: #018041; }
     /* Пока грузится приложение (несколько мегабайт по заводскому каналу) —
        зелёный экран с логотипом, как у заставки на телефоне, а не белый. */
+    /* Крупно: на iPhone 96 точек логотипа и тонкое колечко едва читались. */
     #loading {
       position: fixed; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 24px;
-      font: 15px -apple-system, system-ui, sans-serif; color: #fff;
+      align-items: center; justify-content: center; gap: 40px;
+      font: 17px -apple-system, system-ui, sans-serif; color: #fff;
     }
-    #loading img { width: 96px; height: auto; filter: brightness(0) invert(1); }
+    #loading img {
+      width: min(55vw, 220px); height: auto; filter: brightness(0) invert(1);
+    }
     #loading .spin {
-      width: 28px; height: 28px; border-radius: 50%;
-      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-      animation: spin 1s linear infinite;
+      width: 48px; height: 48px; border-radius: 50%; box-sizing: border-box;
+      border: 5px solid rgba(255,255,255,.35); border-top-color: #fff;
+      animation: spin .9s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
