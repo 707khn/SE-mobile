@@ -270,24 +270,27 @@ class _MainPage2State extends State<MainPage2> {
               // Две кнопки в строку не помещались даже на обычном телефоне:
               // «Просмотреть последний файл Excel» и «…CSV» шире 360 точек, и
               // вторая уходила за край. Не помещаются — встают одна под другой.
-              Wrap(
-                alignment: WrapAlignment.center,
-                children: [
-                  TextButton.icon(
-                    onPressed: () =>
-                        openLatestExport(context, 'report', 'xlsx'),
-                    icon: const Icon(Icons.table_chart_outlined, size: 16),
-                    label: SmallText(content: "see last Excel".tr),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: () =>
-                        openLatestExport(context, 'report', 'csv'),
-                    icon: const Icon(Icons.description_outlined, size: 16),
-                    label: SmallText(content: "see last CSV".tr),
-                  ),
-                ],
-              ),
+              // В браузере выгрузки не хранятся: файл сразу уходит в
+              // «Поделиться» или в «Загрузки», открыть потом нечего.
+              if (keepsExports)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () =>
+                          openLatestExport(context, 'report', 'xlsx'),
+                      icon: const Icon(Icons.table_chart_outlined, size: 16),
+                      label: SmallText(content: "see last Excel".tr),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () =>
+                          openLatestExport(context, 'report', 'csv'),
+                      icon: const Icon(Icons.description_outlined, size: 16),
+                      label: SmallText(content: "see last CSV".tr),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 4.0),
               BigText(content: "choose period".tr, fontWeight: FontWeight.bold),
               const SizedBox(height: 8.0),

@@ -24,9 +24,14 @@ STATE_DIR=${FETCH_APK_STATE_DIR:-/var/lib/se-mobile/fetch-apk}
 # Сколько сборок держать в папке: предыдущие — чтобы было куда откатиться.
 KEEP=${APK_KEEP:-3}
 TOKEN=${GITHUB_TOKEN:-}
+# Веб-версия — распакованной: её отдаёт nginx по адресу /web/ (см.
+# deploy/nginx-se-mobile.conf). Внутри той же папки, что и сборки, — туда
+# служба таймера уже может писать.
+WEB_DIR=${WEB_DIR:-$APK_DIR/web}
 
 APK_RE='^se-mobile-[0-9]+\.[0-9]+\.[0-9]+\+([0-9]+)\.apk$'
 WINDOWS_RE='^SemEng-windows-[0-9]+\.[0-9]+\.[0-9]+\+([0-9]+)\.zip$'
+WEB_RE='^se-mobile-web-[0-9]+\.[0-9]+\.[0-9]+\+([0-9]+)\.zip$'
 
 # Чем кончился последний запуск — для экрана «Обновление» в приложении.
 # Журнал systemd читает только root, и истёкший токен две недели краснел бы
@@ -52,10 +57,12 @@ fi
 
 work=$(mktemp -d)
 partial=
+unpacking=
 cleanup() {
     rc=$?
     rm -rf "$work"
     if [ -n "$partial" ]; then rm -f -- "$partial"; fi
+    if [ -n "$unpacking" ]; then rm -rf -- "$unpacking"; fi
     # Упали не там, где ждали (set -e) — всё равно сказать, что упали.
     if [ "$rc" != 0 ] && [ "$result" = ok ]; then
         result=fail
@@ -124,6 +131,7 @@ if not isinstance(release, dict):
 kinds = (
     ('apk', r'se-mobile-\d+\.\d+\.\d+\+(\d+)\.apk'),
     ('windows', r'SemEng-windows-\d+\.\d+\.\d+\+(\d+)\.zip'),
+    ('web', r'se-mobile-web-\d+\.\d+\.\d+\+(\d+)\.zip'),
 )
 for kind, pattern in kinds:
     for a in release.get('assets') or []:
@@ -148,6 +156,9 @@ take() {
         windows)
             re=$WINDOWS_RE; glob='SemEng-windows-*.zip'
             last="$STATE_DIR/last-build-windows"; who='компьютеры' ;;
+        web)
+            re=$WEB_RE; glob='se-mobile-web-*.zip'
+            last="$STATE_DIR/last-build-web"; who='браузеры (/web/)' ;;
     esac
 
     local have=0 file
@@ -205,6 +216,12 @@ take() {
         fi
     fi
 
+    # Веб-версию — сначала разложить: не разложилась — архив не берём, и
+    # следующий запуск попробует снова, а в /web/ остаётся прежняя.
+    if [ "$kind" = web ]; then
+        publish_web "$partial" "$name" "$build"
+    fi
+
     chmod 644 "$partial"
     mv -f -- "$partial" "$APK_DIR/$name"
     partial=
@@ -221,6 +238,41 @@ take() {
     done | sort -rn | tail -n +$((KEEP + 1)) | while read -r _ old; do
         rm -f -- "$old"
         echo "Убрана старая сборка $(basename "$old")"
+    done
+}
+
+# Раскладывает архив веб-версии в $WEB_DIR/<сборка> и переключает на неё
+# $WEB_DIR/current. Переключение — одно переименование ссылки: открывший
+# страницу в эту секунду получит либо прежнюю сборку целиком, либо новую.
+publish_web() {
+    local zip=$1 name=$2 build=$3
+    mkdir -p "$WEB_DIR" || fail "Не могу создать $WEB_DIR для веб-версии."
+    unpacking="$WEB_DIR/.unpack-$build"
+    rm -rf -- "$unpacking"
+    # zipfile из питона сам отбрасывает в именах «..» и начальный «/»: из
+    # архива ничего не выйдет за пределы папки.
+    python3 -m zipfile -e "$zip" "$unpacking" \
+        || fail "Архив $name не распаковался — веб-версию не меняю."
+    [ -f "$unpacking/index.html" ] \
+        || fail "В архиве $name нет index.html — веб-версию не меняю."
+    chmod -R u=rwX,go=rX "$unpacking"
+    rm -rf -- "${WEB_DIR:?}/$build"
+    mv -- "$unpacking" "$WEB_DIR/$build"
+    unpacking=
+    ln -sfn "$build" "$WEB_DIR/.current-$build"
+    mv -Tf -- "$WEB_DIR/.current-$build" "$WEB_DIR/current"
+
+    # Прежние сборки — кроме последних $KEEP: на них можно вернуться,
+    # переставив current руками.
+    local dir
+    for dir in "$WEB_DIR"/*/; do
+        dir=${dir%/}
+        if [[ $(basename "$dir") =~ ^[0-9]+$ ]] && [ ! -L "$dir" ]; then
+            echo "$(basename "$dir") $dir"
+        fi
+    done | sort -rn | tail -n +$((KEEP + 1)) | while read -r _ old; do
+        rm -rf -- "$old"
+        echo "Убрана старая веб-версия $(basename "$old")"
     done
 }
 

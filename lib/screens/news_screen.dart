@@ -165,6 +165,10 @@ class _NewsScreenState extends State<NewsScreen> {
                 width: double.infinity,
                 height: 160,
                 fit: BoxFit.cover,
+                // В браузере картинка с сайта компании приходит без
+                // разрешения CORS, и нарисовать её сам Flutter не может —
+                // тогда её показывает браузер обычным <img>.
+                webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
             Padding(

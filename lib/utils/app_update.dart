@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,6 +50,9 @@ class AppUpdate {
   static Future<AppUpdate?> check() async {
     // Из Google Play обновляет только Play: своя загрузка apk там запрещена.
     if (kFromPlay) return null;
+    // Веб-версия обновляется сама: сервер отдаёт новую при следующем
+    // открытии. Скачивать браузеру нечего — apk на iPhone не поставить.
+    if (kIsWeb) return null;
     try {
       final response = await http
           .get(Uri.parse('${AppValues.baseUrl}/api/app/latest'))

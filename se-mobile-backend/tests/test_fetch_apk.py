@@ -6,11 +6,13 @@
 """
 
 import hashlib
+import io
 import json
 import os
 import shutil
 import subprocess
 import threading
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -26,6 +28,20 @@ APK = b'PK\x03\x04 fake apk ' * 1000
 NAME = 'se-mobile-1.20.0+60.apk'
 ZIP = b'PK\x03\x04 fake windows zip ' * 500
 ZIP_NAME = 'SemEng-windows-1.20.0+60.zip'
+WEB_NAME = 'se-mobile-web-1.20.0+60.zip'
+
+
+def _web_zip(files):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w') as z:
+        for name, data in files.items():
+            z.writestr(name, data)
+    return buf.getvalue()
+
+
+WEB = _web_zip({'index.html': '<html>web 60</html>',
+                'main.dart.js': 'void 0;',
+                'icons/Icon-192.png': 'png'})
 
 
 class _GitHub(BaseHTTPRequestHandler):
@@ -35,6 +51,7 @@ class _GitHub(BaseHTTPRequestHandler):
     asset_status = 200
     expires = None
     seen_tokens = []
+    web = WEB
 
     def log_message(self, *args):
         pass
@@ -70,6 +87,10 @@ class _GitHub(BaseHTTPRequestHandler):
             return self._send(302, headers=[('Location', '/blob/zip')])
         if self.path == '/blob/zip':
             return self._send(200, ZIP)
+        if self.path == '/assets/4':
+            return self._send(302, headers=[('Location', '/blob/web')])
+        if self.path == '/blob/web':
+            return self._send(200, self.web)
         return self._send(404)
 
 
@@ -82,6 +103,7 @@ def github():
     _GitHub.asset_status = 200
     _GitHub.expires = None
     _GitHub.seen_tokens = []
+    _GitHub.web = WEB
     _GitHub.release = {'assets': [
         {'name': 'se-mobile-play-1.20.0+60.aab', 'state': 'uploaded',
          'url': f'{base}/assets/1', 'size': 10, 'digest': 'sha256:00'},
@@ -314,3 +336,63 @@ def test_windows_archive_only_is_named_and_still_taken(github, dirs):
     assert done.returncode == 0, done.stderr
     assert 'нет APK' in done.stderr
     assert _apks(apk_dir) == [ZIP_NAME]
+
+
+def _with_web(github, data=None):
+    if data is not None:
+        _GitHub.web = data
+    _GitHub.release['assets'].append(
+        {'name': WEB_NAME, 'state': 'uploaded', 'url': f'{github}/assets/4',
+         'size': len(_GitHub.web),
+         'digest': 'sha256:' + hashlib.sha256(_GitHub.web).hexdigest()})
+
+
+def test_web_version_is_unpacked_and_switched_to(github, dirs):
+    """Веб-версия приезжает тем же путём и раскладывается для nginx."""
+    apk_dir, state = dirs
+    _with_web(github)
+    done = _run(github, dirs)
+    assert done.returncode == 0, done.stderr
+    web = apk_dir / 'web'
+    assert (web / 'current').is_symlink()
+    assert os.readlink(web / 'current') == '60'
+    assert (web / 'current' / 'index.html').read_text() == '<html>web 60</html>'
+    assert (web / 'current' / 'icons' / 'Icon-192.png').exists()
+    assert oct((web / '60' / 'index.html').stat().st_mode & 0o777) == '0o644'
+    assert (state / 'last-build-web').read_text().strip() == '60'
+    assert WEB_NAME in _apks(apk_dir)
+    # Ни временных папок, ни ссылок рядом.
+    assert sorted(p.name for p in web.iterdir()) == ['60', 'current']
+
+    again = _run(github, dirs)
+    assert again.returncode == 0 and again.stdout == ''
+
+
+def test_web_version_keeps_three_latest(github, dirs):
+    apk_dir, _ = dirs
+    web = apk_dir / 'web'
+    for build in ('55', '56', '57', '58'):
+        (web / build).mkdir(parents=True)
+    os.symlink('58', web / 'current')
+    _with_web(github)
+    assert _run(github, dirs).returncode == 0
+    assert sorted(p.name for p in web.iterdir()) == ['57', '58', '60', 'current']
+    assert os.readlink(web / 'current') == '60'
+
+
+def test_broken_web_archive_leaves_the_old_version(github, dirs):
+    """Архив без index.html не выкладывается, и следующий запуск
+    попробует снова, а не сочтёт сборку забранной."""
+    apk_dir, state = dirs
+    web = apk_dir / 'web'
+    (web / '59').mkdir(parents=True)
+    (web / '59' / 'index.html').write_text('old')
+    os.symlink('59', web / 'current')
+    _with_web(github, _web_zip({'readme.txt': 'nothing here'}))
+    done = _run(github, dirs)
+    assert done.returncode == 1
+    assert 'нет index.html' in done.stderr
+    assert (web / 'current' / 'index.html').read_text() == 'old'
+    assert sorted(p.name for p in web.iterdir()) == ['59', 'current']
+    assert WEB_NAME not in _apks(apk_dir)
+    assert not (state / 'last-build-web').exists()

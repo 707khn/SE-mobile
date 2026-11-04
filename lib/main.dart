@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'utils/role_helper.dart';
 import 'package:flutter/services.dart';
@@ -42,8 +43,10 @@ void main() {
     // и «стереть» уходили за край. Android держит то же самое в манифесте,
     // чтобы экран не повернулся и до старта Flutter.
     //
-    // У окна на компьютере ориентации нет — там и спрашивать нечего.
-    if (!isDesktop) {
+    // У окна на компьютере ориентации нет — там и спрашивать нечего. В
+    // браузере экран держит не страница, а manifest.json (для значка на
+    // экране «Домой»): Safari запрет поворота из страницы не выполняет.
+    if (!isDesktop && !kIsWeb) {
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
 
@@ -65,7 +68,10 @@ void main() {
 
     // На компьютере уведомлений Firebase нет: настроен он только под
     // Android и iPhone, а без настройки на Windows подъём лишь ждёт отказа.
-    if (!isDesktop) {
+    // В браузере — тоже: веб-версия для Firebase не настроена, а без
+    // настройки он грузил бы чужие скрипты лишь затем, чтобы отказать.
+    // Колокольчик внутри приложения работает и там.
+    if (!isDesktop && !kIsWeb) {
       try {
         await Firebase.initializeApp();
         // Не ждём: каналы уведомлений создаются, пока рисуется первый экран.

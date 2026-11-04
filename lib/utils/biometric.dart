@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:local_auth/local_auth.dart';
@@ -35,7 +36,10 @@ class _LocalAuthBiometric implements Biometric {
   Future<bool> available() async {
     // На компьютере отпечатка нет, а Windows Hello пускает и по ПИН-коду
     // Windows — то есть ровно тем, что приложение просит не принимать.
-    if (isDesktop) return false;
+    //
+    // В браузере отпечатка нет вовсе: Safari пускает к Face ID только через
+    // ключи входа (passkeys), а не как замок на код приложения.
+    if (isDesktop || kIsWeb) return false;
     try {
       if (!await _auth.isDeviceSupported()) return false;
       final enrolled = await _auth.getAvailableBiometrics();

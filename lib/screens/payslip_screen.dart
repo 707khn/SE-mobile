@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -229,6 +230,12 @@ class _PayslipPageState extends State<PayslipPage> {
       if (bytes != null) {
         final name =
             'Расчетный листок ${_monthsRu[date.month - 1]} ${date.year}.xlsx';
+        // В браузере — сразу в «Поделиться» (или в «Загрузки»): папок,
+        // куда положить файл, у страницы нет.
+        if (kIsWeb) {
+          await shareBytesOnWeb(context, name, bytes);
+          return;
+        }
         // На компьютере листок ложится к выгрузкам, в «Загрузки»: отправить
         // его оттуда — перетащить в письмо. Уборка при выходе уносит и его.
         if (isDesktop) {
