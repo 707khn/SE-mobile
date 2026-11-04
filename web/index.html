@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <!--
+    Адрес, с которого раздаётся приложение: /web/ на api.se-btrz.com.
+    Подставляет `flutter build web --base-href /web/`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="SE-mobile — приложение сотрудников Semey Engineering">
+
+  <!--
+    iPhone: «Поделиться» → «На экран Домой» ставит приложение значком и
+    открывает его без строки адреса, как обычное. Полоса сверху — светлая,
+    как у самого приложения, и не наезжает на экран (viewport-fit не cover):
+    иначе часы и вырез закрывали бы заголовок.
+  -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="SE-mobile">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#018041">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>SE-mobile</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body { margin: 0; height: 100%; background: #018041; }
+    /* Пока грузится приложение (несколько мегабайт по заводскому каналу) —
+       зелёный экран с логотипом, как у заставки на телефоне, а не белый. */
+    #loading {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 24px;
+      font: 15px -apple-system, system-ui, sans-serif; color: #fff;
+    }
+    #loading img { width: 96px; height: auto; filter: brightness(0) invert(1); }
+    #loading .spin {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <img src="icons/logo.png" alt="">
+    <div class="spin"></div>
+  </div>
+  <noscript>Для работы SE-mobile включите JavaScript в настройках браузера.</noscript>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var el = document.getElementById('loading');
+      if (el) el.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

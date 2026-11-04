@@ -1,0 +1,83 @@
+name: Build Web
+
+# Веб-версия: тот же код, что у телефона, собранный для браузера. Нужна прежде
+# всего для iPhone — сборку для iOS без платной учётной записи Apple не
+# раздать, а Safari открывает https://api.se-btrz.com/web/ и ставит её значком
+# на экран «Домой».
+#
+# Архив se-mobile-web-<версия>.zip ложится в тот же релиз, что и APK этой
+# версии; оттуда его раз в десять минут забирает сервер (deploy/fetch-apk.sh)
+# и раскладывает в /var/www/se-mobile/web/. Собирается на Linux за пару минут
+# — с каждой правкой экранов, как и APK.
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'lib/**'
+      - 'web/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/build-web.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/build-web.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: 'stable'
+          cache: true
+
+      - run: flutter pub get --enforce-lockfile
+
+      # --base-href /web/ — адрес, с которого nginx раздаёт сборку.
+      # --no-web-resources-cdn — движок отрисовки (CanvasKit) кладётся в саму
+      # сборку, а не грузится с серверов Google: всё приложение приходит с
+      # нашего сервера, и закрытый на заводе доступ к gstatic.com его не
+      # сломает.
+      - name: Сборка
+        run: >
+          flutter build web --release --base-href /web/
+          --no-web-resources-cdn --no-wasm-dry-run
+
+      # Отладочные .symbols браузеру не нужны, а весят как полсборки.
+      - name: Упаковать
+        run: |
+          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
+          find build/web -name '*.symbols' -delete
+          (cd build/web && zip -qr "$GITHUB_WORKSPACE/se-mobile-web-$PUB.zip" .)
+          ls -lh "se-mobile-web-$PUB.zip"
+          echo "PUB=$PUB" >> "$GITHUB_ENV"
+
+      # Проверка правки web/ в pull request'е — только сборка, без выкладки.
+      - name: Выложить в Releases
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${PUB/+/-}"
+          FILE="se-mobile-web-$PUB.zip"
+          # Релиз заводит сборка APK, идущая параллельно. Успела она — кладём
+          # рядом; нет — заводим сами (а не успели и мы — значит, успела она).
+          if ! gh release upload "$TAG" "$FILE" --clobber 2>/dev/null; then
+            gh release create "$TAG" "$FILE" \
+              --target "$GITHUB_SHA" --title "SE Mobile $PUB" \
+              --notes "Сборка из $GITHUB_SHA. APK — раздать сотрудникам (deploy/README.md), AAB — для Google Play, web — для браузера." \
+              || gh release upload "$TAG" "$FILE" --clobber
+          fi
+          echo "### Веб-версия $PUB: https://github.com/${{ github.repository }}/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

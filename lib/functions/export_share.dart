@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -16,6 +17,11 @@ import 'export_file.dart';
 /// временную папку, и обе не убирались никогда.
 Future<void> saveAndShare(BuildContext context, String? who, String extension,
     List<int> bytes) async {
+  if (kIsWeb) {
+    await shareBytesOnWeb(context, exportFileName(who, extension), bytes,
+        text: 'send_report_tooltip'.tr);
+    return;
+  }
   try {
     final file =
         await saveExport(await exportDirectory(), who, extension, bytes);
@@ -28,6 +34,38 @@ Future<void> saveAndShare(BuildContext context, String? who, String extension,
   } catch (_) {
     if (context.mounted) showExportMessage(context, 'export_failed'.tr);
   }
+}
+
+/// Хранятся ли выгрузки на устройстве — есть ли что открыть кнопкой
+/// «Просмотреть последний файл». В браузере папки для них нет.
+bool get keepsExports => !kIsWeb;
+
+/// Выгрузка в браузере: файл собирается в памяти и сразу уходит в
+/// «Поделиться» — на iPhone это то же системное окно, что у приложения:
+/// почта, Telegram, «Сохранить в Файлы». Где «Поделиться» с файлами нет
+/// (браузер на компьютере), файл просто скачивается.
+Future<void> shareBytesOnWeb(
+    BuildContext context, String name, List<int> bytes,
+    {String? text}) async {
+  try {
+    await Share.shareXFiles([
+      XFile.fromData(Uint8List.fromList(bytes),
+          name: name, mimeType: exportMimeType(name)),
+    ], text: text, fileNameOverrides: [name]);
+  } catch (_) {
+    if (context.mounted) showExportMessage(context, 'export_failed'.tr);
+  }
+}
+
+/// Тип файла по расширению — без него Safari не знает, чем открыть
+/// выгрузку, и предлагает сохранить её как «документ».
+String exportMimeType(String name) {
+  final lower = name.toLowerCase();
+  if (lower.endsWith('.xlsx')) {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+  if (lower.endsWith('.csv')) return 'text/csv';
+  return 'application/octet-stream';
 }
 
 /// Кнопка выгрузки: на телефоне — «Поделиться», на компьютере — «Сохранить».

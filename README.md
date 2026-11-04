@@ -43,7 +43,7 @@
 - **Генерация CSV**: csv
 - **Шаринг файлов**: share_plus
 - **Интернационализация**: intl, flutter_localizations
-- **Платформы**: Android, iOS, Windows (версия для компьютера)
+- **Платформы**: Android, iOS, Windows (версия для компьютера), браузер — https://api.se-btrz.com/web/ (для iPhone через Safari, см. `deploy/README.md`)
 
 ---
 

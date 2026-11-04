@@ -68,10 +68,17 @@ def nginx(tmp_path_factory):
     apk_dir = tmp / 'apk'
     apk_dir.mkdir()
     (apk_dir / 'se-mobile-1.0.0+1.apk').write_bytes(b'apk')
+    web = apk_dir / 'web' / '7'
+    web.mkdir(parents=True)
+    (web / 'index.html').write_text('<html>SE-mobile web</html>')
+    (web / 'main.dart.js').write_text('void 0;' * 400)
+    (apk_dir / 'web' / 'current').symlink_to('7')
 
     port = _free_port()
     site = CONF.read_text(encoding='utf-8')
     site = site.replace('127.0.0.1:8000', f'127.0.0.1:{app.server_port}')
+    site = site.replace('alias /var/www/se-mobile/web/current/;',
+                        f'alias {apk_dir}/web/current/;')
     site = site.replace('alias /var/www/se-mobile/;', f'alias {apk_dir}/;')
     site = re.sub(r'listen \[::\]:80;\n', '', site)
     site = site.replace('listen 80;', f'listen 127.0.0.1:{port};')
@@ -188,3 +195,26 @@ def test_whole_shift_downloads_the_apk(nginx):
     _, headers, body = refused[0]
     assert headers['Retry-After'] == '60'
     assert 'Повторите через минуту' in body.decode('utf-8')
+
+
+def test_web_version_is_served_and_always_revalidated(nginx):
+    """Веб-версия отдаётся по /web/, и браузер переспрашивает её каждый раз:
+    имена файлов у сборок одинаковые, иначе iPhone сидел бы на старой."""
+    status, headers, body = _hit(f'{nginx}/web/')
+    assert status == 200
+    assert body == b'<html>SE-mobile web</html>'
+    assert headers['Cache-Control'] == 'no-cache'
+
+    status, headers, _ = _hit(f'{nginx}/web/main.dart.js',
+                              headers={'Accept-Encoding': 'gzip'})
+    assert status == 200
+    assert headers.get('Content-Encoding') == 'gzip'
+
+    # Без «/» на конце — туда же.
+    status, _, body = _hit(f'{nginx}/web')
+    assert status == 200 and body == b'<html>SE-mobile web</html>'
+
+
+def test_web_version_is_not_downloadable_through_app(nginx):
+    status, _, _ = _hit(f'{nginx}/app/web/current/index.html')
+    assert status == 404
