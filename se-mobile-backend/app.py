@@ -1814,11 +1814,18 @@ def create_app():
     db.init_app(app)
 
     with app.app_context():
+        # Схема — не «non-fatal». Раньше сбой здесь писался в журнал, и
+        # сервер продолжал работать на неверной схеме: запросы падали
+        # по одному на каждой недостающей колонке, а /health был зелёным.
+        # Теперь процесс не стартует: systemd пишет причину, сторож и
+        # выкладка (deploy/autodeploy.sh — с откатом) видят упавший сервер.
         logging.info('Running db.create_all()...')
         try:
             db.create_all()
         except Exception as e:
-            logging.error(f'db.create_all() failed (non-fatal): {e}', exc_info=True)
+            logging.critical(f'db.create_all() failed — сервер не стартует: {e}',
+                             exc_info=True)
+            raise
         logging.info('db.create_all() done')
         # _migrate_schema идёт отдельно и всегда: он приводит схему в
         # соответствие с моделями, а не наполняет её данными.
@@ -1826,7 +1833,9 @@ def create_app():
             _migrate_schema()
         except Exception as e:
             db.session.rollback()
-            logging.error(f'_migrate_schema failed (non-fatal): {e}', exc_info=True)
+            logging.critical(f'_migrate_schema failed — сервер не стартует: {e}',
+                             exc_info=True)
+            raise
         try:
             _hash_stored_tokens()
         except Exception as e:
