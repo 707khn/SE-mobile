@@ -107,6 +107,7 @@ $script:seenOnce = @{}   # путь -> ключ на прошлой провер
 $script:retryAt = @{}    # ключ -> когда пробовать снова
 $script:attempts = @{}   # ключ -> сколько раз не удалось из-за сети
 $script:busy = $false
+$script:loginRefused = $false   # сервер не принял логин — до перезапуска молчим
 
 # --- значок у часов ---------------------------------------------------------
 $script:tray = New-Object System.Windows.Forms.NotifyIcon
@@ -206,11 +207,23 @@ function Send-File($file, $key) {
         return
     }
 
+    if ($r.Status -in 401, 403, 429) {
+        # Неверный пароль, чужой логин или вход уже закрыт. Дальше не шлём
+        # ничего — ни этот файл, ни следующие: каждая попытка с неверным
+        # паролем засчитывается как ошибка входа, после пяти сервер закрывает
+        # вход, и каждая новая удваивает замок. Под ним остаётся и сам технолог
+        # в приложении. Снова пробуем только после перезапуска, то есть после
+        # того, как settings.txt поправили.
+        $script:loginRefused = $true
+        Write-Log "вход не принят ($($r.Status)), отправка остановлена до перезапуска"
+        Show-Note 'Меню НЕ загружено' "$($r.Text)`nАвтозагрузка остановлена. Проверьте логин и пароль в settings.txt и снова запустите «Включить автозагрузку»." 'Error'
+        return
+    }
+
     if ($r.Status -ge 400 -and $r.Status -lt 500) {
-        # Неверный пароль, чужой логин, файл без блюд — повтор не поможет, а
-        # повтор с неверным паролем ещё и закроет вход на время.
+        # Файл без блюд, не тот формат — повтор этого же файла не поможет.
         Set-Done $key 'failed'
-        Show-Note 'Меню НЕ загружено' "$($file.Name)`n$($r.Text)`nИсправьте settings.txt и снова запустите «Включить автозагрузку»." 'Error'
+        Show-Note 'Меню НЕ загружено' "$($file.Name)`n$($r.Text)" 'Error'
         return
     }
 
@@ -251,6 +264,7 @@ function Test-Readable($path) {
 }
 
 function Find-NewFiles {
+    if ($script:loginRefused) { return }
     if (-not (Test-Path -LiteralPath $script:watchDir)) { return }
     $today = (Get-Date).Date
     $files = Get-ChildItem -LiteralPath $script:watchDir -File -ErrorAction SilentlyContinue |
@@ -270,6 +284,7 @@ function Find-NewFiles {
         }
         if (-not (Test-Readable $file.FullName)) { continue }
         Send-File $file $key
+        if ($script:loginRefused) { return }
     }
 }
 
