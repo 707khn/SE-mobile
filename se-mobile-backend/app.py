@@ -1337,6 +1337,20 @@ def _is_admin_account():
     return _is_system_admin(viewer.job_title)
 
 
+def _may_upload_directory(employee):
+    """Справочник загружает офис-менеджер — она его и ведёт; админ — чтобы
+    починить. DIRECTORY_STAFF в окружении — табельные номера сверх этого,
+    например на время отпуска офис-менеджера.
+    """
+    if employee is None:
+        return False
+    job = ' '.join((employee.job_title or '').lower().replace('-', ' ').split())
+    extra = {p.strip() for p in os.environ.get('DIRECTORY_STAFF', '').split(',')
+             if p.strip()}
+    return ('офис менеджер' in job or _is_system_admin(job)
+            or employee.employee_id in extra)
+
+
 def _may_edit_menu():
     """Меню столовой пишет технолог; админ — чтобы починить, когда она не может."""
     viewer = getattr(g, 'employee', None)
@@ -4341,9 +4355,10 @@ def register_routes(app):
             return _credentials_refused(login)
 
         uploader = Employee.query.get(employee_id)
-        if not _is_system_admin(uploader.job_title if uploader else ''):
+        if not _may_upload_directory(uploader):
             return jsonify({
-                'message': 'Загружать справочник может администратор',
+                'message': 'Загружать справочник может офис-менеджер '
+                           'или администратор',
                 'error': True,
             }), 403
 
@@ -4357,6 +4372,44 @@ def register_routes(app):
             entries = parse_directory_excel(upload.read())
         except ValueError as e:
             return jsonify({'message': str(e), 'error': True}), 422
+
+        departments = []
+        for entry in entries:
+            if entry['department'] and entry['department'] not in departments:
+                departments.append(entry['department'])
+
+        # dry_run=1 — только сказать, что в файле и чем он отличается от
+        # загруженного. Так программа на компьютере офис-менеджера, сама
+        # заметившая новый файл, может спросить «Загрузить?» с цифрами на
+        # руках, а одинаковый файл не грузить вовсе.
+        if (request.form.get('dry_run') or '').strip() in ('1', 'true'):
+            def key(row):
+                return (row['department'] or '', row['name'],
+                        row['position'] or '', row['extension'] or '',
+                        row['email'] or '', row['mobile'] or '')
+            current_rows = [{
+                'department': r.department, 'name': r.name,
+                'position': r.position, 'extension': r.extension,
+                'email': r.email, 'mobile': r.mobile,
+            } for r in DirectoryEntry.query.order_by(DirectoryEntry.sort_order)]
+            old_names = {r['name'] for r in current_rows}
+            new_names = {e['name'] for e in entries}
+            old_keys = {key(r) for r in current_rows}
+            same = [key(r) for r in current_rows] == [key(e) for e in entries]
+            # Был и остался, но что-то поменялось: должность, номер, отдел.
+            changed = sum(1 for e in entries
+                          if e['name'] in old_names and key(e) not in old_keys)
+            return jsonify({
+                'message': 'Success',
+                'dry_run': True,
+                'count': len(entries),
+                'departments': len(departments),
+                'current_count': len(current_rows),
+                'unchanged': same,
+                'added': sorted(new_names - old_names),
+                'removed': sorted(old_names - new_names),
+                'changed': changed,
+            })
 
         # Заменяем целиком: справочник — снимок на дату, а не журнал. Иначе
         # уволенные остались бы в нём навсегда.
@@ -4390,10 +4443,6 @@ def register_routes(app):
                 'error': True,
             }), 500
 
-        departments = []
-        for entry in entries:
-            if entry['department'] and entry['department'] not in departments:
-                departments.append(entry['department'])
         logging.info('Directory import by %s: %d entries', login, len(entries))
         return jsonify({
             'message': (f'Загружено: {len(entries)} записей, '
