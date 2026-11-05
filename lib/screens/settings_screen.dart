@@ -8,6 +8,7 @@ import '../utils/app_version.dart';
 import '../utils/biometric.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
+import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/theme_pref.dart';
 import '../utils/variables.dart';
@@ -87,15 +88,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: _pickLanguage,
           ),
           _section('settings_security'.tr),
-          _tile(
-            icon: Icons.lock_outline,
-            label: 'password_change_title'.tr,
-            onTap: () => Get.to(() => ChangePasswordScreen(
-                  fullName: _fullName,
-                  job: _job,
-                  currentPassword: '',
-                  mandatory: false,
-                )),
+          // Вошедший с телефона по одноразовому коду своего пароля не имеет:
+          // ему нужен пароль только для входа с компьютера или из браузера.
+          ValueListenableBuilder<bool>(
+            valueListenable: OwnPassword.has,
+            builder: (context, has, _) => _tile(
+              icon: Icons.lock_outline,
+              label: has
+                  ? 'password_change_title'.tr
+                  : 'password_set_title'.tr,
+              onTap: () => Get.to(() => ChangePasswordScreen(
+                    fullName: _fullName,
+                    job: _job,
+                    currentPassword: '',
+                    mandatory: false,
+                    hasPassword: has,
+                  )),
+            ),
           ),
           _tile(
             icon: Icons.pin_outlined,

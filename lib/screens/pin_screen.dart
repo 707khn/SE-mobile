@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../requests/account_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/biometric.dart';
 import '../utils/colors.dart';
 import '../utils/desktop.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
+import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import 'change_password_screen.dart';
 import 'home_shell.dart';
@@ -34,7 +36,7 @@ enum PinMode {
 /// Четыре цифры — это десять тысяч сочетаний; без счётчика их подобрал бы и
 /// подросток за вечер. После пятой ошибки код и пропуск стираются, и вход
 /// снова только по логину с паролем — как в первый раз.
-const int _maxFails = 5;
+const int pinMaxFails = 5;
 
 /// Вход в приложение после успешной проверки логина и пароля.
 ///
@@ -487,7 +489,7 @@ class _PinScreenState extends State<PinScreen> {
   Future<void> _wrongCode() async {
     final fails = await SecureStorageHelper.instance.bumpPinFails();
     if (!mounted) return;
-    if (fails >= _maxFails) {
+    if (fails >= pinMaxFails) {
       // Стираем всё и отправляем на обычный вход. Снаружи это выглядит как
       // «приложение попросило войти заново» — и это честно: подобравший код
       // не должен получить ни данных, ни пропуска.
@@ -495,7 +497,7 @@ class _PinScreenState extends State<PinScreen> {
       return;
     }
     _reject('pin_wrong'.tr,
-        extra: 'pin_attempts_left'.trParams({'count': '${_maxFails - fails}'}));
+        extra: 'pin_attempts_left'.trParams({'count': '${pinMaxFails - fails}'}));
   }
 
   /// Первый шаг — запомнить, второй — сверить и сохранить.
@@ -575,8 +577,16 @@ class _PinScreenState extends State<PinScreen> {
     final fullName = await secure.getFullName() ?? widget.fullName;
     final job = await secure.getJob() ?? widget.job;
 
-    // Пароль сбросили, пока человек пользовался кодом: спрашиваем новый
-    // здесь, а не на входе — на вход он теперь попадает редко.
+    // Пароль выданный (у старых учёток — табельный номер), а человек уже
+    // вошёл. На телефоне выданный просто гасим: дальше вход по коду, свой
+    // пароль тут не нужен. Не вышло (нет связи, старый сервер) или это
+    // компьютер — спрашиваем новый здесь, а не на входе: на вход теперь
+    // попадают редко.
+    if (await secure.passwordExpired() &&
+        !passwordNeededToStart &&
+        await spendOneTimeCode()) {
+      await secure.clearPasswordExpired();
+    }
     if (await secure.passwordExpired()) {
       Get.offAll(() => ChangePasswordScreen(
             fullName: fullName,

@@ -1481,6 +1481,21 @@ def _must_change_password(login):
     return bool(account and account.must_change_password)
 
 
+# «Пароля нет». На телефоне первый вход — это код с бумажки и сразу код из
+# четырёх цифр для входа: свой пароль человек придумал бы и тут же забыл,
+# потому что дальше входит по коду или пальцем. Выданный код при этом гасится
+# (см. /api/account/code-used) — его видел тот, кто раздавал, — и вместо хеша
+# остаётся эта метка. Ни один пароль с ней не сходится: check_password_hash
+# на строке без «$» отвечает False. Пароль задают потом в «Настройках» — тем,
+# кому нужен вход с компьютера или из Safari.
+_NO_PASSWORD = '!'
+
+
+def _has_password(account):
+    return bool(account is not None and account.password_hash
+                and account.password_hash != _NO_PASSWORD)
+
+
 def _login_by_employee():
     """employee_id → логин, для админ-панели.
 
@@ -2740,6 +2755,9 @@ def register_routes(app):
             'job': viewer.job_title,
             'department': viewer.department or '',
             'must_change_password': bool(account and account.must_change_password),
+            # Есть ли у человека свой пароль. Нет — после входа с телефона по
+            # одноразовому коду; «Настройки» предлагают его задать.
+            'has_password': _has_password(account),
             # Раздел «Расчётные листы» на компьютере: по должности приложение
             # узнаёт не всех, кого сервер считает расчётной группой
             # (PAYROLL_STAFF).
@@ -2876,8 +2894,12 @@ def register_routes(app):
         if account.must_change_password:
             candidates += [form for form in _number_forms(old_password)
                            if form not in candidates]
-        if not any(check_password_hash(account.password_hash, candidate)
-                   for candidate in candidates):
+        # Пароля нет (вошёл с телефона по коду) — спрашивать старый не о чем.
+        # Задать его можно только с пропуском, то есть с телефона, где человек
+        # уже вошёл; приложение перед этим спрашивает его код из четырёх цифр.
+        if _has_password(account) and not any(
+                check_password_hash(account.password_hash, candidate)
+                for candidate in candidates):
             account.failed_attempts = (account.failed_attempts or 0) + 1
             delay = _lock_delay(account.failed_attempts)
             if delay is not None:
@@ -2905,6 +2927,43 @@ def register_routes(app):
             'token': _issue_token(viewer.employee_id),
         })
 
+    @app.route('/api/account/code-used', methods=['POST'])
+    @require_auth
+    def one_time_code_used():
+        """Вход с телефона по одноразовому коду: код погасить, пароль не просить.
+
+        Телефон зовёт это сразу после входа с выданным паролем — одноразовым
+        кодом или, у старых учёток, табельным номером. Выданный пароль знает
+        не только владелец, поэтому прежде приложение заставляло придумать
+        свой. Теперь на телефоне это лишний шаг: дальше человек входит кодом
+        из четырёх цифр или пальцем, а пароль, придуманный на бегу, забыл бы.
+        Выданный пароль при этом перестаёт действовать — так же, как после
+        смены, — а свой можно задать позже в «Настройках».
+
+        Компьютер и браузер сюда не ходят: там пароль нужен, чтобы войти
+        снова. Учётке admin пароль нужен всегда.
+        """
+        viewer = getattr(g, 'employee', None)
+        if viewer is None:
+            return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
+        account = UserAccount.query.filter_by(
+            employee_id=viewer.employee_id, is_active=True).first()
+        if account is None:
+            return jsonify({'message': 'Failure', 'error': 'no_account'}), 404
+        if account.login == 'admin' or not account.login.isdigit():
+            return jsonify({'message': 'Failure',
+                            'error': 'password_required'}), 403
+        if account.must_change_password:
+            account.password_hash = _NO_PASSWORD
+            account.must_change_password = False
+            account.failed_attempts = 0
+            account.locked_until = None
+            db.session.commit()
+            logging.info('Одноразовый код %r погашен: вход с телефона',
+                         account.login)
+        return jsonify({'message': 'Success',
+                        'has_password': _has_password(account)})
+
     @app.route('/api/admin/accounts', methods=['GET'])
     @require_auth
     def admin_accounts():
@@ -2917,6 +2976,7 @@ def register_routes(app):
             'employee_id': a.employee_id,
             'full_name': names.get(a.employee_id, a.employee_id),
             'must_change_password': a.must_change_password,
+            'has_password': _has_password(a),
             'is_active': a.is_active,
             'failed_attempts': a.failed_attempts,
             'locked_seconds': locked_for(a.login),

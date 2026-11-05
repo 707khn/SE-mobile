@@ -24,6 +24,7 @@ class ChangePasswordScreen extends StatefulWidget {
     required this.job,
     required this.currentPassword,
     this.mandatory = true,
+    this.hasPassword = true,
   }) : super(key: key);
 
   final String fullName;
@@ -37,6 +38,12 @@ class ChangePasswordScreen extends StatefulWidget {
 
   /// false — человек пришёл сюда сам из меню и может уйти.
   final bool mandatory;
+
+  /// false — своего пароля нет: человек вошёл с телефона по одноразовому
+  /// коду и задаёт пароль для входа с компьютера. Старого спрашивать не о
+  /// чем, поэтому вместо него — код из четырёх цифр: открытый чужой телефон
+  /// не должен позволить завести пароль и входить потом откуда угодно.
+  final bool hasPassword;
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -57,6 +64,31 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (widget.mandatory) _oldController.text = widget.currentPassword;
   }
 
+  /// Пароля нет — вместо старого спрашиваем код для входа в приложение.
+  bool get _askPin => !widget.mandatory && !widget.hasPassword;
+
+  /// Код из четырёх цифр под тем же счётчиком, что и на экране кода: пятая
+  /// ошибка выводит из учётной записи.
+  Future<bool> _pinMatches() async {
+    final secure = SecureStorageHelper.instance;
+    final saved = await secure.getPin();
+    if (saved == null) return true;
+    if (_oldController.text.trim() == saved) {
+      await secure.resetPinFails();
+      return true;
+    }
+    final fails = await secure.bumpPinFails();
+    if (!mounted) return false;
+    if (fails >= pinMaxFails) {
+      await forceLogout(message: 'pin_locked_out'.tr);
+      return false;
+    }
+    _oldController.clear();
+    setState(() => _error = '${'pin_wrong'.tr}. ${'pin_attempts_left'.trParams(
+        {'count': '${pinMaxFails - fails}'})}');
+    return false;
+  }
+
   @override
   void dispose() {
     _oldController.dispose();
@@ -71,13 +103,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       setState(() => _error = 'password_mismatch'.tr);
       return;
     }
+    if (_askPin && !await _pinMatches()) return;
     setState(() {
       _saving = true;
       _error = null;
     });
 
     final (result, problem, retryAfter) = await changePassword(
-      oldPassword: _oldController.text.trim(),
+      oldPassword: _askPin ? '' : _oldController.text.trim(),
       newPassword: fresh,
     );
     if (!mounted) return;
@@ -135,7 +168,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: !widget.mandatory,
-          title: Text('password_change_title'.tr),
+          title: Text(widget.hasPassword
+              ? 'password_change_title'.tr
+              : 'password_set_title'.tr),
           actions: [
             if (widget.mandatory)
               TextButton(
@@ -150,13 +185,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (widget.mandatory) _buildWhy(),
-              if (widget.mandatory) SizedBox(height: Dimensions.height30 / 1.5),
+              if (widget.mandatory || _askPin) _buildWhy(),
+              if (widget.mandatory || _askPin)
+                SizedBox(height: Dimensions.height30 / 1.5),
               if (!widget.mandatory || widget.currentPassword.isEmpty) ...[
                 _field(
                   controller: _oldController,
-                  label: 'password_old'.tr,
+                  label: _askPin ? 'password_pin_field'.tr : 'password_old'.tr,
                   obscure: true,
+                  digits: _askPin,
                 ),
                 const SizedBox(height: 14),
               ],
@@ -240,9 +277,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              widget.currentPassword.isEmpty
-                  ? 'password_change_why_reset'.tr
-                  : 'password_change_why'.tr,
+              _askPin
+                  ? 'password_set_why'.tr
+                  : widget.currentPassword.isEmpty
+                      ? 'password_change_why_reset'.tr
+                      : 'password_change_why'.tr,
               style: const TextStyle(fontSize: 13.5, height: 1.45),
             ),
           ),
@@ -257,11 +296,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     required bool obscure,
     Widget? trailing,
     ValueChanged<String>? onSubmitted,
+    bool digits = false,
   }) {
     return TextField(
       controller: controller,
       obscureText: obscure,
-      keyboardType: TextInputType.visiblePassword,
+      keyboardType:
+          digits ? TextInputType.number : TextInputType.visiblePassword,
+      maxLength: digits ? 4 : null,
+      inputFormatters:
+          digits ? [FilteringTextInputFormatter.digitsOnly] : null,
       onSubmitted: onSubmitted,
       decoration: InputDecoration(
         labelText: label,
