@@ -28,6 +28,15 @@ def transition_mode(monkeypatch):
     monkeypatch.setattr(app_module, '_AUTH_REQUIRED', False)
 
 
+def _back_to_number(login):
+    """База общая на весь прогон, и другие проверки входят по табельному
+    номеру — возвращаем учётке прежний пароль после сброса."""
+    from werkzeug.security import generate_password_hash as _hash
+    account = db.session.get(UserAccount, login)
+    account.password_hash = _hash(login)
+    db.session.commit()
+
+
 def _anon_post(client, path, body=None):
     return client.post(path, data=json.dumps(body or {}),
                        content_type='application/json')
@@ -100,4 +109,10 @@ def test_admin_with_a_pass_still_resets(app, client):
     answer = client.post('/api/admin/accounts/2114/reset',
                          headers={'Authorization': f'Bearer {token}'})
     assert answer.status_code == 200
-    assert answer.get_json()['temporary_password'] == '2114'
+    code = answer.get_json()['temporary_password']
+    assert code != '2114' and len(code) == 8 and code.isdigit()
+    with app.app_context():
+        assert app_module._authenticate('2114', '2114') is None
+        assert app_module._authenticate('2114', code) is not None
+        # База общая на прогон: возвращаем, как было.
+        _back_to_number('2114')

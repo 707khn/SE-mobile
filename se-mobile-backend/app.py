@@ -804,6 +804,19 @@ def _random_password(length=14):
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
+def _one_time_code():
+    """Одноразовый код для новой учётки и для сброса пароля.
+
+    Восемь цифр, первая не ноль: цифры набирают на телефоне с цифровой
+    клавиатуры, а ноль в начале _number_forms считал бы лишним. Раньше
+    временным паролем был табельный номер — а он напечатан на пропуске, и
+    войти под чужим именем мог любой, кто пропуск видел, и сам же сменить
+    пароль. Код знает только кадровик, который передаёт его лично.
+    """
+    return str(secrets.randbelow(9) + 1) + ''.join(
+        str(secrets.randbelow(10)) for _ in range(7))
+
+
 def _is_default_password(password, login):
     """Это выданный при заведении пароль, а не придуманный человеком?
 
@@ -1345,6 +1358,39 @@ def _may_edit_menu():
         return False
     job = (viewer.job_title or '').lower()
     return ('технолог' in job and 'столов' in job) or _is_system_admin(job)
+
+
+def issue_one_time_codes(logins=None):
+    """Меняет выданный пароль (табельный номер) на одноразовый код.
+
+    Только у тех, кто ни разу не входил и чей пароль всё ещё выданный: свой
+    пароль человека и действующую учётку не трогаем. logins=None — все
+    такие. Возвращает [{login, full_name, code}] — коды есть только здесь.
+    Зовут и админ-панель (/api/admin/accounts/issue-codes), и issue_codes.py
+    на сервере.
+    """
+    query = UserAccount.query.filter(
+        UserAccount.must_change_password.is_(True),
+        UserAccount.last_login_at.is_(None),
+        UserAccount.is_active.is_(True))
+    if logins is not None:
+        query = query.filter(UserAccount.login.in_(list(logins)))
+    names = _employee_names()
+    codes = []
+    for account in query.order_by(UserAccount.login).all():
+        if not account.login.isdigit():
+            continue
+        code = _one_time_code()
+        account.password_hash = generate_password_hash(code)
+        account.failed_attempts = 0
+        account.locked_until = None
+        codes.append({'login': account.login,
+                      'full_name': names.get(account.employee_id,
+                                             account.employee_id),
+                      'code': code})
+    db.session.commit()
+    logging.info('One-time codes issued for %d accounts', len(codes))
+    return codes
 
 
 def _employee_names():
@@ -2775,7 +2821,7 @@ def register_routes(app):
     @app.route('/api/admin/accounts/<login>/reset', methods=['POST'])
     @require_auth
     def admin_reset_password(login):
-        """Сброс пароля админом: временным становится табельный номер, и при
+        """Сброс пароля админом: временным становится одноразовый код, и при
         первом же входе человека попросят придумать свой."""
         if not _is_admin_account():
             return _deny()
@@ -2783,11 +2829,12 @@ def register_routes(app):
         if account is None:
             return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
 
-        # Табельный номер годится во временные: он у человека на пропуске и
-        # меняется при первом же входе. Для именованной учётки — «admin» —
-        # это означало бы пароль «admin», то есть ровно то, от чего мы
-        # уходили; такой придумываем случайно и показываем тому, кто сбросил.
-        temporary = account.login if account.login.isdigit() else _random_password()
+        # Не табельный номер: он на пропуске, и войти с ним мог бы кто
+        # угодно, а войдя — сам сменить пароль и забрать учётку. Код видит
+        # только тот, кто сбросил, и передаёт его лично. Именованной учётке
+        # («admin») — длинный пароль из букв: её вводят с компьютера.
+        temporary = (_one_time_code() if account.login.isdigit()
+                     else _random_password())
         account.password_hash = generate_password_hash(temporary)
         account.must_change_password = True
         account.failed_attempts = 0
@@ -2797,6 +2844,30 @@ def register_routes(app):
         db.session.commit()
         logging.info('Password reset for %r by administrator', login)
         return jsonify({'message': 'Success', 'temporary_password': temporary})
+
+    @app.route('/api/admin/accounts/issue-codes', methods=['POST'])
+    @require_auth
+    def admin_issue_codes():
+        """Одноразовые коды вместо пароля, равного табельному номеру, — пачкой.
+
+        Трогает только тех, кто ещё ни разу не входил и у кого пароль всё ещё
+        выданный (must_change_password): придуманный человеком пароль и
+        действующего пользователя не сбрасываем. Без тела — все такие
+        учётки; {"logins": [...]} — только перечисленные. После этого войти
+        по табельному номеру нельзя: коды из ответа кадровик раздаёт лично,
+        больше их нигде нет.
+        """
+        if not _is_admin_account():
+            return _deny()
+        wanted = _json_body().get('logins')
+        if isinstance(wanted, list):
+            wanted = [str(x).strip() for x in wanted if str(x).strip()]
+            if not wanted:
+                return jsonify({'message': 'Success', 'codes': []})
+        else:
+            wanted = None
+        codes = issue_one_time_codes(wanted)
+        return jsonify({'message': 'Success', 'codes': codes})
 
     @app.route('/api/admin/accounts/<login>/active', methods=['POST'])
     @require_auth
@@ -2837,8 +2908,9 @@ def register_routes(app):
         """Заводит сотрудников и учётные записи из таблицы отдела кадров.
 
         Повторная загрузка того же файла безопасна: существующие обновляются,
-        новые добавляются, пароли не трогаются. Временный пароль у новых равен
-        табельному номеру, и сменить его попросят при первом входе.
+        новые добавляются, пароли не трогаются. Новым учёткам выдаётся
+        одноразовый код — он есть только в ответе (new_accounts), кадровик
+        передаёт его лично, и сменить его попросят при первом входе.
         """
         if not _is_admin_account():
             return _deny()
@@ -2865,6 +2937,9 @@ def register_routes(app):
         warnings = []
 
         created_employees = updated_employees = created_accounts = 0
+        # Коды новых учёток показываем один раз, в ответе: в базе только
+        # хеш, и потерянный код восстанавливается лишь сбросом.
+        new_accounts = []
         for person in people:
             # Логин — табельный номер без ведущих нулей; сотрудник в базе
             # может лежать под другой формой того же номера.
@@ -2905,13 +2980,17 @@ def register_routes(app):
                                     'reason': f"ИИН уже у {clash.full_name}"})
 
             if db.session.get(UserAccount, login) is None:
+                code = _one_time_code()
                 db.session.add(UserAccount(
                     login=login,
                     employee_id=emp_id,
-                    password_hash=generate_password_hash(login),
+                    password_hash=generate_password_hash(code),
                     must_change_password=True,
                 ))
                 created_accounts += 1
+                new_accounts.append({'login': login,
+                                     'full_name': person['full_name'],
+                                     'code': code})
 
         db.session.commit()
         logging.info('Employee import: %d new, %d updated, %d accounts, '
@@ -2923,6 +3002,7 @@ def register_routes(app):
             'employees_created': created_employees,
             'employees_updated': updated_employees,
             'accounts_created': created_accounts,
+            'new_accounts': new_accounts,
             'skipped': skipped,
             'warnings': warnings,
             'total_employees': Employee.query.count(),

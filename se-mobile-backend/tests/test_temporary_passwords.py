@@ -19,6 +19,15 @@ from models import db, Employee, UserAccount
 ADMIN_PASSWORD = os.environ['ADMIN_PASSWORD']
 
 
+def _back_to_number(login):
+    """База общая на весь прогон, и другие проверки входят по табельному
+    номеру — возвращаем учётке прежний пароль после сброса."""
+    from werkzeug.security import generate_password_hash as _hash
+    account = db.session.get(UserAccount, login)
+    account.password_hash = _hash(login)
+    db.session.commit()
+
+
 def test_no_account_keeps_a_password_equal_to_its_login(app):
     """Главное утверждение: такой пары в базе нет ни у кого.
 
@@ -204,7 +213,7 @@ def test_resetting_the_admin_does_not_hand_back_the_word_admin(app, client):
         assert app_module._authenticate('admin', 'admin') is None
         assert app_module._authenticate('admin', temporary) == 'ADMIN'
 
-        # Табельному номеру временным остаётся он сам: его человек знает.
+        # Табельный номер временным больше не бывает: он на пропуске.
         account = db.session.get(UserAccount, '1874')
         assert account is not None
         # Сброс гасит все пропуска администратора, в том числе тот, которым
@@ -213,7 +222,12 @@ def test_resetting_the_admin_does_not_hand_back_the_word_admin(app, client):
 
     numeric = client.post('/api/admin/accounts/1874/reset',
                           headers={'Authorization': f'Bearer {admin_token}'})
-    assert numeric.get_json()['temporary_password'] == '1874'
+    code = numeric.get_json()['temporary_password']
+    assert code != '1874' and len(code) == 8 and code.isdigit()
+    with app.app_context():
+        assert app_module._authenticate('1874', '1874') is None
+        assert app_module._authenticate('1874', code) is not None
+        _back_to_number('1874')
 
     # Возвращаем администратора на известный пароль: учётка общая на весь
     # прогон. Флаг оставляем поднятым — иначе второй прогон по той же базе
