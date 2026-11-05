@@ -1,0 +1,78 @@
+name: Выпуск
+
+# Раз в неделю — телефон, компьютер и браузер вместе, под одним номером.
+#
+# Раньше каждое слияние в main сразу собиралось и уходило людям: 44 сборки за
+# четыре недели, пять за один день, а APK ставят руками. Windows при этом
+# собиралась только после правки windows/ и отставала. Теперь выпуск —
+# по понедельникам в 08:00 по заводу (03:00 UTC), если с прошлого выпуска
+# что-то менялось в приложении.
+#
+# Срочное исправление — не ждать понедельника: Actions → «Выпуск» →
+# Run workflow. Соберётся всё сразу, сервер заберёт сборки за десять минут.
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      emulator:
+        description: 'Прогнать проверку APK на эмуляторе (добавит ~12 минут)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  changed:
+    runs-on: ubuntu-24.04
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # По расписанию — только если с прошлого выпуска менялось приложение.
+      # Кнопкой — всегда.
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != schedule ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          tag=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' || true)
+          if [ -z "$tag" ] || ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git diff --quiet "$tag" HEAD -- lib android windows web assets pubspec.yaml pubspec.lock; then
+            echo "С выпуска $tag приложение не менялось — пропускаю."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  android:
+    needs: changed
+    if: needs.changed.outputs.build == 'true'
+    uses: ./.github/workflows/build-apk.yml
+    with:
+      emulator: ${{ inputs.emulator == true }}
+    secrets: inherit
+
+  web:
+    needs: changed
+    if: needs.changed.outputs.build == 'true'
+    uses: ./.github/workflows/build-web.yml
+    secrets: inherit
+
+  windows:
+    needs: changed
+    if: needs.changed.outputs.build == 'true'
+    uses: ./.github/workflows/build-windows.yml
+    secrets: inherit

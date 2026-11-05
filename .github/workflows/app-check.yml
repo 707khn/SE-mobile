@@ -3,7 +3,8 @@ name: App checks
 # Проверка приложения до слияния. Сборка APK запускается только после попадания
 # в main — значит, до сих пор код на Dart впервые компилировался уже после
 # слияния, и ошибка находилась, когда её было поздно ловить в PR. Здесь только
-# то, что быстро и без секретов: версия, компиляция всего lib/ и тесты.
+# то, что быстро и без секретов: компиляция всего lib/ и тесты. Номер версии
+# ставит сборка (.github/scripts/version.sh) — сверять больше нечего.
 on:
   pull_request:
     paths:
@@ -28,17 +29,6 @@ jobs:
           flutter-version: '3.47.6'
           channel: 'stable'
           cache: true
-
-      - name: Версия в двух местах совпадает
-        run: |
-          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
-          DART_V=$(sed -n "s/.*kAppVersion = '\([^']*\)'.*/\1/p" lib/utils/app_version.dart)
-          DART_B=$(sed -n "s/.*kAppBuild = '\([^']*\)'.*/\1/p" lib/utils/app_version.dart)
-          if [ "$PUB" != "$DART_V+$DART_B" ]; then
-            echo "::error::pubspec.yaml: $PUB, app_version.dart: $DART_V+$DART_B. Приведите к одному виду."
-            exit 1
-          fi
-          echo "Версия $PUB"
 
       - run: flutter pub get
 

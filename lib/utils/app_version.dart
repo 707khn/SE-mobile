@@ -1,13 +1,16 @@
 /// Версия приложения, показывается внизу бокового меню.
 ///
-/// Должна совпадать с полем `version` в pubspec.yaml — по ней в поддержке
-/// понимают, какая сборка стоит у сотрудника. Совпадение проверяет сборка:
-/// «помнить про два места» здесь уже не сработало бы, а разошедшиеся номера
-/// означают, что в поддержке смотрят не на ту версию.
-const String kAppVersion = '1.32.0';
+/// Её ставит сборка (.github/scripts/version.sh): старшие цифры — из
+/// pubspec.yaml, номер сборки — число коммитов в main. Руками номер больше не
+/// правят: из-за строки version почти каждый PR конфликтовал с main. Сборка
+/// передаёт оба значения через --dart-define; у собранного на своём
+/// компьютере стоит «dev» и сборка 0.
+const String kAppVersion =
+    String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
 
-/// Номер сборки (часть после «+» в pubspec.yaml).
-const String kAppBuild = '74';
+/// Номер сборки (часть после «+»). По нему приложение решает, вышла ли
+/// новая версия (app_update.dart).
+const String kAppBuild = String.fromEnvironment('APP_BUILD', defaultValue: '0');
 
 /// «1.0.0 (сборка 1)» — то, что видит пользователь.
 String appVersionLabel() => '$kAppVersion ($kAppBuild)';
