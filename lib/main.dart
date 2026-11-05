@@ -180,11 +180,18 @@ class MyApp extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset('assets/logo.png', height: 100, color: Colors.white),
-              const SizedBox(height: 24),
-              const CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2,
+              // В браузере — того же размера, что заставка страницы
+              // (web/index.html), чтобы логотип не прыгал при подмене.
+              Image.asset('assets/logo.png',
+                  height: kIsWeb ? 200 : 100, color: Colors.white),
+              const SizedBox(height: kIsWeb ? 40 : 24),
+              const SizedBox(
+                width: kIsWeb ? 48 : 36,
+                height: kIsWeb ? 48 : 36,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: kIsWeb ? 5 : 2,
+                ),
               ),
             ],
           ),
