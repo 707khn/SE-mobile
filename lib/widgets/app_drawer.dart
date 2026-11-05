@@ -211,6 +211,10 @@ class _AppDrawerState extends State<AppDrawer> {
                     onTap: () => Get.to(() => const PayslipsAdminScreen()),
                   ),
                 ],
+                // Разделы предприятия и свои дела — двумя группами, внутри
+                // группы по русскому алфавиту, чтобы пункт был на одном и том же
+                // месте. Прежде «Медосмотры» и «Приём» стояли за чертой
+                // вместе с «Настройками», будто это тоже настройки.
                 _section('drawer_company'.tr),
                 _item(
                   icon: Icons.campaign_outlined,
@@ -223,28 +227,26 @@ class _AppDrawerState extends State<AppDrawer> {
                   onTap: () => Get.to(() => const DirectoryScreen()),
                 ),
                 _item(
-                  icon: Icons.support_agent_outlined,
-                  label: 'it_title'.tr,
-                  onTap: () => Get.to(() => const ItRequestsScreen()),
-                ),
-                _item(
                   icon: Icons.devices_outlined,
                   label: 'ta_title'.tr,
                   onTap: () => Get.to(() => const TechScreen()),
                 ),
+                _section('drawer_mine'.tr),
                 _item(
                   icon: Icons.task_alt,
                   label: 'asg_title'.tr,
                   onTap: () => Get.to(() => const AssignmentsScreen()),
                 ),
                 _item(
+                  icon: Icons.support_agent_outlined,
+                  label: 'it_title'.tr,
+                  onTap: () => Get.to(() => const ItRequestsScreen()),
+                ),
+                _item(
                   icon: Icons.flight_takeoff,
                   label: 'bt_title'.tr,
                   onTap: () => Get.to(() => const BusinessTripsScreen()),
                 ),
-                const SizedBox(height: 8),
-                const Divider(height: 1, indent: 28, endIndent: 28),
-                const SizedBox(height: 8),
                 _item(
                   icon: Icons.health_and_safety_outlined,
                   label: 'md_title'.tr,
@@ -255,6 +257,9 @@ class _AppDrawerState extends State<AppDrawer> {
                   label: 'rc_title'.tr,
                   onTap: () => Get.to(() => const ReceptionScreen()),
                 ),
+                const SizedBox(height: 8),
+                const Divider(height: 1, indent: 28, endIndent: 28),
+                const SizedBox(height: 8),
                 // Оформление, язык, пароль, код и «О программе» — на своём
                 // экране: в меню они занимали половину списка.
                 _item(

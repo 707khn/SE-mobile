@@ -21,6 +21,7 @@ import 'utils/app_lock.dart';
 import 'utils/desktop.dart';
 import 'utils/error_log.dart';
 import 'utils/lang.dart';
+import 'utils/own_password.dart';
 import 'utils/secure_storage_helper.dart';
 import 'widgets/motion.dart';
 import 'widgets/desktop_layout.dart';
@@ -225,6 +226,7 @@ class MyApp extends StatelessWidget {
     if (isLogged) {
       await PayrollAccess.load();
       await ManagerAccess.load();
+      await OwnPassword.load();
       // Always re-read the profile: job title and department drive which
       // screens a user sees, and HR edits them server-side. Offline, the
       // cached values below are used unchanged.
@@ -272,6 +274,10 @@ class MyApp extends StatelessWidget {
       await PayrollAccess.save(b['payroll'] == true);
       final manager = b['manager'];
       await ManagerAccess.save(manager is bool ? manager : null);
+      // Своего пароля нет у вошедшего с телефона по одноразовому коду:
+      // «Настройки» предлагают его задать. Старый сервер поля не шлёт.
+      final hasPassword = b['has_password'];
+      if (hasPassword is bool) await OwnPassword.save(hasPassword);
       return b['must_change_password'] == true;
     } catch (_) {
       // Без связи работаем на сохранённом: код и пропуск лежат на телефоне.

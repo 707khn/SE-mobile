@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../utils/api.dart';
 import '../utils/load_problem.dart';
+import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
@@ -53,6 +54,7 @@ Future<PasswordChange> changePassword({
       // Сервер погасил все пропуска и выдал новый — сохраняем, иначе
       // следующий же запрос улетит с недействительным.
       await SecureStorageHelper.instance.saveToken((body['token'] as String?) ?? '');
+      await OwnPassword.save(true);
       return (PasswordChangeResult.ok, null, null);
     }
     switch (body['error']) {
@@ -81,6 +83,34 @@ Future<PasswordChange> changePassword({
     }
   } catch (e) {
     return (PasswordChangeResult.networkError, problemOf(e), null);
+  }
+}
+
+/// Вход с телефона по выданному паролю: погасить его, свой не придумывать.
+///
+/// Выданный пароль — одноразовый код с бумажки или, у старых учёток,
+/// табельный номер — знает не только владелец. Раньше его заменяли своим
+/// паролем прямо на первом экране; на телефоне это лишний шаг, а пароль
+/// человек тут же забывал. Сервер гасит выданный пароль, и дальше вход
+/// кодом из четырёх цифр или пальцем.
+///
+/// false — сервер не согласился или не ответил (старый сервер такого адреса
+/// не знает): тогда, как прежде, просим придумать пароль.
+Future<bool> spendOneTimeCode() async {
+  try {
+    final response = await http
+        .post(
+          Uri.parse('${AppValues.baseUrl}/api/account/code-used'),
+          headers: await authHeaders(),
+        )
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode != 200) return false;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['message'] != 'Success') return false;
+    await OwnPassword.save(body['has_password'] != false);
+    return true;
+  } catch (_) {
+    return false;
   }
 }
 

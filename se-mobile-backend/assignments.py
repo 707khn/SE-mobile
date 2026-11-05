@@ -1,4 +1,4 @@
-"""Поручения с контролем сроков: руководитель поручает, исполнитель
+"""Задачи с контролем сроков (в интерфейсе — «Задачи», прежде «Поручения»): руководитель поручает, исполнитель
 принимает, отчитывается или просит перенести срок, руководитель принимает
 работу или возвращает.
 
@@ -314,7 +314,7 @@ def register(app, core):
                      viewer.employee_id, len(created))
         for item in created:
             _notify([item.assignee_id],
-                    f'{"Важное поручение" if important else "Поручение"}: {title}',
+                    f'{"Важная задача" if important else "Новая задача"}: {title}',
                     f'{viewer.full_name}, срок {due:%d.%m}', item.id)
         today = core._plant_today()
         return jsonify({'message': 'Success',
@@ -368,7 +368,7 @@ def register(app, core):
             if item.status != 'new':
                 return _fail('bad_state', 409)
             item.status = 'in_progress'
-            notify_to, title = item.author_id, f'Поручение принято: {label}'
+            notify_to, title = item.author_id, f'Задача принята: {label}'
             body = viewer.full_name
         elif action == 'done':
             if item.status not in OPEN:
@@ -410,7 +410,7 @@ def register(app, core):
                 if new_due < core._plant_today():
                     return _fail('bad_date', 400)
                 item.due_date = due = new_due
-            notify_to, title = item.assignee_id, f'Поручение возвращено: {label}'
+            notify_to, title = item.assignee_id, f'Задача возвращена: {label}'
             body = f'{viewer.full_name}: {comment}'
         elif action in ('extend_ok', 'extend_no'):
             if item.proposed_due is None:
@@ -426,7 +426,7 @@ def register(app, core):
         elif action == 'cancel':
             item.status = 'cancelled'
             item.closed_at = now
-            notify_to, title = item.assignee_id, f'Поручение снято: {label}'
+            notify_to, title = item.assignee_id, f'Задача снята: {label}'
             body = f'{viewer.full_name}' + (f': {comment}' if comment else '')
         elif action == 'remind':
             if item.status not in OPEN:

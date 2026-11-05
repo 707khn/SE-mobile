@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'account_request.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/pin_screen.dart';
 import '../utils/dimensions.dart';
 import '../utils/load_problem.dart';
 import '../widgets/load_error_view.dart';
 import '../utils/login_lock.dart';
+import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
@@ -93,8 +95,14 @@ Future<void> loginToAccount(
         token: body['token'] as String?,
       );
       // Выданный пароль (одноразовый код или, у старых учёток, табельный
-      // номер) — сначала на смену: его знает не только владелец.
-      if (body['must_change_password'] == true) {
+      // номер) знает не только владелец. На телефоне его просто гасим и
+      // сразу просим код из четырёх цифр: свой пароль тут не нужен. На
+      // компьютере и в браузере, или если сервер не согласился, — как
+      // прежде, сначала придумать пароль.
+      final mustChange = body['must_change_password'] == true;
+      if (mustChange && !passwordNeededToStart && await spendOneTimeCode()) {
+        await enterApp(fullName: body['full_name'], job: body['job']);
+      } else if (mustChange) {
         Get.to(() => ChangePasswordScreen(
               fullName: body['full_name'],
               job: body['job'],

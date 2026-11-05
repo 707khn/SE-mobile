@@ -97,7 +97,7 @@ def test_accept_done_return_close(app, client, pushes):
     head, peo = _auth(app, _HEAD), _auth(app, _PEO)
     r = _give(client, head, important=True)
     item = r.get_json()['items'][0]
-    assert pushes[-1] == ([_PEO], 'Важное поручение: Подготовить план на ноябрь',
+    assert pushes[-1] == ([_PEO], 'Важная задача: Подготовить план на ноябрь',
                           f'{_name(app, _HEAD)}, срок 20.01')
 
     # Чужой не видит.

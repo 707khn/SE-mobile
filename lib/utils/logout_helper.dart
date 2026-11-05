@@ -9,6 +9,7 @@ import '../screens/start_screen.dart';
 import '../services/fcm_service.dart';
 import '../variables.dart';
 import 'notice_badge.dart';
+import 'own_password.dart';
 import 'role_helper.dart';
 import 'secure_storage_helper.dart';
 import 'api.dart';
@@ -18,7 +19,11 @@ Future<void> confirmAndLogout(BuildContext context) async {
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text('log_out_title'.tr),
-      content: Text('log_out_confirm'.tr),
+      // Вошедший с телефона по коду своего пароля не имеет: выйдя, обратно
+      // он попадёт только по новому коду. Пусть знает это до, а не после.
+      content: Text(OwnPassword.has.value
+          ? 'log_out_confirm'.tr
+          : '${'log_out_confirm'.tr}\n\n${'log_out_no_password'.tr}'),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
@@ -57,6 +62,7 @@ Future<void> forceLogout({String? message}) async {
   await prefs.clear();
   PayrollAccess.granted.value = false;
   ManagerAccess.known.value = null;
+  OwnPassword.has.value = true;
   try {
     await clearExports(await exportDirectory());
   } catch (_) {
