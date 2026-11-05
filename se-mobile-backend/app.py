@@ -833,17 +833,26 @@ def _random_password(length=14):
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
-def _one_time_code():
+def _one_time_code(login=None):
     """Одноразовый код для новой учётки и для сброса пароля.
 
-    Восемь цифр, первая не ноль: цифры набирают на телефоне с цифровой
-    клавиатуры, а ноль в начале _number_forms считал бы лишним. Раньше
+    Четыре цифры, первая не ноль: код диктуют и набирают на телефоне с
+    цифровой клавиатуры, а ноль в начале _number_forms считал бы лишним.
+    Вариантов всего 9000, поэтому держит его замок на учётке (_lock_delay):
+    после пяти неудач — растущая задержка до получаса, и код живёт только
+    до первого входа. Раньше
     временным паролем был табельный номер — а он напечатан на пропуске, и
     войти под чужим именем мог любой, кто пропуск видел, и сам же сменить
     пароль. Код знает только кадровик, который передаёт его лично.
     """
-    return str(secrets.randbelow(9) + 1) + ''.join(
-        str(secrets.randbelow(10)) for _ in range(7))
+    # Код, совпавший с табельным номером (из 9000 вариантов такое бывает),
+    # был бы тем же паролем «по пропуску» — берём другой.
+    taken = set(_number_forms(login)) if login else set()
+    while True:
+        code = str(secrets.randbelow(9) + 1) + ''.join(
+            str(secrets.randbelow(10)) for _ in range(3))
+        if code not in taken:
+            return code
 
 
 def _is_default_password(password, login):
@@ -1423,7 +1432,7 @@ def issue_one_time_codes(logins=None):
     for account in query.order_by(UserAccount.login).all():
         if not account.login.isdigit():
             continue
-        code = _one_time_code()
+        code = _one_time_code(account.login)
         account.password_hash = generate_password_hash(code)
         account.failed_attempts = 0
         account.locked_until = None
@@ -2932,7 +2941,7 @@ def register_routes(app):
         # угодно, а войдя — сам сменить пароль и забрать учётку. Код видит
         # только тот, кто сбросил, и передаёт его лично. Именованной учётке
         # («admin») — длинный пароль из букв: её вводят с компьютера.
-        temporary = (_one_time_code() if account.login.isdigit()
+        temporary = (_one_time_code(account.login) if account.login.isdigit()
                      else _random_password())
         account.password_hash = generate_password_hash(temporary)
         account.must_change_password = True
@@ -3079,7 +3088,7 @@ def register_routes(app):
                                     'reason': f"ИИН уже у {clash.full_name}"})
 
             if db.session.get(UserAccount, login) is None:
-                code = _one_time_code()
+                code = _one_time_code(login)
                 db.session.add(UserAccount(
                     login=login,
                     employee_id=emp_id,

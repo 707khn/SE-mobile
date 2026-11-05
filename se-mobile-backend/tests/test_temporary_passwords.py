@@ -223,7 +223,7 @@ def test_resetting_the_admin_does_not_hand_back_the_word_admin(app, client):
     numeric = client.post('/api/admin/accounts/1874/reset',
                           headers={'Authorization': f'Bearer {admin_token}'})
     code = numeric.get_json()['temporary_password']
-    assert code != '1874' and len(code) == 8 and code.isdigit()
+    assert code != '1874' and len(code) == 4 and code.isdigit()
     with app.app_context():
         assert app_module._authenticate('1874', '1874') is None
         assert app_module._authenticate('1874', code) is not None

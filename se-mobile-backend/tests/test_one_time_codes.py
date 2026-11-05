@@ -32,9 +32,9 @@ def _drop(*logins):
 
 def test_code_shape():
     codes = {app_module._one_time_code() for _ in range(200)}
-    assert all(len(c) == 8 and c.isdigit() and c[0] != '0' for c in codes)
-    # Случайные, а не одинаковые.
-    assert len(codes) > 190
+    assert all(len(c) == 4 and c.isdigit() and c[0] != '0' for c in codes)
+    # Случайные, а не одинаковые (из 9000 вариантов).
+    assert len(codes) > 150
 
 
 def test_issue_codes_closes_number_password(app, client):
