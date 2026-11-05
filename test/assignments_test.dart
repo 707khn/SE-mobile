@@ -15,7 +15,7 @@ import 'package:se_mobile/utils/localization.dart';
 
 import 'support/fake_server.dart';
 
-/// Поручения: отчёт исполнителя, приёмка, перенос срока, выдача.
+/// Задачи (прежде «Поручения»): отчёт исполнителя, приёмка, перенос срока, выдача.
 void main() {
   Map<String, dynamic> item(int id, String status,
           {bool author = false,
@@ -116,8 +116,8 @@ void main() {
           ));
     await HttpOverrides.runWithHttpOverrides(() async {
       await pump(tester, const AssignmentDetailScreen(assignmentId: 4));
-      expect(find.text('Просрочено · до 20.01'), findsOneWidget);
-      expect(find.text('Поручил: Начальник Тест Тестович'), findsOneWidget);
+      expect(find.text('Просрочена · до 20.01'), findsOneWidget);
+      expect(find.text('Поставил: Начальник Тест Тестович'), findsOneWidget);
       expect(find.byKey(const Key('asg_accept')), findsNothing);
       expect(find.byKey(const Key('asg_close')), findsNothing);
       await tester.tap(find.byKey(const Key('asg_done')));
@@ -261,6 +261,6 @@ void main() {
     }, server);
     expect(find.text('Подготовить план на ноябрь'), findsOneWidget);
     expect(find.byKey(const Key('asg_new')), findsNothing);
-    expect(find.text('Я поручил'), findsNothing);
+    expect(find.text('Я поставил'), findsNothing);
   });
 }
