@@ -1,8 +1,16 @@
 # Обновления зависимостей — PR раз в неделю, а не ручной аудит раз в полгода.
 # Сервер (pip), приложение (pub) и сами шаги сборки (GitHub Actions).
+#
+# Только мелкие обновления (minor, patch): они не меняют API и проходят
+# проверки. Мажорные (http 0.13 → 1.6) ломают код и тесты — такие делают
+# руками, отдельной задачей. Уязвимости Dependabot предлагает и так:
+# security-обновления идут мимо этих правил.
 version: 2
 updates:
   - package-ecosystem: pip
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     directory: /se-mobile-backend
     schedule:
       interval: weekly
@@ -13,6 +21,9 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: pub
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     directory: /
     schedule:
       interval: weekly
