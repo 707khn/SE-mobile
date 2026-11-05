@@ -32,11 +32,10 @@ from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
 from privacy import privacy_page
 import it_requests
-import purchases
+import retired  # noqa: F401 — таблицы снятых разделов, см. retired.py
 import payslip_questions
 import assignments
 import business_trips
-import onboarding
 import medical_visits
 import it_assets
 import planned_outages
@@ -1885,11 +1884,9 @@ def create_app():
 
     register_routes(app)
     it_requests.register(app, sys.modules[__name__])
-    purchases.register(app, sys.modules[__name__])
     payslip_questions.register(app, sys.modules[__name__])
     assignments.register(app, sys.modules[__name__])
     business_trips.register(app, sys.modules[__name__])
-    onboarding.register(app, sys.modules[__name__])
     medical_visits.register(app, sys.modules[__name__])
     it_assets.register(app, sys.modules[__name__])
     planned_outages.register(app, sys.modules[__name__])
