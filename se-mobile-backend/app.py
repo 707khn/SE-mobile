@@ -2394,6 +2394,44 @@ _PAYSLIPS_LATE_DAYS = 40
 _OUTAGE_FRESH = timedelta(hours=24)
 
 
+# Чем кончилась последняя выкладка deploy/autodeploy.sh (таймер
+# se-mobile-autodeploy). Нет файла — выкладка без SSH не поставлена, и это не
+# беда: значит, выкладывают руками.
+_AUTODEPLOY_STATUS = os.environ.get(
+    'AUTODEPLOY_STATUS', '/var/lib/se-mobile/autodeploy/status')
+_AUTODEPLOY_SILENT_AFTER = timedelta(hours=1)
+_AUTODEPLOY_BAD = {'fail', 'red', 'rolled-back', 'no-token'}
+
+
+def _autodeploy_state():
+    """Выкладка без SSH: что было в последний раз. `problem` пусто — порядок."""
+    try:
+        with open(_AUTODEPLOY_STATUS, encoding='utf-8', errors='replace') as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
+        return {'available': False, 'problem': None}
+    except OSError as e:
+        return {'available': False, 'problem': str(e)}
+    fields = dict(line.split('=', 1) for line in lines if '=' in line)
+    state = {'available': True,
+             'result': fields.get('result') or 'fail',
+             'message': fields.get('message') or '',
+             'commit': fields.get('commit') or None,
+             'checked_at': fields.get('checked_at') or None,
+             'problem': None}
+    if state['result'] in _AUTODEPLOY_BAD:
+        state['problem'] = state['message'] or 'Последняя выкладка не удалась.'
+    try:
+        checked = datetime.strptime(state['checked_at'], '%Y-%m-%dT%H:%M:%SZ') \
+            .replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - checked > _AUTODEPLOY_SILENT_AFTER:
+            state['problem'] = (f'Таймер выкладки не запускался с '
+                                f'{state["checked_at"]}.')
+    except (TypeError, ValueError):
+        pass
+    return state
+
+
 def _system_problems():
     """Что на сервере требует рук администратора — прямо сейчас.
 
@@ -2429,6 +2467,13 @@ def _system_problems():
             add('fetch_apk', 'Новые сборки не приезжают', fetch['problem'])
     except Exception as e:
         logging.warning('Не удалось проверить доставку сборок: %s', e)
+
+    try:
+        deploy = _autodeploy_state()
+        if deploy.get('problem'):
+            add('autodeploy', 'Выкладка сервера стоит', deploy['problem'])
+    except Exception as e:
+        logging.warning('Не удалось проверить выкладку: %s', e)
 
     # Копия, лежащая только на сервере, умрёт вместе с ним, а из той, что ни
     # разу не восстанавливали, может и не восстановиться.
@@ -4233,6 +4278,7 @@ def register_routes(app):
             # только в журнале systemd.
             'fetch_apk': _fetch_apk_state(),
             'offsite': _offsite_state(),
+            'autodeploy': _autodeploy_state(),
             'restore_test': _restore_test_state(),
             # Что сторож записал о перебоях. Пусто — сервер не падал.
             'outages': _outage_state(),

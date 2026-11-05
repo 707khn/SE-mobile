@@ -29,6 +29,10 @@ LAST_RESTART="$STATE_DIR/last-restart"
 # а в журнале не разобрать, что было причиной.
 COOLDOWN=${WATCHDOG_COOLDOWN:-900}
 
+# Сигнал в Telegram (deploy/notify.sh) — при поломке и при починке, один раз.
+NOTIFY=${NOTIFY:-$(dirname "$0")/notify.sh}
+say() { [ -r "$NOTIFY" ] && bash "$NOTIFY" "$*" >/dev/null 2>&1 || true; }
+
 # Две неудачи подряд, а не одна: одиночная бывает от чего угодно — сборщик
 # мусора, долгий запрос, перезапуск по обновлению.
 NEEDED=${WATCHDOG_FAILURES:-2}
@@ -56,11 +60,13 @@ check_https() {
         if [ -e "$HTTPS_DOWN" ]; then
             rm -f "$HTTPS_DOWN"
             echo "$(date -Is) https://$PUBLIC_HOST снова отвечает" >> "$OUTAGES"
+            say "✅ https://$PUBLIC_HOST снова отвечает"
         fi
     elif [ ! -e "$HTTPS_DOWN" ]; then
         touch "$HTTPS_DOWN"
         echo "$(date -Is) приложение живо, но https://$PUBLIC_HOST не отвечает — телефоны не войдут: $outside" >> "$OUTAGES"
         echo "https://$PUBLIC_HOST не отвечает: $outside" >&2
+        say "⚠️ Приложение живо, но https://$PUBLIC_HOST не отвечает — телефоны не войдут: $outside"
     fi
 }
 
@@ -72,6 +78,7 @@ if [ $code -eq 0 ]; then
     if [ "$previous" -ge "$NEEDED" ]; then
         echo "$(date -Is) восстановился после $previous неудач подряд" >> "$OUTAGES"
         echo "Сервер отвечает снова"
+        say "✅ Сервер снова отвечает (после $previous неудач подряд)"
     fi
     echo 0 > "$FAILS"
     check_https
@@ -85,6 +92,7 @@ echo "$(date -Is) не отвечает ($fails подряд): $answer" >> "$OUT
 echo "Сервер не отвечает ($fails подряд): $answer" >&2
 
 [ "$fails" -lt "$NEEDED" ] && exit 0
+[ "$fails" -eq "$NEEDED" ] && say "⚠️ Сервер не отвечает ($fails проверки подряд): $answer. Сторож перезапускает."
 
 since=$(cat "$LAST_RESTART" 2>/dev/null || echo 0)
 if [ $((now - since)) -lt "$COOLDOWN" ]; then
