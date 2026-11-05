@@ -69,7 +69,8 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.11'
+          # Как на сервере: Ubuntu 24.04 даёт Python 3.12.
+          python-version: '3.12'
           cache: pip
           cache-dependency-path: |
             se-mobile-backend/requirements.txt
@@ -89,6 +90,16 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends nginx-core
+
+      # Известные уязвимости в зависимостях. Устаревшие gunicorn и
+      # flask-cors прежде нашёл только ручной аудит. Один раз — на SQLite:
+      # зависимости в обоих прогонах одни и те же.
+      - name: pip-audit
+        if: matrix.name == 'SQLite'
+        working-directory: se-mobile-backend
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
 
       - name: pytest
         working-directory: se-mobile-backend
