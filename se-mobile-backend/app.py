@@ -1445,6 +1445,23 @@ def issue_one_time_codes(logins=None):
     return codes
 
 
+def reset_password(account, password_hash):
+    """Сброс пароля: вместо прежнего — выданный, вход на всех устройствах
+    закрыт. Без commit.
+
+    Одно на «Сбросить пароль» в админ-панели и сброс пачкой
+    (reset_passwords.py). Пропуска гасим обязательно. Телефон, где уже
+    вошли, увидел бы в /api/me must_change_password и сам погасил бы новый
+    код (/api/account/code-used): выданный кадровиком код не сработал бы, а
+    кто вошёл под чужим табельным, так и остался бы в учётке.
+    """
+    account.password_hash = password_hash
+    account.must_change_password = True
+    account.failed_attempts = 0
+    account.locked_until = None
+    AuthToken.query.filter_by(employee_id=account.employee_id).delete()
+
+
 def _employee_names():
     """employee_id → ФИО, одним запросом.
 
@@ -3003,12 +3020,8 @@ def register_routes(app):
         # («admin») — длинный пароль из букв: её вводят с компьютера.
         temporary = (_one_time_code(account.login) if account.login.isdigit()
                      else _random_password())
-        account.password_hash = generate_password_hash(temporary)
-        account.must_change_password = True
-        account.failed_attempts = 0
-        account.locked_until = None
+        reset_password(account, generate_password_hash(temporary))
         account.is_active = True
-        AuthToken.query.filter_by(employee_id=account.employee_id).delete()
         db.session.commit()
         logging.info('Password reset for %r by administrator', login)
         return jsonify({'message': 'Success', 'temporary_password': temporary})
