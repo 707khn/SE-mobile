@@ -1,17 +1,16 @@
 name: Build Android APK
 
-# Сборка идёт сама, как только правка попала в main: пока вы читаете письмо
-# о слиянии, файл уже собирается. Раньше её запускали руками и стояли над
-# ней семь минут — а ждать имеет смысл только то, что нельзя начать заранее.
+# Собирается в составе еженедельного выпуска (release.yml) — вместе с
+# Windows и веб-версией, под одним номером. 44 сборки за четыре недели, пять
+# за один день, и каждую люди ставили руками. Срочное исправление — Actions →
+# «Выпуск» → Run workflow: соберётся всё сразу, в тот же час. Эту сборку
+# можно запустить и отдельно (Run workflow здесь).
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'lib/**'
-      - 'android/**'
-      - 'assets/**'
-      - 'pubspec.yaml'
-      - '.github/workflows/build-apk.yml'
+  workflow_call:
+    inputs:
+      emulator:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       emulator:
@@ -37,6 +36,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # Номер сборки — число коммитов в main: нужна вся история.
+          fetch-depth: 0
 
       # На машине GitHub около 14 ГБ свободного места, а Flutter со своим
       # кэшем, кэш Gradle, NDK и три сборки подряд занимают почти всё — 5
@@ -70,21 +72,9 @@ jobs:
           key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties', 'pubspec.lock') }}
           restore-keys: gradle-
 
-      # Номер версии записан в двух местах: pubspec.yaml и app_version.dart.
-      # Второй показывается в «О программе» и уходит на сервер заголовком
-      # X-App-Version — по нему в поддержке понимают, какая сборка у человека.
-      # Разойдутся — и смотреть будут не на ту версию, а заметить это по
-      # экрану нельзя. Пусть замечает сборка, за секунду.
-      - name: Версия в двух местах совпадает
-        run: |
-          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
-          DART_V=$(sed -n "s/.*kAppVersion = '\([^']*\)'.*/\1/p" lib/utils/app_version.dart)
-          DART_B=$(sed -n "s/.*kAppBuild = '\([^']*\)'.*/\1/p" lib/utils/app_version.dart)
-          if [ "$PUB" != "$DART_V+$DART_B" ]; then
-            echo "::error::pubspec.yaml: $PUB, app_version.dart: $DART_V+$DART_B. Приведите к одному виду."
-            exit 1
-          fi
-          echo "Версия $PUB"
+      # Номер версии ставит сборка, а не автор PR: см. .github/scripts/version.sh.
+      - name: Версия
+        run: bash .github/scripts/version.sh
 
       - name: Install dependencies
         run: flutter pub get
@@ -187,7 +177,7 @@ jobs:
       - name: Build APK
         env:
           CHAT_URL: ${{ vars.CHAT_URL }}
-        run: flutter build apk --release --dart-define=CHAT_URL="$CHAT_URL"
+        run: flutter build apk --release $FLUTTER_VERSION_ARGS --dart-define=CHAT_URL="$CHAT_URL"
 
       # Чтобы по файлу было видно, чем он подписан: с «своим» ключом сборка
       # встанет поверх прежней, с отладочным — нет.
@@ -212,7 +202,6 @@ jobs:
       # ни один из двух уже готовых.
       - name: Назвать APK версией
         run: |
-          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
           cp build/app/outputs/flutter-apk/app-release.apk "se-mobile-$PUB.apk"
           ls -lh "se-mobile-$PUB.apk"
 
@@ -244,7 +233,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
           TAG="v${PUB/+/-}"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -262,14 +250,13 @@ jobs:
       # принимает .aab, а не .apk. Подписывается тем же ключом: для Play он —
       # ключ загрузки, окончательную подпись ставит сам Play.
       - name: Build AAB для Google Play
-        run: flutter build appbundle --release --dart-define=STORE=play
+        run: flutter build appbundle --release $FLUTTER_VERSION_ARGS --dart-define=STORE=play
 
       - name: Пропустит ли Google Play
         run: .github/scripts/check-play-bundle.sh build/app/outputs/bundle/release/app-release.aab
 
       - name: Назвать AAB версией
         run: |
-          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
           cp build/app/outputs/bundle/release/app-release.aab "se-mobile-play-$PUB.aab"
           ls -lh "se-mobile-play-$PUB.aab"
           df -h / | tail -1

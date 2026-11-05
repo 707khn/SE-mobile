@@ -54,3 +54,5 @@ se-mobile-backend/data/legacy_seed.json
 se-mobile-backend/data/access_*.csv
 se-mobile-backend/data/*.xls
 se-mobile-backend/data/*.xlsx
+tools/menu-upload/watch_state.txt
+tools/menu-upload/upload_log.txt

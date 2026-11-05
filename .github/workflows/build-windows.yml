@@ -5,15 +5,12 @@ name: Build Windows
 # SemEng-windows-<версия>.zip: распаковать в любую папку и запустить
 # SE-mobile.exe. Установка не нужна, права администратора — тоже.
 #
-# Сама собирается только после правок окна Windows: минута машины Windows у
-# GitHub стоит вдвое дороже Linux, а каждая правка lib/ уже собирает APK.
-# Новую версию для компьютера после правок экранов — кнопкой «Run workflow».
+# Собирается в составе еженедельного выпуска (release.yml), вместе с APK и
+# веб-версией, под тем же номером: раньше Windows собиралась только после
+# правки windows/ и отставала от телефона на несколько версий. Отдельно —
+# кнопкой «Run workflow».
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'windows/**'
-      - '.github/workflows/build-windows.yml'
+  workflow_call:
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +28,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
@@ -40,23 +39,26 @@ jobs:
 
       - run: flutter pub get --enforce-lockfile
 
+      # Номер версии ставит сборка, а не автор PR: см. .github/scripts/version.sh.
+      - name: Версия
+        run: bash .github/scripts/version.sh
+
       # Сборка скачивает Firebase C++ SDK для Windows — большой архив: его
       # тянет firebase_core, хотя на компьютере Firebase не поднимается.
       # Отсюда и лишние минуты.
       - name: Сборка
-        run: flutter build windows --release
+        run: flutter build windows --release $FLUTTER_VERSION_ARGS
 
       - name: Упаковать
         shell: pwsh
         run: |
-          $pub = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(.+)$').Matches[0].Groups[1].Value).Trim()
+          $pub = $env:PUB
           # Архив пока под прежним именем SemEng-windows: по нему его узнают
           # сервер (app.py) и deploy/fetch-apk.sh на сервере. Переименовывать —
           # только вместе с ними, иначе компьютерам перестанут приезжать версии.
           $name = "SemEng-windows-$pub.zip"
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath $name
           Get-Item $name | Select-Object Name, Length
-          "PUB=$pub" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # Установщик: ярлык в «Пуске», установка без прав администратора,
       # новая версия — поверх (windows/installer/SE-mobile.iss). Inno Setup на

@@ -66,9 +66,12 @@ try {
         $dialog = New-Object System.Windows.Forms.OpenFileDialog
         $dialog.Title = 'Выберите файл справочника'
         $dialog.Filter = 'Excel (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls'
+        # В folder может быть несколько папок через «;» — для автозагрузки.
+        # Окно выбора открываем в первой.
+        $firstFolder = if ($settings.ContainsKey('folder')) { ($settings['folder'] -split ';')[0].Trim() } else { '' }
         $dialog.InitialDirectory =
-            if ($settings.ContainsKey('folder') -and $settings['folder'] -ne '' -and (Test-Path $settings['folder'])) {
-                $settings['folder']
+            if ($firstFolder -ne '' -and (Test-Path $firstFolder)) {
+                $firstFolder
             } else {
                 [Environment]::GetFolderPath('MyDocuments')
             }

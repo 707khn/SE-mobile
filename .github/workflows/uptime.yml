@@ -9,12 +9,17 @@ name: Сервер доступен снаружи
 # Не ответил — проверка красная, и GitHub присылает письмо о неудачном
 # запуске (тому, кто последним менял расписание в этом файле).
 #
-# Раз в час, а не чаще: в закрытом репозитории минуты Actions считаются, и
-# каждый запуск округляется до минуты — это ~720 минут в месяц из 2000
-# бесплатных. Сбой в три дня час замечает с запасом.
+# Частую проверку (раз в 1–5 минут) ведёт внешний сервис — UptimeRobot или
+# аналог, см. deploy/README.md, «Проверка снаружи»: он бесплатный, сбой
+# видно через минуты, а не через час, и сигнал приходит в Telegram сам.
+# Здесь остаётся запасная проверка раз в шесть часов и срок сертификата —
+# ~120 минут Actions в месяц вместо ~720.
+#
+# Красный запуск — сигнал в Telegram, если в секретах репозитория заданы
+# TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID (те же, что в /etc/se-mobile-alerts.env).
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -60,3 +65,16 @@ jobs:
             echo "::error::Сертификат $HOST истекает через $days дн. ($end). Продление не сработало: sudo certbot renew --dry-run покажет почему."
             exit 1
           fi
+
+      - name: Сигнал в Telegram
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] || exit 0
+          curl -fsS --max-time 15 -o /dev/null \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=⚠️ [SE-mobile] https://$HOST не прошёл проверку снаружи: $RUN_URL" \
+            "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage"

@@ -35,7 +35,8 @@ void main() {
 
   test('номер установленной сборки — число', () {
     expect(AppUpdate.currentBuild, int.parse(kAppBuild));
-    expect(AppUpdate.currentBuild, greaterThan(0));
+    // Номер передаёт сборка (--dart-define=APP_BUILD); без него — 0.
+    expect(AppUpdate.currentBuild, greaterThanOrEqualTo(0));
   });
 
   test('«позже» откладывает эту сборку, а не обновления вообще', () async {

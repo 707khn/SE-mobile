@@ -20,7 +20,8 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
-                    AuthMiss, Notification, PayslipUpload, PayrollGrant)
+                    AuthMiss, Notification, PayslipUpload, PayrollGrant,
+                    ManagerOverride)
 from parser_1c_xml import parse_1c_xml
 from parser_payslip_excel import parse_payslip_excel
 from parser_menu_excel import parse_menu_excel
@@ -31,11 +32,10 @@ from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
 from privacy import privacy_page
 import it_requests
-import purchases
+import retired  # noqa: F401 — таблицы снятых разделов, см. retired.py
 import payslip_questions
 import assignments
 import business_trips
-import onboarding
 import medical_visits
 import it_assets
 import planned_outages
@@ -126,8 +126,37 @@ def _push_state():
 
 
 def _is_admin_role(job_title: str) -> bool:
-    j = job_title.lower()
+    """Начальник ли по должности. Последнее слово — за ManagerOverride,
+    см. _is_manager_employee: здесь только правило по умолчанию."""
+    j = (job_title or '').lower()
+    # «Главный менеджер» и «главный специалист» — не начальники: так названы
+    # рядовые должности, и по слову «главный» трое в ДМТО видели проходы
+    # всего департамента, включая руководителя.
+    if j.lstrip().startswith(('главный менеджер', 'главный специалист')):
+        return False
     return any(k in j for k in ('руководитель', 'начальник', 'директор', 'главный', 'заместитель'))
+
+
+def _manager_override(employee_id):
+    """True/False, если администратор решил явно, иначе None."""
+    if not employee_id:
+        return None
+    try:
+        row = db.session.get(ManagerOverride, employee_id)
+    except Exception:
+        db.session.rollback()
+        return None
+    return None if row is None else bool(row.is_manager)
+
+
+def _is_manager_employee(employee):
+    """Начальник ли — по списку администратора, а без строки — по должности."""
+    if employee is None:
+        return False
+    explicit = _manager_override(employee.employee_id)
+    if explicit is not None:
+        return explicit
+    return _is_admin_role(employee.job_title)
 
 
 # FCM принимает не больше 500 адресатов за раз, а на предприятии их ровно
@@ -804,6 +833,28 @@ def _random_password(length=14):
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
+def _one_time_code(login=None):
+    """Одноразовый код для новой учётки и для сброса пароля.
+
+    Четыре цифры, первая не ноль: код диктуют и набирают на телефоне с
+    цифровой клавиатуры, а ноль в начале _number_forms считал бы лишним.
+    Вариантов всего 9000, поэтому держит его замок на учётке (_lock_delay):
+    после пяти неудач — растущая задержка до получаса, и код живёт только
+    до первого входа. Раньше
+    временным паролем был табельный номер — а он напечатан на пропуске, и
+    войти под чужим именем мог любой, кто пропуск видел, и сам же сменить
+    пароль. Код знает только кадровик, который передаёт его лично.
+    """
+    # Код, совпавший с табельным номером (из 9000 вариантов такое бывает),
+    # был бы тем же паролем «по пропуску» — берём другой.
+    taken = set(_number_forms(login)) if login else set()
+    while True:
+        code = str(secrets.randbelow(9) + 1) + ''.join(
+            str(secrets.randbelow(10)) for _ in range(3))
+        if code not in taken:
+            return code
+
+
 def _is_default_password(password, login):
     """Это выданный при заведении пароль, а не придуманный человеком?
 
@@ -1268,7 +1319,7 @@ def _visible_employee_ids():
                 if e.employee_id == viewer.employee_id
                 or _norm_title(e.job_title) not in hidden}
 
-    if _is_admin_role(viewer.job_title) and viewer.department:
+    if _is_manager_employee(viewer) and viewer.department:
         ids = {e.employee_id for e in
                Employee.query.filter_by(department=viewer.department).all()}
         ids.add(viewer.employee_id)
@@ -1324,7 +1375,7 @@ def _is_manager():
         # рядовых сотрудников, чтобы они видели своё; начальникам и админу
         # хватает новой сборки, которая пропуск присылает.
         return False
-    return _is_system_admin(viewer.job_title) or _is_admin_role(viewer.job_title)
+    return _is_system_admin(viewer.job_title) or _is_manager_employee(viewer)
 
 
 def _is_admin_account():
@@ -1337,6 +1388,20 @@ def _is_admin_account():
     return _is_system_admin(viewer.job_title)
 
 
+def _may_upload_directory(employee):
+    """Справочник загружает офис-менеджер — она его и ведёт; админ — чтобы
+    починить. DIRECTORY_STAFF в окружении — табельные номера сверх этого,
+    например на время отпуска офис-менеджера.
+    """
+    if employee is None:
+        return False
+    job = ' '.join((employee.job_title or '').lower().replace('-', ' ').split())
+    extra = {p.strip() for p in os.environ.get('DIRECTORY_STAFF', '').split(',')
+             if p.strip()}
+    return ('офис менеджер' in job or _is_system_admin(job)
+            or employee.employee_id in extra)
+
+
 def _may_edit_menu():
     """Меню столовой пишет технолог; админ — чтобы починить, когда она не может."""
     viewer = getattr(g, 'employee', None)
@@ -1345,6 +1410,39 @@ def _may_edit_menu():
         return False
     job = (viewer.job_title or '').lower()
     return ('технолог' in job and 'столов' in job) or _is_system_admin(job)
+
+
+def issue_one_time_codes(logins=None):
+    """Меняет выданный пароль (табельный номер) на одноразовый код.
+
+    Только у тех, кто ни разу не входил и чей пароль всё ещё выданный: свой
+    пароль человека и действующую учётку не трогаем. logins=None — все
+    такие. Возвращает [{login, full_name, code}] — коды есть только здесь.
+    Зовут и админ-панель (/api/admin/accounts/issue-codes), и issue_codes.py
+    на сервере.
+    """
+    query = UserAccount.query.filter(
+        UserAccount.must_change_password.is_(True),
+        UserAccount.last_login_at.is_(None),
+        UserAccount.is_active.is_(True))
+    if logins is not None:
+        query = query.filter(UserAccount.login.in_(list(logins)))
+    names = _employee_names()
+    codes = []
+    for account in query.order_by(UserAccount.login).all():
+        if not account.login.isdigit():
+            continue
+        code = _one_time_code(account.login)
+        account.password_hash = generate_password_hash(code)
+        account.failed_attempts = 0
+        account.locked_until = None
+        codes.append({'login': account.login,
+                      'full_name': names.get(account.employee_id,
+                                             account.employee_id),
+                      'code': code})
+    db.session.commit()
+    logging.info('One-time codes issued for %d accounts', len(codes))
+    return codes
 
 
 def _employee_names():
@@ -1738,11 +1836,18 @@ def create_app():
     db.init_app(app)
 
     with app.app_context():
+        # Схема — не «non-fatal». Раньше сбой здесь писался в журнал, и
+        # сервер продолжал работать на неверной схеме: запросы падали
+        # по одному на каждой недостающей колонке, а /health был зелёным.
+        # Теперь процесс не стартует: systemd пишет причину, сторож и
+        # выкладка (deploy/autodeploy.sh — с откатом) видят упавший сервер.
         logging.info('Running db.create_all()...')
         try:
             db.create_all()
         except Exception as e:
-            logging.error(f'db.create_all() failed (non-fatal): {e}', exc_info=True)
+            logging.critical(f'db.create_all() failed — сервер не стартует: {e}',
+                             exc_info=True)
+            raise
         logging.info('db.create_all() done')
         # _migrate_schema идёт отдельно и всегда: он приводит схему в
         # соответствие с моделями, а не наполняет её данными.
@@ -1750,7 +1855,9 @@ def create_app():
             _migrate_schema()
         except Exception as e:
             db.session.rollback()
-            logging.error(f'_migrate_schema failed (non-fatal): {e}', exc_info=True)
+            logging.critical(f'_migrate_schema failed — сервер не стартует: {e}',
+                             exc_info=True)
+            raise
         try:
             _hash_stored_tokens()
         except Exception as e:
@@ -1800,11 +1907,9 @@ def create_app():
 
     register_routes(app)
     it_requests.register(app, sys.modules[__name__])
-    purchases.register(app, sys.modules[__name__])
     payslip_questions.register(app, sys.modules[__name__])
     assignments.register(app, sys.modules[__name__])
     business_trips.register(app, sys.modules[__name__])
-    onboarding.register(app, sys.modules[__name__])
     medical_visits.register(app, sys.modules[__name__])
     it_assets.register(app, sys.modules[__name__])
     planned_outages.register(app, sys.modules[__name__])
@@ -2348,6 +2453,44 @@ _PAYSLIPS_LATE_DAYS = 40
 _OUTAGE_FRESH = timedelta(hours=24)
 
 
+# Чем кончилась последняя выкладка deploy/autodeploy.sh (таймер
+# se-mobile-autodeploy). Нет файла — выкладка без SSH не поставлена, и это не
+# беда: значит, выкладывают руками.
+_AUTODEPLOY_STATUS = os.environ.get(
+    'AUTODEPLOY_STATUS', '/var/lib/se-mobile/autodeploy/status')
+_AUTODEPLOY_SILENT_AFTER = timedelta(hours=1)
+_AUTODEPLOY_BAD = {'fail', 'red', 'rolled-back', 'no-token'}
+
+
+def _autodeploy_state():
+    """Выкладка без SSH: что было в последний раз. `problem` пусто — порядок."""
+    try:
+        with open(_AUTODEPLOY_STATUS, encoding='utf-8', errors='replace') as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
+        return {'available': False, 'problem': None}
+    except OSError as e:
+        return {'available': False, 'problem': str(e)}
+    fields = dict(line.split('=', 1) for line in lines if '=' in line)
+    state = {'available': True,
+             'result': fields.get('result') or 'fail',
+             'message': fields.get('message') or '',
+             'commit': fields.get('commit') or None,
+             'checked_at': fields.get('checked_at') or None,
+             'problem': None}
+    if state['result'] in _AUTODEPLOY_BAD:
+        state['problem'] = state['message'] or 'Последняя выкладка не удалась.'
+    try:
+        checked = datetime.strptime(state['checked_at'], '%Y-%m-%dT%H:%M:%SZ') \
+            .replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - checked > _AUTODEPLOY_SILENT_AFTER:
+            state['problem'] = (f'Таймер выкладки не запускался с '
+                                f'{state["checked_at"]}.')
+    except (TypeError, ValueError):
+        pass
+    return state
+
+
 def _system_problems():
     """Что на сервере требует рук администратора — прямо сейчас.
 
@@ -2383,6 +2526,13 @@ def _system_problems():
             add('fetch_apk', 'Новые сборки не приезжают', fetch['problem'])
     except Exception as e:
         logging.warning('Не удалось проверить доставку сборок: %s', e)
+
+    try:
+        deploy = _autodeploy_state()
+        if deploy.get('problem'):
+            add('autodeploy', 'Выкладка сервера стоит', deploy['problem'])
+    except Exception as e:
+        logging.warning('Не удалось проверить выкладку: %s', e)
 
     # Копия, лежащая только на сервере, умрёт вместе с ним, а из той, что ни
     # разу не восстанавливали, может и не восстановиться.
@@ -2594,6 +2744,10 @@ def register_routes(app):
             # узнаёт не всех, кого сервер считает расчётной группой
             # (PAYROLL_STAFF).
             'payroll': payslip_questions.is_payroll(viewer),
+            # Начальник ли — по списку администратора (ManagerOverride), а
+            # без него по должности. Приложение по этому полю показывает
+            # «Отчёт сотрудников»: своё правило по должности ошибалось так же.
+            'manager': _is_manager_employee(viewer),
         })
 
     # ── Оповещения в приложении ───────────────────────────────────────────────
@@ -2775,7 +2929,7 @@ def register_routes(app):
     @app.route('/api/admin/accounts/<login>/reset', methods=['POST'])
     @require_auth
     def admin_reset_password(login):
-        """Сброс пароля админом: временным становится табельный номер, и при
+        """Сброс пароля админом: временным становится одноразовый код, и при
         первом же входе человека попросят придумать свой."""
         if not _is_admin_account():
             return _deny()
@@ -2783,11 +2937,12 @@ def register_routes(app):
         if account is None:
             return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
 
-        # Табельный номер годится во временные: он у человека на пропуске и
-        # меняется при первом же входе. Для именованной учётки — «admin» —
-        # это означало бы пароль «admin», то есть ровно то, от чего мы
-        # уходили; такой придумываем случайно и показываем тому, кто сбросил.
-        temporary = account.login if account.login.isdigit() else _random_password()
+        # Не табельный номер: он на пропуске, и войти с ним мог бы кто
+        # угодно, а войдя — сам сменить пароль и забрать учётку. Код видит
+        # только тот, кто сбросил, и передаёт его лично. Именованной учётке
+        # («admin») — длинный пароль из букв: её вводят с компьютера.
+        temporary = (_one_time_code(account.login) if account.login.isdigit()
+                     else _random_password())
         account.password_hash = generate_password_hash(temporary)
         account.must_change_password = True
         account.failed_attempts = 0
@@ -2797,6 +2952,30 @@ def register_routes(app):
         db.session.commit()
         logging.info('Password reset for %r by administrator', login)
         return jsonify({'message': 'Success', 'temporary_password': temporary})
+
+    @app.route('/api/admin/accounts/issue-codes', methods=['POST'])
+    @require_auth
+    def admin_issue_codes():
+        """Одноразовые коды вместо пароля, равного табельному номеру, — пачкой.
+
+        Трогает только тех, кто ещё ни разу не входил и у кого пароль всё ещё
+        выданный (must_change_password): придуманный человеком пароль и
+        действующего пользователя не сбрасываем. Без тела — все такие
+        учётки; {"logins": [...]} — только перечисленные. После этого войти
+        по табельному номеру нельзя: коды из ответа кадровик раздаёт лично,
+        больше их нигде нет.
+        """
+        if not _is_admin_account():
+            return _deny()
+        wanted = _json_body().get('logins')
+        if isinstance(wanted, list):
+            wanted = [str(x).strip() for x in wanted if str(x).strip()]
+            if not wanted:
+                return jsonify({'message': 'Success', 'codes': []})
+        else:
+            wanted = None
+        codes = issue_one_time_codes(wanted)
+        return jsonify({'message': 'Success', 'codes': codes})
 
     @app.route('/api/admin/accounts/<login>/active', methods=['POST'])
     @require_auth
@@ -2837,8 +3016,9 @@ def register_routes(app):
         """Заводит сотрудников и учётные записи из таблицы отдела кадров.
 
         Повторная загрузка того же файла безопасна: существующие обновляются,
-        новые добавляются, пароли не трогаются. Временный пароль у новых равен
-        табельному номеру, и сменить его попросят при первом входе.
+        новые добавляются, пароли не трогаются. Новым учёткам выдаётся
+        одноразовый код — он есть только в ответе (new_accounts), кадровик
+        передаёт его лично, и сменить его попросят при первом входе.
         """
         if not _is_admin_account():
             return _deny()
@@ -2865,6 +3045,9 @@ def register_routes(app):
         warnings = []
 
         created_employees = updated_employees = created_accounts = 0
+        # Коды новых учёток показываем один раз, в ответе: в базе только
+        # хеш, и потерянный код восстанавливается лишь сбросом.
+        new_accounts = []
         for person in people:
             # Логин — табельный номер без ведущих нулей; сотрудник в базе
             # может лежать под другой формой того же номера.
@@ -2905,13 +3088,17 @@ def register_routes(app):
                                     'reason': f"ИИН уже у {clash.full_name}"})
 
             if db.session.get(UserAccount, login) is None:
+                code = _one_time_code(login)
                 db.session.add(UserAccount(
                     login=login,
                     employee_id=emp_id,
-                    password_hash=generate_password_hash(login),
+                    password_hash=generate_password_hash(code),
                     must_change_password=True,
                 ))
                 created_accounts += 1
+                new_accounts.append({'login': login,
+                                     'full_name': person['full_name'],
+                                     'code': code})
 
         db.session.commit()
         logging.info('Employee import: %d new, %d updated, %d accounts, '
@@ -2923,6 +3110,7 @@ def register_routes(app):
             'employees_created': created_employees,
             'employees_updated': updated_employees,
             'accounts_created': created_accounts,
+            'new_accounts': new_accounts,
             'skipped': skipped,
             'warnings': warnings,
             'total_employees': Employee.query.count(),
@@ -3050,6 +3238,8 @@ def register_routes(app):
             return login, bool(login) and accounts.get(login, True)
 
         grants = payslip_questions.payroll_grants()
+        overrides = {r.employee_id: r.is_manager
+                     for r in ManagerOverride.query.all()}
         employees = []
         for e in Employee.query.order_by(Employee.full_name).all():
             login, login_active = login_of(e.employee_id)
@@ -3069,6 +3259,11 @@ def register_routes(app):
                 # открыт вручную.
                 'payroll': by_title or e.employee_id in grants,
                 'payroll_by_title': by_title,
+                # Начальник: решение администратора, а без него — должность.
+                'manager': overrides.get(e.employee_id,
+                                         _is_admin_role(e.job_title)),
+                'manager_by_title': _is_admin_role(e.job_title),
+                'manager_override': overrides.get(e.employee_id),
             })
 
         return jsonify({'message': 'Success', 'employees': employees})
@@ -3102,6 +3297,44 @@ def register_routes(app):
         return jsonify({'message': 'Success',
                         'payroll': payslip_questions.is_payroll(emp),
                         'payroll_by_title': payslip_questions.payroll_by_title(emp)})
+
+    @app.route('/api/admin/employees/<employee_id>/manager', methods=['POST'])
+    @require_auth
+    def admin_set_manager(employee_id):
+        """Начальник или нет — явно, поверх правила по должности.
+
+        {"manager": true} — начальник, {"manager": false} — нет,
+        {"manager": null} — снова по должности. Начальник видит проходы и
+        табель своего отдела, поэтому решает только администратор системы.
+        """
+        if not _is_admin_account():
+            return _deny()
+        emp = db.session.get(Employee, employee_id)
+        if emp is None:
+            return jsonify({'message': 'Сотрудник не найден', 'error': True}), 404
+        value = _json_body().get('manager')
+        if value is not None and not isinstance(value, bool):
+            return jsonify({'message': 'manager: true, false или null',
+                            'error': True}), 400
+        row = db.session.get(ManagerOverride, employee_id)
+        if value is None:
+            if row is not None:
+                db.session.delete(row)
+        else:
+            viewer = getattr(g, 'employee', None)
+            if row is None:
+                row = ManagerOverride(employee_id=employee_id, is_manager=value)
+                db.session.add(row)
+            row.is_manager = value
+            row.set_by = viewer.employee_id if viewer else None
+            row.at = datetime.utcnow()
+        db.session.commit()
+        logging.info('Начальник: %s → %s', employee_id,
+                     'по должности' if value is None else value)
+        return jsonify({'message': 'Success',
+                        'manager': _is_manager_employee(emp),
+                        'manager_by_title': _is_admin_role(emp.job_title),
+                        'manager_override': _manager_override(employee_id)})
 
     @app.route('/get_sname', methods=['POST'])
     @require_auth
@@ -4153,6 +4386,7 @@ def register_routes(app):
             # только в журнале systemd.
             'fetch_apk': _fetch_apk_state(),
             'offsite': _offsite_state(),
+            'autodeploy': _autodeploy_state(),
             'restore_test': _restore_test_state(),
             # Что сторож записал о перебоях. Пусто — сервер не падал.
             'outages': _outage_state(),
@@ -4341,9 +4575,10 @@ def register_routes(app):
             return _credentials_refused(login)
 
         uploader = Employee.query.get(employee_id)
-        if not _is_system_admin(uploader.job_title if uploader else ''):
+        if not _may_upload_directory(uploader):
             return jsonify({
-                'message': 'Загружать справочник может администратор',
+                'message': 'Загружать справочник может офис-менеджер '
+                           'или администратор',
                 'error': True,
             }), 403
 
@@ -4357,6 +4592,44 @@ def register_routes(app):
             entries = parse_directory_excel(upload.read())
         except ValueError as e:
             return jsonify({'message': str(e), 'error': True}), 422
+
+        departments = []
+        for entry in entries:
+            if entry['department'] and entry['department'] not in departments:
+                departments.append(entry['department'])
+
+        # dry_run=1 — только сказать, что в файле и чем он отличается от
+        # загруженного. Так программа на компьютере офис-менеджера, сама
+        # заметившая новый файл, может спросить «Загрузить?» с цифрами на
+        # руках, а одинаковый файл не грузить вовсе.
+        if (request.form.get('dry_run') or '').strip() in ('1', 'true'):
+            def key(row):
+                return (row['department'] or '', row['name'],
+                        row['position'] or '', row['extension'] or '',
+                        row['email'] or '', row['mobile'] or '')
+            current_rows = [{
+                'department': r.department, 'name': r.name,
+                'position': r.position, 'extension': r.extension,
+                'email': r.email, 'mobile': r.mobile,
+            } for r in DirectoryEntry.query.order_by(DirectoryEntry.sort_order)]
+            old_names = {r['name'] for r in current_rows}
+            new_names = {e['name'] for e in entries}
+            old_keys = {key(r) for r in current_rows}
+            same = [key(r) for r in current_rows] == [key(e) for e in entries]
+            # Был и остался, но что-то поменялось: должность, номер, отдел.
+            changed = sum(1 for e in entries
+                          if e['name'] in old_names and key(e) not in old_keys)
+            return jsonify({
+                'message': 'Success',
+                'dry_run': True,
+                'count': len(entries),
+                'departments': len(departments),
+                'current_count': len(current_rows),
+                'unchanged': same,
+                'added': sorted(new_names - old_names),
+                'removed': sorted(old_names - new_names),
+                'changed': changed,
+            })
 
         # Заменяем целиком: справочник — снимок на дату, а не журнал. Иначе
         # уволенные остались бы в нём навсегда.
@@ -4390,10 +4663,6 @@ def register_routes(app):
                 'error': True,
             }), 500
 
-        departments = []
-        for entry in entries:
-            if entry['department'] and entry['department'] not in departments:
-                departments.append(entry['department'])
         logging.info('Directory import by %s: %d entries', login, len(entries))
         return jsonify({
             'message': (f'Загружено: {len(entries)} записей, '

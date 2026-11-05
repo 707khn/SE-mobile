@@ -67,3 +67,18 @@ def test_login_survives_an_old_table(app, client):
     response = client.post('/login', json={'login': '2114', 'password': '2114'})
     assert response.status_code == 200
     assert response.get_json()['message'] == 'Success'
+
+
+def test_broken_migration_stops_startup(monkeypatch):
+    """Сбой миграции больше не «non-fatal»: процесс не стартует.
+
+    Иначе сервер работал бы на неверной схеме, а /health оставался зелёным.
+    """
+    import pytest
+
+    def _broken():
+        raise RuntimeError('column "x" cannot be added')
+
+    monkeypatch.setattr(app_module, '_migrate_schema', _broken)
+    with pytest.raises(RuntimeError):
+        app_module.create_app()

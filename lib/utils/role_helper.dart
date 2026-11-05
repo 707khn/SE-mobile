@@ -1,8 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Начальник ли по должности — правило по умолчанию, как на сервере
+/// (_is_admin_role). Последнее слово за сервером: см. [isManager].
 bool isAdminRole(String job) {
-  final lower = job.toLowerCase();
+  final lower = job.toLowerCase().trimLeft();
+  // «Главный менеджер» и «главный специалист» — рядовые должности.
+  if (lower.startsWith('главный менеджер') ||
+      lower.startsWith('главный специалист')) {
+    return false;
+  }
   return lower.contains('руководитель') ||
       lower.contains('начальник') ||
       lower.contains('директор') ||
@@ -61,6 +68,40 @@ class PayrollAccess {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_key, value);
+    } catch (_) {}
+  }
+}
+
+/// Начальник ли — по слову сервера (/api/me, поле `manager`), а пока ответа
+/// не было — по должности. Сервер учитывает список администратора: кого он
+/// снял или назначил вручную, приложение по должности не узнает.
+bool isManager(String job) => ManagerAccess.known.value ?? isAdminRole(job);
+
+class ManagerAccess {
+  ManagerAccess._();
+
+  /// null — сервер ещё не отвечал (старый сервер поля не присылает).
+  static final ValueNotifier<bool?> known = ValueNotifier<bool?>(null);
+  static const _key = 'manager_access';
+
+  static Future<void> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      known.value = prefs.getBool(_key);
+    } catch (_) {
+      known.value = null;
+    }
+  }
+
+  static Future<void> save(bool? value) async {
+    known.value = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (value == null) {
+        await prefs.remove(_key);
+      } else {
+        await prefs.setBool(_key, value);
+      }
     } catch (_) {}
   }
 }

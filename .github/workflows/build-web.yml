@@ -8,16 +8,12 @@ name: Build Web
 # Архив se-mobile-web-<версия>.zip ложится в тот же релиз, что и APK этой
 # версии; оттуда его раз в десять минут забирает сервер (deploy/fetch-apk.sh)
 # и раскладывает в /var/www/se-mobile/web/. Собирается на Linux за пару минут
-# — с каждой правкой экранов, как и APK.
+# — раз в неделю вместе с APK и Windows.
+#
+# Выкладывается в составе еженедельного выпуска (release.yml), вместе с APK и
+# Windows. В PR, трогающем web/, — только проверка сборки.
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'lib/**'
-      - 'web/**'
-      - 'assets/**'
-      - 'pubspec.yaml'
-      - '.github/workflows/build-web.yml'
+  workflow_call:
   pull_request:
     paths:
       - 'web/**'
@@ -36,6 +32,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
@@ -45,6 +43,10 @@ jobs:
 
       - run: flutter pub get --enforce-lockfile
 
+      # Номер версии ставит сборка, а не автор PR: см. .github/scripts/version.sh.
+      - name: Версия
+        run: bash .github/scripts/version.sh
+
       # --base-href /web/ — адрес, с которого nginx раздаёт сборку.
       # --no-web-resources-cdn — движок отрисовки (CanvasKit) кладётся в саму
       # сборку, а не грузится с серверов Google: всё приложение приходит с
@@ -53,16 +55,14 @@ jobs:
       - name: Сборка
         run: >
           flutter build web --release --base-href /web/
-          --no-web-resources-cdn --no-wasm-dry-run
+          --no-web-resources-cdn --no-wasm-dry-run $FLUTTER_VERSION_ARGS
 
       # Отладочные .symbols браузеру не нужны, а весят как полсборки.
       - name: Упаковать
         run: |
-          PUB=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
           find build/web -name '*.symbols' -delete
           (cd build/web && zip -qr "$GITHUB_WORKSPACE/se-mobile-web-$PUB.zip" .)
           ls -lh "se-mobile-web-$PUB.zip"
-          echo "PUB=$PUB" >> "$GITHUB_ENV"
 
       # Проверка правки web/ в pull request'е — только сборка, без выкладки.
       - name: Выложить в Releases

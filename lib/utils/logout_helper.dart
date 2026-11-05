@@ -56,6 +56,7 @@ Future<void> forceLogout({String? message}) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.clear();
   PayrollAccess.granted.value = false;
+  ManagerAccess.known.value = null;
   try {
     await clearExports(await exportDirectory());
   } catch (_) {

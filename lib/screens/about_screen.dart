@@ -10,9 +10,15 @@ import '../utils/colors.dart';
 import '../utils/dimensions.dart';
 import '../utils/error_log.dart';
 import '../utils/open_external.dart';
+import '../utils/role_helper.dart';
+import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
 /// «О программе»: версия, адрес сервера и последние ошибки.
+///
+/// Адрес сервера и ошибки видит только администратор системы: сотруднику они
+/// ничего не говорят, а след ошибки с адресами кода — не для всех глаз.
+/// Остальные видят версию и кнопку обновления.
 ///
 /// Последнее и есть смысл экрана. Когда приложение падает у человека в цехе,
 /// к его телефону не подключишься: раньше причину искали, собирая сборку за
@@ -27,6 +33,7 @@ class AboutScreen extends StatefulWidget {
 class _AboutScreenState extends State<AboutScreen> {
   List<ErrorEntry> _errors = [];
   bool _loading = true;
+  bool _isAdmin = false;
 
   /// Здесь про обновление говорим всегда, даже отложенное: человек пришёл
   /// сюда посмотреть, что у него за версия, — значит, спрашивает именно это.
@@ -43,8 +50,10 @@ class _AboutScreenState extends State<AboutScreen> {
 
   Future<void> _load() async {
     final errors = await ErrorLog.read();
+    final job = await SecureStorageHelper.instance.getJob() ?? '';
     if (!mounted) return;
     setState(() {
+      _isAdmin = isSystemAdmin(job);
       _errors = errors;
       _loading = false;
     });
@@ -64,11 +73,12 @@ class _AboutScreenState extends State<AboutScreen> {
       appBar: AppBar(
         title: Text('about_title'.tr),
         actions: [
-          IconButton(
-            tooltip: isDesktop ? 'copy'.tr : 'about_share'.tr,
-            icon: Icon(isDesktop ? Icons.copy : Icons.share_outlined),
-            onPressed: () => shareText(context, _report),
-          ),
+          if (_isAdmin)
+            IconButton(
+              tooltip: isDesktop ? 'copy'.tr : 'about_share'.tr,
+              icon: Icon(isDesktop ? Icons.copy : Icons.share_outlined),
+              onPressed: () => shareText(context, _report),
+            ),
         ],
       ),
       body: _loading
@@ -77,7 +87,7 @@ class _AboutScreenState extends State<AboutScreen> {
               padding: EdgeInsets.all(Dimensions.width20),
               children: [
                 _row('app_version'.tr, appVersionLabel()),
-                _row('about_server'.tr, AppValues.baseUrl),
+                if (_isAdmin) _row('about_server'.tr, AppValues.baseUrl),
                 if (_update != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -102,30 +112,33 @@ class _AboutScreenState extends State<AboutScreen> {
                       ],
                     ),
                   ),
-                SizedBox(height: Dimensions.height30 / 1.5),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('about_errors'.tr,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600)),
-                    ),
-                    if (_errors.isNotEmpty)
-                      TextButton(
-                        onPressed: () async {
-                          await ErrorLog.clear();
-                          await _load();
-                        },
-                        child: Text('about_clear'.tr),
+                if (_isAdmin) ...[
+                  SizedBox(height: Dimensions.height30 / 1.5),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('about_errors'.tr,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w600)),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                if (_errors.isEmpty)
-                  Text('about_no_errors'.tr,
-                      style: TextStyle(color: context.mutedColor, fontSize: 13))
-                else
-                  ..._errors.map(_errorCard),
+                      if (_errors.isNotEmpty)
+                        TextButton(
+                          onPressed: () async {
+                            await ErrorLog.clear();
+                            await _load();
+                          },
+                          child: Text('about_clear'.tr),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (_errors.isEmpty)
+                    Text('about_no_errors'.tr,
+                        style:
+                            TextStyle(color: context.mutedColor, fontSize: 13))
+                  else
+                    ..._errors.map(_errorCard),
+                ],
               ],
             ),
     );
@@ -175,8 +188,7 @@ class _AboutScreenState extends State<AboutScreen> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text('$when · ${entry.version}',
-                    style:
-                        TextStyle(fontSize: 12, color: context.mutedColor)),
+                    style: TextStyle(fontSize: 12, color: context.mutedColor)),
               ),
               InkWell(
                 onTap: () {

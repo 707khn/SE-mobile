@@ -16,6 +16,9 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
+# Здесь меняют только старшие цифры (1.32), и то редко. Третью цифру и номер
+# сборки ставит сборка в GitHub (.github/scripts/version.sh) — число коммитов
+# в main. Править их в PR не нужно.
 version: 1.32.0+74
 
 environment:

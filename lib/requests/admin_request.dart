@@ -22,6 +22,9 @@ class AdminEmployee {
     required this.leaveCount,
     this.payroll = false,
     this.payrollByTitle = false,
+    this.manager = false,
+    this.managerByTitle = false,
+    this.managerOverride,
   });
 
   final String employeeId;
@@ -45,6 +48,12 @@ class AdminEmployee {
   final bool payroll;
   final bool payrollByTitle;
 
+  /// Начальник ли: [managerOverride] — решение администратора (null — его
+  /// нет, и действует должность, [managerByTitle]).
+  final bool manager;
+  final bool managerByTitle;
+  final bool? managerOverride;
+
   bool get hasLogin => login.isNotEmpty;
 
   factory AdminEmployee.fromJson(Map<String, dynamic> json) => AdminEmployee(
@@ -60,6 +69,9 @@ class AdminEmployee {
         leaveCount: (json['leave_count'] as num?)?.toInt() ?? 0,
         payroll: json['payroll'] == true,
         payrollByTitle: json['payroll_by_title'] == true,
+        manager: json['manager'] == true,
+        managerByTitle: json['manager_by_title'] == true,
+        managerOverride: json['manager_override'] as bool?,
       );
 }
 
@@ -79,6 +91,30 @@ Future<bool?> setPayrollAccess(String employeeId, bool payroll) async {
     if (response.statusCode != 200) return null;
     final body = jsonDecode(utf8.decode(response.bodyBytes));
     return body is Map && body['payroll'] is bool ? body['payroll'] as bool : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Начальник или нет — явно ([manager] true/false) или снова по должности
+/// (null). Возвращает (начальник ли теперь, решение администратора);
+/// null — не вышло.
+Future<(bool, bool?)?> setManagerOverride(
+    String employeeId, bool? manager) async {
+  try {
+    final response = await http
+        .post(
+          Uri.parse(
+              '${AppValues.baseUrl}/api/admin/employees/$employeeId/manager'),
+          headers: await authHeaders(),
+          body: jsonEncode({'manager': manager}),
+        )
+        .timeout(const Duration(seconds: 20));
+    if (await handledUnauthorized(response)) return null;
+    if (response.statusCode != 200) return null;
+    final body = jsonDecode(utf8.decode(response.bodyBytes));
+    if (body is! Map || body['manager'] is! bool) return null;
+    return (body['manager'] as bool, body['manager_override'] as bool?);
   } catch (_) {
     return null;
   }

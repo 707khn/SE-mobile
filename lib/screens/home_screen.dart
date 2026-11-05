@@ -301,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ],
                   // Managers keep their team-wide screens, now inside the shell.
-                  if (!_isAdmin && isAdminRole(widget.job)) ...[
+                  if (!_isAdmin && isManager(widget.job)) ...[
                     _buildActionCard(
                       icon: Icons.groups,
                       label: 'drawer_staff_report'.tr,
