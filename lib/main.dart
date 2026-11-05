@@ -224,6 +224,7 @@ class MyApp extends StatelessWidget {
     final isLogged = await secure.isLoggedIn();
     if (isLogged) {
       await PayrollAccess.load();
+      await ManagerAccess.load();
       // Always re-read the profile: job title and department drive which
       // screens a user sees, and HR edits them server-side. Offline, the
       // cached values below are used unchanged.
@@ -269,6 +270,8 @@ class MyApp extends StatelessWidget {
         employeeId: (b['employee_id'] as String?) ?? '',
       );
       await PayrollAccess.save(b['payroll'] == true);
+      final manager = b['manager'];
+      await ManagerAccess.save(manager is bool ? manager : null);
       return b['must_change_password'] == true;
     } catch (_) {
       // Без связи работаем на сохранённом: код и пропуск лежат на телефоне.

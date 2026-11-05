@@ -20,7 +20,8 @@ from models import (db, Employee, AccessRecord, Payslip,
                     PayslipReference, LeaveBalance, LeaveHistory,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
-                    AuthMiss, Notification, PayslipUpload, PayrollGrant)
+                    AuthMiss, Notification, PayslipUpload, PayrollGrant,
+                    ManagerOverride)
 from parser_1c_xml import parse_1c_xml
 from parser_payslip_excel import parse_payslip_excel
 from parser_menu_excel import parse_menu_excel
@@ -126,8 +127,37 @@ def _push_state():
 
 
 def _is_admin_role(job_title: str) -> bool:
-    j = job_title.lower()
+    """Начальник ли по должности. Последнее слово — за ManagerOverride,
+    см. _is_manager_employee: здесь только правило по умолчанию."""
+    j = (job_title or '').lower()
+    # «Главный менеджер» и «главный специалист» — не начальники: так названы
+    # рядовые должности, и по слову «главный» трое в ДМТО видели проходы
+    # всего департамента, включая руководителя.
+    if j.lstrip().startswith(('главный менеджер', 'главный специалист')):
+        return False
     return any(k in j for k in ('руководитель', 'начальник', 'директор', 'главный', 'заместитель'))
+
+
+def _manager_override(employee_id):
+    """True/False, если администратор решил явно, иначе None."""
+    if not employee_id:
+        return None
+    try:
+        row = db.session.get(ManagerOverride, employee_id)
+    except Exception:
+        db.session.rollback()
+        return None
+    return None if row is None else bool(row.is_manager)
+
+
+def _is_manager_employee(employee):
+    """Начальник ли — по списку администратора, а без строки — по должности."""
+    if employee is None:
+        return False
+    explicit = _manager_override(employee.employee_id)
+    if explicit is not None:
+        return explicit
+    return _is_admin_role(employee.job_title)
 
 
 # FCM принимает не больше 500 адресатов за раз, а на предприятии их ровно
@@ -1281,7 +1311,7 @@ def _visible_employee_ids():
                 if e.employee_id == viewer.employee_id
                 or _norm_title(e.job_title) not in hidden}
 
-    if _is_admin_role(viewer.job_title) and viewer.department:
+    if _is_manager_employee(viewer) and viewer.department:
         ids = {e.employee_id for e in
                Employee.query.filter_by(department=viewer.department).all()}
         ids.add(viewer.employee_id)
@@ -1337,7 +1367,7 @@ def _is_manager():
         # рядовых сотрудников, чтобы они видели своё; начальникам и админу
         # хватает новой сборки, которая пропуск присылает.
         return False
-    return _is_system_admin(viewer.job_title) or _is_admin_role(viewer.job_title)
+    return _is_system_admin(viewer.job_title) or _is_manager_employee(viewer)
 
 
 def _is_admin_account():
@@ -2685,6 +2715,10 @@ def register_routes(app):
             # узнаёт не всех, кого сервер считает расчётной группой
             # (PAYROLL_STAFF).
             'payroll': payslip_questions.is_payroll(viewer),
+            # Начальник ли — по списку администратора (ManagerOverride), а
+            # без него по должности. Приложение по этому полю показывает
+            # «Отчёт сотрудников»: своё правило по должности ошибалось так же.
+            'manager': _is_manager_employee(viewer),
         })
 
     # ── Оповещения в приложении ───────────────────────────────────────────────
@@ -3175,6 +3209,8 @@ def register_routes(app):
             return login, bool(login) and accounts.get(login, True)
 
         grants = payslip_questions.payroll_grants()
+        overrides = {r.employee_id: r.is_manager
+                     for r in ManagerOverride.query.all()}
         employees = []
         for e in Employee.query.order_by(Employee.full_name).all():
             login, login_active = login_of(e.employee_id)
@@ -3194,6 +3230,11 @@ def register_routes(app):
                 # открыт вручную.
                 'payroll': by_title or e.employee_id in grants,
                 'payroll_by_title': by_title,
+                # Начальник: решение администратора, а без него — должность.
+                'manager': overrides.get(e.employee_id,
+                                         _is_admin_role(e.job_title)),
+                'manager_by_title': _is_admin_role(e.job_title),
+                'manager_override': overrides.get(e.employee_id),
             })
 
         return jsonify({'message': 'Success', 'employees': employees})
@@ -3227,6 +3268,44 @@ def register_routes(app):
         return jsonify({'message': 'Success',
                         'payroll': payslip_questions.is_payroll(emp),
                         'payroll_by_title': payslip_questions.payroll_by_title(emp)})
+
+    @app.route('/api/admin/employees/<employee_id>/manager', methods=['POST'])
+    @require_auth
+    def admin_set_manager(employee_id):
+        """Начальник или нет — явно, поверх правила по должности.
+
+        {"manager": true} — начальник, {"manager": false} — нет,
+        {"manager": null} — снова по должности. Начальник видит проходы и
+        табель своего отдела, поэтому решает только администратор системы.
+        """
+        if not _is_admin_account():
+            return _deny()
+        emp = db.session.get(Employee, employee_id)
+        if emp is None:
+            return jsonify({'message': 'Сотрудник не найден', 'error': True}), 404
+        value = _json_body().get('manager')
+        if value is not None and not isinstance(value, bool):
+            return jsonify({'message': 'manager: true, false или null',
+                            'error': True}), 400
+        row = db.session.get(ManagerOverride, employee_id)
+        if value is None:
+            if row is not None:
+                db.session.delete(row)
+        else:
+            viewer = getattr(g, 'employee', None)
+            if row is None:
+                row = ManagerOverride(employee_id=employee_id, is_manager=value)
+                db.session.add(row)
+            row.is_manager = value
+            row.set_by = viewer.employee_id if viewer else None
+            row.at = datetime.utcnow()
+        db.session.commit()
+        logging.info('Начальник: %s → %s', employee_id,
+                     'по должности' if value is None else value)
+        return jsonify({'message': 'Success',
+                        'manager': _is_manager_employee(emp),
+                        'manager_by_title': _is_admin_role(emp.job_title),
+                        'manager_override': _manager_override(employee_id)})
 
     @app.route('/get_sname', methods=['POST'])
     @require_auth

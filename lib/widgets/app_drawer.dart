@@ -186,7 +186,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       index: ChatBridge.tabIndex,
                       onTap: () => _goToTab(ChatBridge.tabIndex),
                     ),
-                  if (isAdminRole(_job)) ...[
+                  if (isManager(_job)) ...[
                     _section('drawer_manager'.tr),
                     _item(
                       icon: Icons.groups_outlined,

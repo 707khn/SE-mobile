@@ -71,6 +71,7 @@ class AdminEmployeeScreen extends StatelessWidget {
           SizedBox(height: Dimensions.height30 * 0.5),
           _sectionTitle(context, 'admin_access'.tr),
           _PayrollSwitch(employee: employee),
+          _ManagerSwitch(employee: employee),
         ],
       ),
     );
@@ -297,6 +298,89 @@ class _PayrollSwitchState extends State<_PayrollSwitch> {
           ),
           value: _on,
           onChanged: fixed || _saving ? null : _set,
+        ),
+      ),
+    );
+  }
+}
+
+/// «Начальник»: видит проходы и табель своего отдела.
+///
+/// По умолчанию решает должность, но справочник 1С её не всегда называет
+/// честно. Переключатель записывает решение администратора поверх
+/// должности; «Как по должности» его снимает.
+class _ManagerSwitch extends StatefulWidget {
+  const _ManagerSwitch({required this.employee});
+
+  final AdminEmployee employee;
+
+  @override
+  State<_ManagerSwitch> createState() => _ManagerSwitchState();
+}
+
+class _ManagerSwitchState extends State<_ManagerSwitch> {
+  late bool _on = widget.employee.manager;
+  late bool? _override = widget.employee.managerOverride;
+  bool _saving = false;
+
+  Future<void> _set(bool? value) async {
+    setState(() => _saving = true);
+    final result = await setManagerOverride(widget.employee.employeeId, value);
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (result != null) {
+        _on = result.$1;
+        _override = result.$2;
+      }
+    });
+    if (result == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('admin_payroll_failed'.tr)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final byTitle = widget.employee.managerByTitle
+        ? 'admin_manager_yes'.tr
+        : 'admin_manager_no'.tr;
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: Dimensions.width20, vertical: 4),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: context.cardShadow,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwitchListTile(
+              key: const Key('admin_manager'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              secondary: const Icon(Icons.groups_outlined),
+              title: Text('admin_manager'.tr,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                'admin_manager_hint'.trParams({'title': byTitle}),
+                style: TextStyle(fontSize: 12, color: context.mutedColor),
+              ),
+              value: _on,
+              onChanged: _saving ? null : (v) => _set(v),
+            ),
+            if (_override != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _saving ? null : () => _set(null),
+                  child: Text('admin_manager_reset'.tr),
+                ),
+              ),
+          ],
         ),
       ),
     );

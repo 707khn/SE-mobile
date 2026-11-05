@@ -140,6 +140,23 @@ class PayrollGrant(db.Model):
     at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class ManagerOverride(db.Model):
+    """Кто начальник — решено администратором, а не словом в должности.
+
+    По должности начальником считается «руководитель», «начальник»,
+    «директор», «главный…» и «заместитель». Справочник 1С это правило
+    обманывает: «Главный менеджер» — не начальник, а видел проходы всего
+    департамента. Строка здесь перекрывает правило в обе стороны:
+    is_manager=False снимает, True — даёт тому, кого по должности не видно.
+    """
+    __tablename__ = 'manager_overrides'
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'),
+                            primary_key=True)
+    is_manager = db.Column(db.Boolean, nullable=False)
+    set_by = db.Column(db.String(10))
+    at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class LeaveBalance(db.Model):
     __tablename__ = 'leave_balances'
     id = db.Column(db.Integer, primary_key=True)
