@@ -130,7 +130,8 @@ class MyApp extends StatelessWidget {
       title: 'SE-mobile',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      // По умолчанию — как в телефоне; выбор переопределяется в боковом меню.
+      // Пока человек не выбрал сам — в браузере светлая, на телефоне и
+      // компьютере как в системе (см. ThemePref); выбор — в «Настройках».
       themeMode: ThemePref.read(prefs),
       // Мышью на компьютере страницы можно и перетаскивать, как пальцем.
       scrollBehavior: isDesktop ? const DesktopScrollBehavior() : null,
