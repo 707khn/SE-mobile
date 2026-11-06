@@ -17,23 +17,96 @@ import 'package:se_mobile/utils/secure_storage_helper.dart';
 
 import 'support/fake_server.dart';
 
-/// Первый вход с телефона: код с бумажки и сразу код из четырёх цифр.
+/// Первый вход с телефона и из браузера: код с бумажки и сразу код из
+/// четырёх цифр.
 ///
 /// Свой пароль на телефоне придумывали и тут же забывали: дальше вход по
-/// коду или пальцем. Теперь телефон гасит выданный код на сервере, а пароль
-/// задают позже в «Настройках» — те, кому нужен вход с компьютера.
+/// коду или пальцем. Теперь телефон и браузер гасят выданный код на сервере,
+/// а пароль задают позже в «Настройках» — те, кому нужен вход с компьютера.
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     OwnPassword.has.value = true;
   });
-  tearDown(() => debugDesktopOverride = null);
+  tearDown(() {
+    debugDesktopOverride = null;
+    debugIosBrowserTabOverride = null;
+  });
 
   test('пароль при первом входе нужен только на компьютере', () {
     debugDesktopOverride = false;
     expect(passwordNeededToStart, isFalse);
     debugDesktopOverride = true;
     expect(passwordNeededToStart, isTrue);
+  });
+
+  test('вне браузера вкладки на iPhone не бывает', () {
+    debugDesktopOverride = false;
+    expect(iosBrowserTab, isFalse);
+    expect(spendIssuedPasswordHere, isTrue);
+  });
+
+  /// Сервер, который гасит выданный код, как настоящий.
+  FakeServer codeServer({int status = 200, bool hasPassword = false}) =>
+      FakeServer.routed((method, url, body) =>
+          url.path == '/api/account/code-used'
+              ? (
+                  status,
+                  status == 200
+                      ? jsonEncode(
+                          {'message': 'Success', 'has_password': hasPassword})
+                      : jsonEncode(
+                          {'message': 'Failure', 'error': 'password_required'})
+                )
+              : (404, '{}'));
+
+  group('вошли с выданным паролем', () {
+    setUp(() => FlutterSecureStorage.setMockInitialValues({'token': 't'}));
+
+    test('на телефоне и в браузере — гасим и пускаем без своего пароля',
+        () async {
+      debugDesktopOverride = false;
+      debugIosBrowserTabOverride = false;
+      final server = codeServer();
+      final ok = await HttpOverrides.runWithHttpOverrides(
+          settleIssuedPassword, server);
+      expect(ok, isTrue);
+      expect(server.requests, hasLength(1));
+      expect(OwnPassword.has.value, isFalse);
+    });
+
+    test('во вкладке на iPhone — пускаем, а код не гасим: им войдут со значка',
+        () async {
+      debugDesktopOverride = false;
+      debugIosBrowserTabOverride = true;
+      expect(spendIssuedPasswordHere, isFalse);
+      final server = codeServer();
+      final ok = await HttpOverrides.runWithHttpOverrides(
+          settleIssuedPassword, server);
+      expect(ok, isTrue);
+      expect(server.requests, isEmpty);
+      expect(OwnPassword.has.value, isTrue);
+    });
+
+    test('на компьютере — придумать пароль, сервер не трогаем', () async {
+      debugDesktopOverride = true;
+      final server = codeServer();
+      final ok = await HttpOverrides.runWithHttpOverrides(
+          settleIssuedPassword, server);
+      expect(ok, isFalse);
+      expect(server.requests, isEmpty);
+    });
+
+    test('сервер не согласился (admin) — придумать пароль, как прежде',
+        () async {
+      debugDesktopOverride = false;
+      debugIosBrowserTabOverride = false;
+      final server = codeServer(status: 403);
+      final ok = await HttpOverrides.runWithHttpOverrides(
+          settleIssuedPassword, server);
+      expect(ok, isFalse);
+      expect(OwnPassword.has.value, isTrue);
+    });
   });
 
   test('сервер погасил код — своего пароля нет', () async {

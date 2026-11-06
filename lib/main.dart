@@ -274,8 +274,9 @@ class MyApp extends StatelessWidget {
       await PayrollAccess.save(b['payroll'] == true);
       final manager = b['manager'];
       await ManagerAccess.save(manager is bool ? manager : null);
-      // Своего пароля нет у вошедшего с телефона по одноразовому коду:
-      // «Настройки» предлагают его задать. Старый сервер поля не шлёт.
+      // Своего пароля нет у вошедшего с телефона или из браузера по
+      // одноразовому коду: «Настройки» предлагают его задать. Старый сервер
+      // поля не шлёт.
       final hasPassword = b['has_password'];
       if (hasPassword is bool) await OwnPassword.save(hasPassword);
       return b['must_change_password'] == true;
