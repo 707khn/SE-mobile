@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../requests/telegram_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_version.dart';
 import '../utils/biometric.dart';
@@ -15,13 +16,15 @@ import '../utils/variables.dart';
 import 'about_screen.dart';
 import 'change_password_screen.dart';
 import 'pin_screen.dart';
+import 'telegram_screen.dart';
 
 /// «Настройки» — всё, что меняют под себя, на одном экране.
 ///
 /// Раньше оформление, язык, пароль, код и «О программе» лежали в боковом
 /// меню вперемешку с разделами приложения, и меню не помещалось на экран.
-/// Теперь там один пункт, а здесь — группы: внешний вид, безопасность,
-/// о приложении. Текущее значение видно справа, не открывая выбора.
+/// Теперь там один пункт, а здесь — группы: внешний вид, уведомления (в
+/// браузере), безопасность, о приложении. Текущее значение видно справа, не
+/// открывая выбора.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
 
@@ -40,10 +43,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _biometricAvailable = false;
   bool _biometricOn = false;
 
+  /// Уведомления в Telegram — в браузере, если сервер их умеет. null — не
+  /// предлагаем: не браузер, сервер старый или не ответил.
+  TelegramState? _telegram;
+
   @override
   void initState() {
     super.initState();
     _load();
+    if (telegramOffered) _loadTelegram();
+  }
+
+  Future<void> _loadTelegram() async {
+    try {
+      final state = await fetchTelegramState();
+      if (mounted) setState(() => _telegram = state);
+    } catch (_) {
+      // Не ответил — строки просто нет; остальные настройки работают.
+    }
   }
 
   Future<void> _load() async {
@@ -87,6 +104,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _langName(_lang),
             onTap: _pickLanguage,
           ),
+          // В браузере уведомлений на телефон нет — их присылает бот в
+          // Telegram. На Android есть пуш, и строки там нет.
+          if (_telegram?.enabled == true) ...[
+            _section('settings_notifications'.tr),
+            _tile(
+              icon: Icons.send_outlined,
+              label: 'tg_title'.tr,
+              value: _telegram!.linked ? 'tg_on'.tr : 'tg_off'.tr,
+              onTap: () async {
+                await Get.to(() => const TelegramScreen());
+                _loadTelegram();
+              },
+            ),
+          ],
           _section('settings_security'.tr),
           // Вошедший с телефона или из браузера по одноразовому коду своего
           // пароля не имеет: пароль ему нужен для входа с компьютера.

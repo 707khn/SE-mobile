@@ -220,6 +220,13 @@ class RolloutReport {
   String pushProblem = '';
   int pushDevices = 0;
   int pushPeople = 0;
+
+  /// Уведомления в Telegram (для веб-версии): включены ли (null — сервер
+  /// старый), бот, сколько человек подключили и что не так.
+  bool? telegramEnabled;
+  String telegramBot = '';
+  int telegramPeople = 0;
+  String telegramProblem = '';
 }
 
 List<MapEntry<String, int>> _days(dynamic raw) {
@@ -293,6 +300,13 @@ Future<RolloutReport> fetchRollout() async {
     report.pushProblem = (push['problem'] as String?) ?? '';
     report.pushDevices = (push['devices'] as num?)?.toInt() ?? 0;
     report.pushPeople = (push['people'] as num?)?.toInt() ?? 0;
+  }
+  final telegram = body['telegram'];
+  if (telegram is Map) {
+    report.telegramEnabled = telegram['enabled'] == true;
+    report.telegramBot = (telegram['bot'] as String?) ?? '';
+    report.telegramPeople = (telegram['people'] as num?)?.toInt() ?? 0;
+    report.telegramProblem = (telegram['problem'] as String?) ?? '';
   }
   return report;
 }
