@@ -31,7 +31,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _lang = Lang.ru;
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemePref.defaultMode();
   String _fullName = '';
   String _job = '';
 

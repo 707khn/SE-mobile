@@ -1,24 +1,38 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Выбор темы: следовать системе, всегда светлая, всегда тёмная.
 ///
-/// По умолчанию — как в телефоне. У большинства он и так переключается по
-/// расписанию, а кому надо иначе — есть пункт в боковом меню.
+/// Пока человек не выбрал сам, на телефоне и компьютере — как в системе: у
+/// большинства телефон и так переключается по расписанию. В браузере —
+/// светлая: веб-версию решено открывать светлой, какая бы тема ни стояла в
+/// системе. Выбор в «Настройках» хранится и перекрывает умолчание везде, в
+/// браузере тоже.
 class ThemePref {
   const ThemePref._();
 
   static const _key = 'themeMode';
 
-  static ThemeMode fromName(String? name) {
+  /// Тема, пока человек не выбрал сам. `web` — для проверок: в них
+  /// приложение не в браузере, а проверить нужно и браузерное умолчание.
+  static ThemeMode defaultMode({bool web = kIsWeb}) =>
+      web ? ThemeMode.light : ThemeMode.system;
+
+  /// «Как в системе» узнаётся по своему слову, а не уходит в умолчание: в
+  /// браузере умолчание — светлая, и сам выбравший системную тему иначе
+  /// получил бы светлую.
+  static ThemeMode fromName(String? name, {bool web = kIsWeb}) {
     switch (name) {
       case 'light':
         return ThemeMode.light;
       case 'dark':
         return ThemeMode.dark;
-      default:
+      case 'system':
         return ThemeMode.system;
+      default:
+        return defaultMode(web: web);
     }
   }
 
@@ -35,8 +49,8 @@ class ThemePref {
 
   /// Читается синхронно при сборке приложения, поэтому SharedPreferences
   /// должны быть уже подняты — main() делает это до runApp.
-  static ThemeMode read(SharedPreferences prefs) =>
-      fromName(prefs.getString(_key));
+  static ThemeMode read(SharedPreferences prefs, {bool web = kIsWeb}) =>
+      fromName(prefs.getString(_key), web: web);
 
   static Future<void> write(ThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
