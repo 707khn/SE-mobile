@@ -173,6 +173,27 @@ class _RolloutScreenState extends State<RolloutScreen> {
               '',
               muted: true),
       ],
+      if (r.telegramEnabled != null) ...[
+        SizedBox(height: Dimensions.height30 / 1.5),
+        _section('rollout_telegram'.tr),
+        if (r.telegramEnabled!) ...[
+          if (r.telegramBot.isNotEmpty)
+            _line('rollout_telegram_bot'.tr, r.telegramBot),
+          // Как и у телефонов: ноль здесь не «всё хорошо».
+          if (r.telegramPeople == 0)
+            _line('rollout_telegram_nobody'.tr, '', muted: true)
+          else
+            _line('rollout_telegram_people'.tr, '${r.telegramPeople}'),
+          if (r.telegramProblem.isNotEmpty)
+            _line(r.telegramProblem, '', muted: true),
+        ] else
+          _line(
+              r.telegramProblem.isEmpty
+                  ? 'rollout_telegram_off'.tr
+                  : r.telegramProblem,
+              '',
+              muted: true),
+      ],
       SizedBox(height: Dimensions.height30 / 1.5),
       _section('rollout_without_pass'.tr),
       if (r.withoutPass.isEmpty)

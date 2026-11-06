@@ -41,6 +41,7 @@ import it_assets
 import planned_outages
 import chat_link
 import reception
+import telegram_bot
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
 _ONE_DAY = timedelta(days=1)
@@ -182,11 +183,20 @@ def _push_to(employee_ids, title, body, data=None):
     Возвращает, скольким устройствам ушло. Молчит, если Firebase не настроен
     или ни у кого нет установленного приложения: уведомление — не повод
     ломать запрос, из-за которого оно отправляется.
+
+    Тем же, кто подключил Telegram, — туда же и то же самое
+    (telegram_bot.py): в веб-версии пуша нет, и для iPhone это единственный
+    путь. Здесь, а не у каждого повода отдельно: так в Telegram уходит ровно
+    то, что уходит пушем, — и ничего, что в пуш не пускают.
     """
-    if not _get_firebase():
-        return 0
     employee_ids = [e for e in set(employee_ids or []) if e]
     if not employee_ids:
+        return 0
+    try:
+        telegram_bot.deliver(employee_ids, title, body)
+    except Exception as e:
+        logging.warning('Уведомление в Telegram не поставлено: %s', e)
+    if not _get_firebase():
         return 0
 
     tokens = [t.token for t in FcmToken.query.filter(
@@ -318,8 +328,10 @@ _ANNOUNCEMENT_PUSH_TEXT = 'Новое объявление — откройте 
 
 
 def _push_to_everyone(title, body, data=None):
-    """Уведомление всем, у кого установлено приложение."""
-    return _push_to([t.employee_id for t in FcmToken.query.all()],
+    """Уведомление всем, у кого установлено приложение или подключён
+    Telegram."""
+    return _push_to([t.employee_id for t in FcmToken.query.all()]
+                    + telegram_bot.linked_employee_ids(),
                     title, body, data)
 
 
@@ -1460,6 +1472,9 @@ def reset_password(account, password_hash):
     account.failed_attempts = 0
     account.locked_until = None
     AuthToken.query.filter_by(employee_id=account.employee_id).delete()
+    # И Telegram отвязываем: подключить его мог тот, кто вошёл под чужим
+    # табельным, — уведомления этого человека шли бы ему и дальше.
+    telegram_bot.forget(account.employee_id)
 
 
 def _employee_names():
@@ -1946,6 +1961,7 @@ def create_app():
     it_assets.register(app, sys.modules[__name__])
     planned_outages.register(app, sys.modules[__name__])
     reception.register(app, sys.modules[__name__])
+    telegram_bot.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)
     def _unhandled(error):
@@ -3075,6 +3091,8 @@ def register_routes(app):
         account.is_active = active
         if not active:
             AuthToken.query.filter_by(employee_id=account.employee_id).delete()
+            # Уволенному уведомления предприятия в личный Telegram — незачем.
+            telegram_bot.forget(account.employee_id)
         db.session.commit()
         logging.info('Account %r %s by administrator', login,
                      'enabled' if active else 'disabled')
@@ -4468,6 +4486,9 @@ def register_routes(app):
             # Уведомления на телефоны: включены ли и сколько телефонов
             # привязано.
             'push': _push_state(),
+            # И в Telegram — для веб-версии: бот, сколько человек подключили
+            # и что не так.
+            'telegram': telegram_bot.state(),
         })
 
     @app.route('/api/admin/news/refresh', methods=['GET', 'POST'])
