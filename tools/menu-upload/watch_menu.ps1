@@ -30,10 +30,17 @@ function Write-Log($text) {
 }
 
 try {
+    . (Join-Path $scriptDir 'common.ps1')
+    # Windows 7 со встроенным PowerShell 2.0: перезапуск на .NET 4, где есть
+    # TLS 1.2. Копия запускается сама, эта — выходит.
+    $argLine = ''
+    if ($Announce) { $argLine = '-Announce' }
+    if ((Restart-OnNet4 $MyInvocation.MyCommand.Path $argLine -NoWait) -ne $null) { exit 0 }
+
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
-    Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    if (-not (Enable-Tls12)) { Write-Log 'TLS 1.2 недоступен на этом .NET' }
+    Write-Log "PowerShell $($PSVersionTable.PSVersion), .NET $($PSVersionTable.CLRVersion)"
 } catch {
     Write-Log "ОШИБКА запуска: $($_.Exception.Message)"
     exit 1
@@ -51,21 +58,7 @@ if (-not $createdNew) {
 # --- настройки -------------------------------------------------------------
 $settings = @{}
 try {
-    $settingsPath = Join-Path $scriptDir 'settings.txt'
-    if (-not (Test-Path $settingsPath)) {
-        throw "Не найден файл settings.txt рядом со скриптом."
-    }
-    foreach ($line in Get-Content $settingsPath -Encoding UTF8) {
-        $trimmed = $line.Trim()
-        if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
-        $parts = $trimmed -split '=', 2
-        if ($parts.Count -eq 2) { $settings[$parts[0].Trim()] = $parts[1].Trim() }
-    }
-    foreach ($key in 'server', 'login', 'password') {
-        if (-not $settings.ContainsKey($key) -or $settings[$key] -eq '') {
-            throw "В settings.txt не заполнено поле '$key'."
-        }
-    }
+    $settings = Read-Settings $scriptDir
 } catch {
     Write-Log "ОШИБКА настроек: $($_.Exception.Message)"
     [System.Windows.Forms.MessageBox]::Show(
@@ -74,13 +67,12 @@ try {
     exit 1
 }
 
-$script:watchDir =
-    if ($settings.ContainsKey('folder') -and $settings['folder'] -ne '' -and (Test-Path -LiteralPath $settings['folder'])) {
-        $settings['folder']
-    } else {
-        # С учётом OneDrive: рабочий стол может лежать не в профиле.
-        [Environment]::GetFolderPath('Desktop')
-    }
+if ($settings.ContainsKey('folder') -and $settings['folder'] -ne '' -and (Test-Path -LiteralPath $settings['folder'])) {
+    $script:watchDir = $settings['folder']
+} else {
+    # С учётом OneDrive: рабочий стол может лежать не в профиле.
+    $script:watchDir = [Environment]::GetFolderPath('Desktop')
+}
 Write-Log "запуск, слежу за папкой: $script:watchDir"
 
 # --- что уже отправлено ----------------------------------------------------
@@ -153,42 +145,32 @@ function Get-DateFromName($name) {
 
 # Возвращает @{ Ok; Status (0 — до сервера не достучались); Text }.
 function Send-Menu($path, $forceDate) {
-    $client = $null
     try {
         $url = $settings['server'].TrimEnd('/') + '/api/menu/import-excel'
-        $client = New-Object System.Net.Http.HttpClient
-        $client.Timeout = [TimeSpan]::FromSeconds(180)
-
-        $content = New-Object System.Net.Http.MultipartFormDataContent
-        $content.Add((New-Object System.Net.Http.StringContent($settings['login'])), 'login')
-        $content.Add((New-Object System.Net.Http.StringContent($settings['password'])), 'password')
+        $fields = @{ login = $settings['login']; password = $settings['password'] }
+        $dateNote = 'даты из файла'
         if ($forceDate) {
-            $content.Add((New-Object System.Net.Http.StringContent($forceDate.ToString('yyyy-MM-dd'))), 'force_date')
+            $fields['force_date'] = $forceDate.ToString('yyyy-MM-dd')
+            $dateNote = $forceDate.ToString('dd.MM.yyyy')
         }
-        $bytes = Read-Shared $path
-        $fileContent = New-Object System.Net.Http.ByteArrayContent -ArgumentList (, $bytes)
-        $fileContent.Headers.ContentType =
-            [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/octet-stream')
-        $content.Add($fileContent, 'file', [System.IO.Path]::GetFileName($path))
-
-        $dateNote = if ($forceDate) { $forceDate.ToString('dd.MM.yyyy') } else { 'даты из файла' }
         Write-Log "отправка $path на $url ($dateNote)"
-        $response = $client.PostAsync($url, $content).GetAwaiter().GetResult()
-        $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-        Write-Log "ответ $([int]$response.StatusCode): $body"
-
-        $parsed = $null
-        try { $parsed = $body | ConvertFrom-Json } catch { }
-        $text = if ($parsed -and $parsed.message) { [string]$parsed.message } else { $body }
-        return @{ Ok = $response.IsSuccessStatusCode; Status = [int]$response.StatusCode; Text = $text }
+        $bytes = Read-SharedBytes $path
+        $r = Send-Form $url $fields $path $bytes 180
+        Write-Log "ответ $($r.Status): $($r.Body)"
+        return $r
     } catch {
         # Настоящая причина сетевого сбоя лежит во вложенном исключении.
         $e = $_.Exception
-        while ($e.InnerException) { $e = $e.InnerException }
+        $network = $false
+        while ($e.InnerException) {
+            if ($e -is [System.Net.WebException]) { $network = $true }
+            $e = $e.InnerException
+        }
+        if ($e -is [System.Net.WebException]) { $network = $true }
         Write-Log "ОШИБКА отправки: $($e.GetType().FullName): $($e.Message)"
-        return @{ Ok = $false; Status = 0; Text = $e.Message }
-    } finally {
-        if ($client) { $client.Dispose() }
+        $text = $e.Message
+        if ($network) { $text += (Get-OldNetHint) }
+        return @{ Ok = $false; Status = 0; Text = $text }
     }
 }
 
@@ -207,7 +189,7 @@ function Send-File($file, $key) {
         return
     }
 
-    if ($r.Status -in 401, 403, 429) {
+    if (@(401, 403, 429) -contains $r.Status) {
         # Неверный пароль, чужой логин или вход уже закрыт. Дальше не шлём
         # ничего — ни этот файл, ни следующие: каждая попытка с неверным
         # паролем засчитывается как ошибка входа, после пяти сервер закрывает
@@ -239,20 +221,9 @@ function Send-File($file, $key) {
     }
 }
 
-# Технолог может держать файл открытым в Excel — читать его это не мешает,
-# поэтому открываем с разрешением чужой записи. Что 1С файл дописала, видно
-# по тому, что он две проверки подряд не меняется.
-function Read-Shared($path) {
-    $stream = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
-    try {
-        $buffer = New-Object System.IO.MemoryStream
-        $stream.CopyTo($buffer)
-        return , $buffer.ToArray()
-    } finally {
-        $stream.Close()
-    }
-}
-
+# Технолог может держать файл открытым в Excel — читать его это не мешает
+# (Read-SharedBytes в common.ps1). Что 1С файл дописала, видно по тому, что
+# он две проверки подряд не меняется.
 function Test-Readable($path) {
     try {
         $stream = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
@@ -267,10 +238,11 @@ function Find-NewFiles {
     if ($script:loginRefused) { return }
     if (-not (Test-Path -LiteralPath $script:watchDir)) { return }
     $today = (Get-Date).Date
-    $files = Get-ChildItem -LiteralPath $script:watchDir -File -ErrorAction SilentlyContinue |
+    $files = Get-ChildItem -LiteralPath $script:watchDir -ErrorAction SilentlyContinue |
         Where-Object {
+            -not $_.PSIsContainer -and
             $_.Name -match '^Меню' -and
-            $_.Extension -in '.xlsx', '.xlsm', '.xls' -and
+            @('.xlsx', '.xlsm', '.xls') -contains $_.Extension.ToLower() -and
             $_.LastWriteTime -ge $today
         }
     foreach ($file in $files) {

@@ -36,7 +36,8 @@ function Show-Message($text, $icon) {
 function Stop-Watcher {
     # Только свои процессы: чужие сеансы на этом компьютере не трогаем.
     $mine = [System.Diagnostics.Process]::GetCurrentProcess().SessionId
-    Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+    # Get-WmiObject, а не Get-CimInstance: того нет в PowerShell 2.0 (Windows 7).
+    Get-WmiObject Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -like '*watch_menu.ps1*' -and $_.SessionId -eq $mine } |
         ForEach-Object {
             Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
@@ -47,6 +48,7 @@ function Stop-Watcher {
 try {
     if ($Enable) {
         if (-not (Test-Path $watchScript)) { throw "Рядом нет файла watch_menu.ps1." }
+        if (-not (Test-Path (Join-Path $scriptDir 'common.ps1'))) { throw "Рядом нет файла common.ps1." }
         $settingsPath = Join-Path $scriptDir 'settings.txt'
         if (-not (Test-Path $settingsPath)) { throw "Рядом нет файла settings.txt." }
 
