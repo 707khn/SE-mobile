@@ -19,8 +19,9 @@ Future<void> confirmAndLogout(BuildContext context) async {
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text('log_out_title'.tr),
-      // Вошедший с телефона по коду своего пароля не имеет: выйдя, обратно
-      // он попадёт только по новому коду. Пусть знает это до, а не после.
+      // Вошедший с телефона или из браузера по коду своего пароля не имеет:
+      // выйдя, обратно он попадёт только по новому коду. Пусть знает это до,
+      // а не после.
       content: Text(OwnPassword.has.value
           ? 'log_out_confirm'.tr
           : '${'log_out_confirm'.tr}\n\n${'log_out_no_password'.tr}'),

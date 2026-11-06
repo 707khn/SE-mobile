@@ -9,7 +9,6 @@ import '../utils/colors.dart';
 import '../utils/desktop.dart';
 import '../utils/dimensions.dart';
 import '../utils/logout_helper.dart';
-import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import 'change_password_screen.dart';
 import 'home_shell.dart';
@@ -578,22 +577,22 @@ class _PinScreenState extends State<PinScreen> {
     final job = await secure.getJob() ?? widget.job;
 
     // Пароль выданный (у старых учёток — табельный номер), а человек уже
-    // вошёл. На телефоне выданный просто гасим: дальше вход по коду, свой
-    // пароль тут не нужен. Не вышло (нет связи, старый сервер) или это
-    // компьютер — спрашиваем новый здесь, а не на входе: на вход теперь
-    // попадают редко.
-    if (await secure.passwordExpired() &&
-        !passwordNeededToStart &&
-        await spendOneTimeCode()) {
-      await secure.clearPasswordExpired();
-    }
+    // вошёл. На телефоне и в браузере выданный просто гасим: дальше вход по
+    // коду, свой пароль тут не нужен. Не вышло (нет связи, старый сервер)
+    // или это компьютер — спрашиваем новый здесь, а не на входе: на вход
+    // теперь попадают редко.
     if (await secure.passwordExpired()) {
-      Get.offAll(() => ChangePasswordScreen(
-            fullName: fullName,
-            job: job,
-            currentPassword: '',
-          ));
-      return;
+      if (!await settleIssuedPassword()) {
+        Get.offAll(() => ChangePasswordScreen(
+              fullName: fullName,
+              job: job,
+              currentPassword: '',
+            ));
+        return;
+      }
+      // Во вкладке на iPhone выданный ещё жив, и при следующем запуске
+      // сервер скажет об этом снова — флаг встанет заново, а пустят так же.
+      await secure.clearPasswordExpired();
     }
     Get.offAll(() => HomeShell(fullName: fullName, job: job));
   }

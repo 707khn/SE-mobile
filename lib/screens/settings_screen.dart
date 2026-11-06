@@ -88,8 +88,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: _pickLanguage,
           ),
           _section('settings_security'.tr),
-          // Вошедший с телефона по одноразовому коду своего пароля не имеет:
-          // ему нужен пароль только для входа с компьютера или из браузера.
+          // Вошедший с телефона или из браузера по одноразовому коду своего
+          // пароля не имеет: пароль ему нужен для входа с компьютера.
           ValueListenableBuilder<bool>(
             valueListenable: OwnPassword.has,
             builder: (context, has, _) => _tile(

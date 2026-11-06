@@ -10,7 +10,6 @@ import '../utils/dimensions.dart';
 import '../utils/load_problem.dart';
 import '../widgets/load_error_view.dart';
 import '../utils/login_lock.dart';
-import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
 
@@ -95,14 +94,13 @@ Future<void> loginToAccount(
         token: body['token'] as String?,
       );
       // Выданный пароль (одноразовый код или, у старых учёток, табельный
-      // номер) знает не только владелец. На телефоне его просто гасим и
-      // сразу просим код из четырёх цифр: свой пароль тут не нужен. На
-      // компьютере и в браузере, или если сервер не согласился, — как
-      // прежде, сначала придумать пароль.
+      // номер) знает не только владелец. На телефоне и в браузере его просто
+      // гасим и сразу просим код из четырёх цифр: свой пароль тут не нужен
+      // (во вкладке на iPhone — не гасим, см. settleIssuedPassword). На
+      // компьютере, или если сервер не согласился, — как прежде, сначала
+      // придумать пароль.
       final mustChange = body['must_change_password'] == true;
-      if (mustChange && !passwordNeededToStart && await spendOneTimeCode()) {
-        await enterApp(fullName: body['full_name'], job: body['job']);
-      } else if (mustChange) {
+      if (mustChange && !await settleIssuedPassword()) {
         Get.to(() => ChangePasswordScreen(
               fullName: body['full_name'],
               job: body['job'],
