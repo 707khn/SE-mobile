@@ -21,8 +21,12 @@
 # Вход тот же, что в приложении: логин и пароль офис-менеджера. Сервер сам
 # проверит, что ей можно менять справочник.
 #
-# Файл сохранён в UTF-8 С BOM: Windows PowerShell 5.1 читает .ps1 без BOM
-# как ANSI, и кириллица ломается ещё на разборе скрипта.
+# Работает и на Windows 10 (PowerShell 5.1), и на Windows 7 со встроенным
+# PowerShell 2.0: отправка и разбор ответа — в common.ps1, без HttpClient и
+# ConvertFrom-Json, а на .NET 2.0 скрипт перезапускается на .NET 4.
+#
+# Файл сохранён в UTF-8 С BOM: Windows PowerShell читает .ps1 без BOM как
+# ANSI, и кириллица ломается ещё на разборе скрипта.
 
 param([switch]$Announce)
 
@@ -39,11 +43,17 @@ function Write-Log($text) {
 }
 
 try {
+    . (Join-Path $scriptDir 'common.ps1')
+    # Windows 7 со встроенным PowerShell 2.0: перезапуск на .NET 4, где есть
+    # TLS 1.2. Копия запускается сама, эта — выходит.
+    $argLine = ''
+    if ($Announce) { $argLine = '-Announce' }
+    if ((Restart-OnNet4 $MyInvocation.MyCommand.Path $argLine -NoWait) -ne $null) { exit 0 }
+
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
-    Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
-    Add-Type -AssemblyName System.IO.Compression -ErrorAction Stop
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    if (-not (Enable-Tls12)) { Write-Log 'TLS 1.2 недоступен на этом .NET' }
+    Write-Log "PowerShell $($PSVersionTable.PSVersion), .NET $($PSVersionTable.CLRVersion)"
 } catch {
     Write-Log "ОШИБКА запуска: $($_.Exception.Message)"
     exit 1
@@ -60,21 +70,7 @@ if (-not $createdNew) {
 # --- настройки -------------------------------------------------------------
 $settings = @{}
 try {
-    $settingsPath = Join-Path $scriptDir 'settings.txt'
-    if (-not (Test-Path $settingsPath)) {
-        throw "Не найден файл settings.txt рядом со скриптом."
-    }
-    foreach ($line in Get-Content $settingsPath -Encoding UTF8) {
-        $trimmed = $line.Trim()
-        if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
-        $parts = $trimmed -split '=', 2
-        if ($parts.Count -eq 2) { $settings[$parts[0].Trim()] = $parts[1].Trim() }
-    }
-    foreach ($key in 'server', 'login', 'password') {
-        if (-not $settings.ContainsKey($key) -or $settings[$key] -eq '') {
-            throw "В settings.txt не заполнено поле '$key'."
-        }
-    }
+    $settings = Read-Settings $scriptDir
 } catch {
     Write-Log "ОШИБКА настроек: $($_.Exception.Message)"
     [System.Windows.Forms.MessageBox]::Show(
@@ -122,7 +118,7 @@ function Set-Done($key, $result) {
     # Отказ сервера помним только до перезапуска: исправили пароль в
     # settings.txt, снова нажали «Включить автозагрузку» — и тот же файл
     # пробуется ещё раз.
-    if ($result -notin 'ok', 'declined', 'same') { return }
+    if (-not (@('ok', 'declined', 'same') -contains $result)) { return }
     try { Add-Content -Path $statePath -Value "$key`t$result" -Encoding UTF8 } catch { }
 }
 
@@ -131,6 +127,7 @@ $script:notDirectory = @{}
 $script:retryAt = @{}
 $script:attempts = @{}
 $script:busy = $false
+$script:loginRefused = $false   # сервер не принял логин — до перезапуска молчим
 
 # --- значок у часов ---------------------------------------------------------
 $script:tray = New-Object System.Windows.Forms.NotifyIcon
@@ -185,18 +182,8 @@ $exitItem.add_Click({
 $script:tray.ContextMenuStrip = $menu
 
 # --- чтение файла -----------------------------------------------------------
-# Файл может быть открыт в Excel — читать это не мешает.
-function Read-Shared($path) {
-    $stream = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
-    try {
-        $buffer = New-Object System.IO.MemoryStream
-        $stream.CopyTo($buffer)
-        return , $buffer.ToArray()
-    } finally {
-        $stream.Close()
-    }
-}
-
+# Файл может быть открыт в Excel — читать это не мешает (Read-SharedBytes в
+# common.ps1).
 function Test-Readable($path) {
     try {
         $stream = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
@@ -211,7 +198,17 @@ function Test-Readable($path) {
 # столбец с телефоном (внутренний или мобильный). Список сотрудников из
 # отдела кадров с ФИО и должностью, но без телефонов, сюда не попадёт.
 # Слова те же, что ищет сервер (parser_directory_excel.py).
+# Читать .xlsx (это zip) умеет только .NET 4.5. Если его нет, по содержимому
+# не судим: такой файл проверит сервер (dry_run), а «это не справочник» с
+# его стороны мы молча пропускаем, как и здесь.
+$script:canUnzip = $false
+try {
+    [void][Reflection.Assembly]::LoadWithPartialName('System.IO.Compression')
+    if ('System.IO.Compression.ZipArchive' -as [type]) { $script:canUnzip = $true }
+} catch { }
+
 function Test-Directory($bytes) {
+    if (-not $script:canUnzip) { return $true }
     $zip = $null
     try {
         $memory = New-Object System.IO.MemoryStream -ArgumentList (, $bytes)
@@ -225,7 +222,7 @@ function Test-Directory($bytes) {
         }
         # Excel пишет кириллицу как есть, а другие программы (openpyxl,
         # выгрузки из учётных систем) — ссылками вида &#1060;.
-        $text = [System.Net.WebUtility]::HtmlDecode($text)
+        try { $text = [System.Net.WebUtility]::HtmlDecode($text) } catch { }
         return ($text -match 'Ф\.?И\.?О') -and
                ($text -match 'Должност') -and
                ($text -match 'Вн[/. ]?(номер|№)|Внутрен|Мобильн|Сотов')
@@ -237,41 +234,59 @@ function Test-Directory($bytes) {
 }
 
 # --- сервер -----------------------------------------------------------------
-function Get-Json($body) {
-    try { return ($body | ConvertFrom-Json) } catch { return $null }
+# Поля ответа dry_run без ConvertFrom-Json (его нет в PowerShell 2.0). Ответ
+# сервера плоский: числа, true/false и списки строк, кириллица в \uXXXX.
+function Get-JsonNumber($body, $name) {
+    $m = [regex]::Match($body, '"' + $name + '"\s*:\s*(-?\d+)')
+    if ($m.Success) { return [int]$m.Groups[1].Value }
+    return 0
 }
 
-# Возвращает @{ Ok; Status (0 — до сервера не достучались); Text; Data }.
-function Send-Directory($client, $path, $bytes, [bool]$dryRun) {
-    $url = $settings['server'].TrimEnd('/') + '/api/directory/import-excel'
-    $content = New-Object System.Net.Http.MultipartFormDataContent
-    $content.Add((New-Object System.Net.Http.StringContent($settings['login'])), 'login')
-    $content.Add((New-Object System.Net.Http.StringContent($settings['password'])), 'password')
-    if ($dryRun) {
-        $content.Add((New-Object System.Net.Http.StringContent('1')), 'dry_run')
-    }
-    $fileContent = New-Object System.Net.Http.ByteArrayContent -ArgumentList (, $bytes)
-    $fileContent.Headers.ContentType =
-        [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/octet-stream')
-    $content.Add($fileContent, 'file', [System.IO.Path]::GetFileName($path))
+function Get-JsonBool($body, $name) {
+    return [regex]::IsMatch($body, '"' + $name + '"\s*:\s*true')
+}
 
-    $what = if ($dryRun) { 'проверка' } else { 'загрузка' }
+function Get-JsonStrings($body, $name) {
+    $list = @()
+    $m = [regex]::Match($body, '"' + $name + '"\s*:\s*\[((?:[^\]"]|"(?:[^"\\]|\\.)*")*)\]')
+    if (-not $m.Success) { return , $list }
+    foreach ($item in [regex]::Matches($m.Groups[1].Value, '"((?:[^"\\]|\\.)*)"')) {
+        try { $list += [regex]::Unescape($item.Groups[1].Value) } catch { $list += $item.Groups[1].Value }
+    }
+    return , $list
+}
+
+# Возвращает @{ Ok; Status (0 — до сервера не достучались); Text; Body }.
+function Send-Directory($path, $bytes, [bool]$dryRun) {
+    $url = $settings['server'].TrimEnd('/') + '/api/directory/import-excel'
+    $fields = @{ login = $settings['login']; password = $settings['password'] }
+    $what = 'загрузка'
+    if ($dryRun) {
+        $fields['dry_run'] = '1'
+        $what = 'проверка'
+    }
     Write-Log "$what $path"
     try {
-        $response = $client.PostAsync($url, $content).GetAwaiter().GetResult()
-        $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-        $parsed = Get-Json $body
-        $text = if ($parsed -and $parsed.message) { [string]$parsed.message } else { $body }
-        # Пароль в журнал не пишем; ответ сервера без него.
-        $logged = if ($dryRun -and $parsed) { "count=$($parsed.count) unchanged=$($parsed.unchanged)" } else { $text }
-        Write-Log "ответ $([int]$response.StatusCode): $logged"
-        return @{ Ok = $response.IsSuccessStatusCode; Status = [int]$response.StatusCode
-                  Text = $text; Data = $parsed }
+        $r = Send-Form $url $fields $path $bytes 180
+        # Пароль в журнал не пишем; в ответе сервера его нет.
+        if ($dryRun -and $r.Ok) {
+            Write-Log "ответ $($r.Status): записей $(Get-JsonNumber $r.Body 'count'), без изменений: $(Get-JsonBool $r.Body 'unchanged')"
+        } else {
+            Write-Log "ответ $($r.Status): $($r.Text)"
+        }
+        return $r
     } catch {
         $e = $_.Exception
-        while ($e.InnerException) { $e = $e.InnerException }
+        $network = $false
+        while ($e.InnerException) {
+            if ($e -is [System.Net.WebException]) { $network = $true }
+            $e = $e.InnerException
+        }
+        if ($e -is [System.Net.WebException]) { $network = $true }
         Write-Log "ОШИБКА связи: $($e.GetType().FullName): $($e.Message)"
-        return @{ Ok = $false; Status = 0; Text = $e.Message; Data = $null }
+        $text = $e.Message
+        if ($network) { $text += (Get-OldNetHint) }
+        return @{ Ok = $false; Status = 0; Text = $text; Body = '' }
     }
 }
 
@@ -282,87 +297,105 @@ function Format-Names($names) {
     return $text
 }
 
-function Format-Summary($data) {
-    $lines = @("В файле: $($data.count) записей, $($data.departments) подразделений " +
-               "(сейчас в приложении $($data.current_count)).")
-    $added = @($data.added)
-    $removed = @($data.removed)
+function Format-Summary($body) {
+    $lines = @("В файле: $(Get-JsonNumber $body 'count') записей, $(Get-JsonNumber $body 'departments') подразделений " +
+               "(сейчас в приложении $(Get-JsonNumber $body 'current_count')).")
+    $added = Get-JsonStrings $body 'added'
+    $removed = Get-JsonStrings $body 'removed'
+    $changed = Get-JsonNumber $body 'changed'
     if ($added.Count -gt 0) { $lines += "Новые ($($added.Count)): $(Format-Names $added)" }
     if ($removed.Count -gt 0) { $lines += "Пропадут ($($removed.Count)): $(Format-Names $removed)" }
-    if ([int]$data.changed -gt 0) { $lines += "Изменились номер, должность или отдел: $($data.changed)" }
+    if ($changed -gt 0) { $lines += "Изменились номер, должность или отдел: $changed" }
     return ($lines -join "`n")
 }
 
 # --- одна попытка над одним файлом -----------------------------------------
 function Send-File($file, $key, $bytes) {
-    $client = New-Object System.Net.Http.HttpClient
-    $client.Timeout = [TimeSpan]::FromSeconds(180)
-    try {
-        $r = Send-Directory $client $file.FullName $bytes $true
-        if ($r.Ok) {
-            if ($r.Data.unchanged) {
-                # Тот же справочник, что уже в приложении: пересохранили,
-                # переслали — тревожить не о чем.
-                Write-Log "не изменился, не загружаю: $($file.FullName)"
-                Set-Done $key 'same'
-                return
-            }
-            $summary = Format-Summary $r.Data
-            $shrinks = [int]$r.Data.current_count -gt 0 -and
-                       ([int]$r.Data.count * 2) -lt [int]$r.Data.current_count
-            if ($script:confirm -or $shrinks) {
-                $warning = ''
-                if ($shrinks) {
-                    $warning = "ВНИМАНИЕ: в файле вдвое меньше записей, чем сейчас в приложении. " +
-                               "Проверьте, тот ли это файл.`n`n"
-                }
-                $question = "Найден новый справочник:`n$($file.Name)`n`n$summary`n`n$warning" +
-                    "Загрузить в приложение? Справочник заменится целиком у всех сотрудников."
-                if (-not (Ask-YesNo $question)) {
-                    Write-Log "офис-менеджер отказалась загружать $($file.FullName)"
-                    Set-Done $key 'declined'
-                    Show-Note 'Справочник не загружен' "$($file.Name)`nВы нажали «Нет». Чтобы загрузить, сохраните файл заново или перетащите его на «Загрузить справочник»." 'Info'
-                    return
-                }
-            }
-            $r = Send-Directory $client $file.FullName $bytes $false
-            if ($r.Ok) {
-                Set-Done $key 'ok'
-                Show-Note 'Справочник загружен' $r.Text 'Info'
-                return
-            }
-        }
-
-        if ($r.Status -ge 400 -and $r.Status -lt 500) {
-            # Неверный пароль, нет прав, файл не разобрался — повтор не
-            # поможет, а повтор с неверным паролем ещё и закроет вход.
-            Set-Done $key 'failed'
-            Show-Note 'Справочник НЕ загружен' "$($file.Name)`n$($r.Text)`nЕсли дело в settings.txt — исправьте его и снова запустите «Включить автозагрузку»." 'Error'
+    $r = Send-Directory $file.FullName $bytes $true
+    if ($r.Ok) {
+        if (Get-JsonBool $r.Body 'unchanged') {
+            # Тот же справочник, что уже в приложении: пересохранили,
+            # переслали — тревожить не о чем.
+            Write-Log "не изменился, не загружаю: $($file.FullName)"
+            Set-Done $key 'same'
             return
         }
-
-        # Нет связи или сервер перезапускается — пробуем ещё, всё реже.
-        $n = 1 + [int]$script:attempts[$key]
-        $script:attempts[$key] = $n
-        $delays = 1, 2, 5, 10, 15
-        $minutes = $delays[[Math]::Min($n - 1, $delays.Count - 1)]
-        $script:retryAt[$key] = (Get-Date).AddMinutes($minutes)
-        Write-Log "не удалось ($n-й раз), повтор через $minutes мин."
-        if ($n -eq 1) {
-            Show-Note 'Справочник пока не загружен' "Нет связи с сервером: $($r.Text)`nПопробую ещё раз сам." 'Warning'
+        $summary = Format-Summary $r.Body
+        $count = Get-JsonNumber $r.Body 'count'
+        $current = Get-JsonNumber $r.Body 'current_count'
+        $shrinks = ($current -gt 0) -and (($count * 2) -lt $current)
+        if ($script:confirm -or $shrinks) {
+            $warning = ''
+            if ($shrinks) {
+                $warning = "ВНИМАНИЕ: в файле вдвое меньше записей, чем сейчас в приложении. " +
+                           "Проверьте, тот ли это файл.`n`n"
+            }
+            $question = "Найден новый справочник:`n$($file.Name)`n`n$summary`n`n$warning" +
+                "Загрузить в приложение? Справочник заменится целиком у всех сотрудников."
+            if (-not (Ask-YesNo $question)) {
+                Write-Log "офис-менеджер отказалась загружать $($file.FullName)"
+                Set-Done $key 'declined'
+                Show-Note 'Справочник не загружен' "$($file.Name)`nВы нажали «Нет». Чтобы загрузить, сохраните файл заново или перетащите его на «Загрузить справочник»." 'Info'
+                return
+            }
         }
-    } finally {
-        $client.Dispose()
+        $r = Send-Directory $file.FullName $bytes $false
+        if ($r.Ok) {
+            Set-Done $key 'ok'
+            Show-Note 'Справочник загружен' $r.Text 'Info'
+            return
+        }
+    }
+
+    if (@(401, 403, 429) -contains $r.Status) {
+        # Неверный пароль, чужой логин или вход уже закрыт. Дальше не шлём
+        # ничего — ни этот файл, ни следующие: каждая попытка с неверным
+        # паролем засчитывается как ошибка входа, после пяти сервер закрывает
+        # вход, и каждая новая удваивает замок. Под ним оказалась бы и сама
+        # офис-менеджер в приложении. Снова пробуем только после перезапуска,
+        # то есть после того, как settings.txt поправили.
+        $script:loginRefused = $true
+        Write-Log "вход не принят ($($r.Status)), автозагрузка остановлена до перезапуска"
+        Show-Note 'Справочник НЕ загружен' "$($r.Text)`nАвтозагрузка остановлена. Проверьте логин и пароль в settings.txt и снова запустите «Включить автозагрузку»." 'Error'
+        return
+    }
+
+    if ($r.Status -eq 422) {
+        # Сервер не нашёл в файле справочника. Обычно это просто другая
+        # таблица — особенно там, где файл не проверить самим (нет .NET 4.5).
+        Write-Log "сервер: не справочник — $($file.FullName): $($r.Text)"
+        $script:notDirectory[$key] = $true
+        return
+    }
+
+    if ($r.Status -ge 400 -and $r.Status -lt 500) {
+        # Не тот формат и т. п. — повтор этого же файла не поможет.
+        Set-Done $key 'failed'
+        Show-Note 'Справочник НЕ загружен' "$($file.Name)`n$($r.Text)" 'Error'
+        return
+    }
+
+    # Нет связи или сервер перезапускается — пробуем ещё, всё реже.
+    $n = 1 + [int]$script:attempts[$key]
+    $script:attempts[$key] = $n
+    $delays = 1, 2, 5, 10, 15
+    $minutes = $delays[[Math]::Min($n - 1, $delays.Count - 1)]
+    $script:retryAt[$key] = (Get-Date).AddMinutes($minutes)
+    Write-Log "не удалось ($n-й раз), повтор через $minutes мин."
+    if ($n -eq 1) {
+        Show-Note 'Справочник пока не загружен' "Нет связи с сервером: $($r.Text)`nПопробую ещё раз сам." 'Warning'
     }
 }
 
 function Find-NewFiles {
+    if ($script:loginRefused) { return }
     $today = (Get-Date).Date
     foreach ($dir in $script:watchDirs) {
         if (-not (Test-Path -LiteralPath $dir)) { continue }
-        $files = Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue |
+        $files = Get-ChildItem -LiteralPath $dir -ErrorAction SilentlyContinue |
             Where-Object {
-                $_.Extension -in '.xlsx', '.xlsm' -and
+                -not $_.PSIsContainer -and
+                @('.xlsx', '.xlsm') -contains $_.Extension.ToLower() -and
                 -not $_.Name.StartsWith('~$') -and
                 $_.Length -gt 0 -and
                 $_.LastWriteTime -ge $today
@@ -379,13 +412,14 @@ function Find-NewFiles {
                 continue
             }
             if (-not (Test-Readable $file.FullName)) { continue }
-            $bytes = Read-Shared $file.FullName
+            $bytes = Read-SharedBytes $file.FullName
             if (-not (Test-Directory $bytes)) {
                 $script:notDirectory[$key] = $true
                 continue
             }
             Write-Log "найден файл справочника: $($file.FullName)"
             Send-File $file $key $bytes
+            if ($script:loginRefused) { return }
         }
     }
 }
