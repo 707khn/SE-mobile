@@ -28,7 +28,6 @@ const Map<String, String> payslipUploadStringsKk = {
   'psu_done_hint': 'Қызметкерлер хабарлама алады',
   'psu_again': 'Тағы бір файл жүктеу',
   'psu_too_big': 'Файл тым үлкен. ОИТиС-ке хабарласыңыз.',
-  'drawer_payroll': 'Есеп тобы',
   'admin_access': 'Қолжетімділік',
   'admin_payroll': 'Есеп тобы',
   'admin_payroll_hint':
@@ -93,7 +92,6 @@ const Map<String, String> payslipUploadStringsRu = {
   'psu_done_hint': 'Сотрудникам отправлены уведомления',
   'psu_again': 'Загрузить ещё файл',
   'psu_too_big': 'Файл слишком большой. Обратитесь в ОИТиС.',
-  'drawer_payroll': 'Расчётная группа',
   'admin_access': 'Доступ',
   'admin_payroll': 'Расчётная группа',
   'admin_payroll_hint':
