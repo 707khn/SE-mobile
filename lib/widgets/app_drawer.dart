@@ -129,12 +129,20 @@ class _AppDrawerState extends State<AppDrawer> {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.only(top: 8, bottom: 8),
+              // Пункты разбиты на группы тонкой чертой, без заголовков:
+              // подписи «Руководителю», «Предприятие», «Мои дела» занимали
+              // место и не помогали найти пункт — «Заявки в ОИТиС» стояли в
+              // одной группе, а «Техника и отключения» в другой. Теперь
+              // рядом стоит то, что по смыслу вместе, а сверху — то, куда
+              // заходят чаще.
               children: [
-                // Разделы приложения — первыми и без заголовка: за ними в
-                // меню и приходят. У администратора нижней панели нет, у
-                // него на этом месте свои экраны.
+                // Разделы приложения — первыми: за ними в меню и приходят.
+                // Порядок — как на нижней панели телефона. Пункты начальника
+                // и расчётной группы — сразу под своим разделом: проходы
+                // отдела под своими проходами, листки всех под своим листком.
+                // У администратора нижней панели нет, у него на этом месте
+                // свои экраны.
                 if (_isAdmin) ...[
-                  _section('drawer_admin'.tr),
                   _item(
                     icon: Icons.admin_panel_settings_outlined,
                     label: 'admin_panel'.tr,
@@ -146,6 +154,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     label: 'canteen_menu'.tr,
                     onTap: () => Get.to(() => MenuScreen(job: _job)),
                   ),
+                  if (_uploadsPayslips) _payslipsAdminItem(),
                 ] else ...[
                   _item(
                     icon: Icons.home_outlined,
@@ -159,12 +168,20 @@ class _AppDrawerState extends State<AppDrawer> {
                     index: 1,
                     onTap: () => _goToTab(1),
                   ),
+                  if (isManager(_job))
+                    _item(
+                      icon: Icons.groups_outlined,
+                      label: 'drawer_staff_report'.tr,
+                      onTap: () => Get.to(
+                          () => MainPage2(fullName: _fullName, job: _job)),
+                    ),
                   _item(
                     icon: Icons.receipt_long_outlined,
                     label: 'tab_payslip'.tr,
                     index: 2,
                     onTap: () => _goToTab(2),
                   ),
+                  if (_uploadsPayslips) _payslipsAdminItem(),
                   _item(
                     icon: Icons.beach_access_outlined,
                     label: 'tab_leave'.tr,
@@ -184,56 +201,14 @@ class _AppDrawerState extends State<AppDrawer> {
                       index: ChatBridge.tabIndex,
                       onTap: () => _goToTab(ChatBridge.tabIndex),
                     ),
-                  if (isManager(_job)) ...[
-                    _section('drawer_manager'.tr),
-                    _item(
-                      icon: Icons.groups_outlined,
-                      label: 'drawer_staff_report'.tr,
-                      onTap: () => Get.to(
-                          () => MainPage2(fullName: _fullName, job: _job)),
-                    ),
-                  ],
                 ],
-                // Листки из 1С загружают с компьютера бухгалтерии: файл
-                // сохраняется там, и на телефоне его нет.
-                if (isDesktop && canUploadPayslips(_job)) ...[
-                  _section('drawer_payroll'.tr),
-                  _item(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'psa_title'.tr,
-                    onTap: () => Get.to(() => const PayslipsAdminScreen()),
-                  ),
-                ],
-                // Разделы предприятия и свои дела — двумя группами, внутри
-                // группы по русскому алфавиту, чтобы пункт был на одном и том же
-                // месте. Прежде «Медосмотры» и «Приём» стояли за чертой
-                // вместе с «Настройками», будто это тоже настройки.
-                _section('drawer_company'.tr),
-                _item(
-                  icon: Icons.campaign_outlined,
-                  label: 'news'.tr,
-                  onTap: () => Get.to(() => NewsScreen(job: _job)),
-                ),
-                _item(
-                  icon: Icons.contact_phone_outlined,
-                  label: 'directory'.tr,
-                  onTap: () => Get.to(() => const DirectoryScreen()),
-                ),
-                _item(
-                  icon: Icons.devices_outlined,
-                  label: 'ta_title'.tr,
-                  onTap: () => Get.to(() => const TechScreen()),
-                ),
-                _section('drawer_mine'.tr),
+                // Свои дела по работе: что поручили, куда ехать, когда к
+                // врачу.
+                _groupBreak(),
                 _item(
                   icon: Icons.task_alt,
                   label: 'asg_title'.tr,
                   onTap: () => Get.to(() => const AssignmentsScreen()),
-                ),
-                _item(
-                  icon: Icons.support_agent_outlined,
-                  label: 'it_title'.tr,
-                  onTap: () => Get.to(() => const ItRequestsScreen()),
                 ),
                 _item(
                   icon: Icons.flight_takeoff,
@@ -245,9 +220,31 @@ class _AppDrawerState extends State<AppDrawer> {
                   label: 'md_title'.tr,
                   onTap: () => Get.to(() => const MedicalScreen()),
                 ),
-                const SizedBox(height: 8),
-                const Divider(height: 1, indent: 28, endIndent: 28),
-                const SizedBox(height: 8),
+                // Что происходит на заводе и как кого найти.
+                _groupBreak(),
+                _item(
+                  icon: Icons.campaign_outlined,
+                  label: 'news'.tr,
+                  onTap: () => Get.to(() => NewsScreen(job: _job)),
+                ),
+                _item(
+                  icon: Icons.contact_phone_outlined,
+                  label: 'directory'.tr,
+                  onTap: () => Get.to(() => const DirectoryScreen()),
+                ),
+                // Всё, что к ОИТиС: заявка, своя техника, отключения.
+                _groupBreak(),
+                _item(
+                  icon: Icons.support_agent_outlined,
+                  label: 'it_title'.tr,
+                  onTap: () => Get.to(() => const ItRequestsScreen()),
+                ),
+                _item(
+                  icon: Icons.devices_outlined,
+                  label: 'ta_title'.tr,
+                  onTap: () => Get.to(() => const TechScreen()),
+                ),
+                _groupBreak(),
                 // Оформление, язык, пароль, код и «О программе» — на своём
                 // экране: в меню они занимали половину списка.
                 _item(
@@ -282,21 +279,21 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
-  /// Подзаголовок группы пунктов.
-  Widget _section(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 18, 20, 6),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.8,
-          color: context.mutedColor,
-        ),
-      ),
-    );
-  }
+  /// Черта между группами пунктов.
+  Widget _groupBreak() => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Divider(height: 1, indent: 28, endIndent: 28),
+      );
+
+  /// Листки из 1С загружают с компьютера бухгалтерии: файл сохраняется там,
+  /// и на телефоне его нет.
+  bool get _uploadsPayslips => isDesktop && canUploadPayslips(_job);
+
+  Widget _payslipsAdminItem() => _item(
+        icon: Icons.upload_file_outlined,
+        label: 'psa_title'.tr,
+        onTap: () => Get.to(() => const PayslipsAdminScreen()),
+      );
 
   /// Версия сборки внизу меню: в поддержке первым делом спрашивают её.
   /// По нажатию копируется, чтобы не переписывать вручную.
