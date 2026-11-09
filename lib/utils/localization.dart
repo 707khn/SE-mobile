@@ -8,7 +8,6 @@ import 'localization_assign.dart';
 import 'localization_trip.dart';
 import 'localization_medical.dart';
 import 'localization_tech.dart';
-import 'localization_reception.dart';
 import 'localization_telegram.dart';
 
 class LocaleString extends Translations {
@@ -22,7 +21,6 @@ class LocaleString extends Translations {
           ...businessTripStringsKk,
           ...medicalStringsKk,
           ...techStringsKk,
-          ...receptionStringsKk,
           ...telegramStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
@@ -422,7 +420,6 @@ class LocaleString extends Translations {
           ...businessTripStringsRu,
           ...medicalStringsRu,
           ...techStringsRu,
-          ...receptionStringsRu,
           ...telegramStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',

@@ -11,7 +11,6 @@ import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
 import '../screens/assignments_screen.dart';
 import '../screens/tech_screen.dart';
-import '../screens/reception_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/payslips_admin_screen.dart';
 import '../screens/main_screen_2.dart';
@@ -251,11 +250,6 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.health_and_safety_outlined,
                   label: 'md_title'.tr,
                   onTap: () => Get.to(() => const MedicalScreen()),
-                ),
-                _item(
-                  icon: Icons.event_seat_outlined,
-                  label: 'rc_title'.tr,
-                  onTap: () => Get.to(() => const ReceptionScreen()),
                 ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
