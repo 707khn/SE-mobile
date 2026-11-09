@@ -8,7 +8,6 @@ import 'localization_assign.dart';
 import 'localization_trip.dart';
 import 'localization_medical.dart';
 import 'localization_tech.dart';
-import 'localization_reception.dart';
 import 'localization_telegram.dart';
 
 class LocaleString extends Translations {
@@ -22,7 +21,6 @@ class LocaleString extends Translations {
           ...businessTripStringsKk,
           ...medicalStringsKk,
           ...techStringsKk,
-          ...receptionStringsKk,
           ...telegramStringsKk,
           'send report exc': 'Есепті Excel бағдарламасына жүктеңіз',
           'send report csv': 'CSV форматындағы ақырғы файлды көру',
@@ -324,12 +322,10 @@ class LocaleString extends Translations {
           'loaded_until': 'Өтулер @date-ке дейін жүктелген',
           'select_employee_hint': 'Есеп алу үшін қызметкерді таңдаңыз',
           'upcoming_leave': 'Жоспарланған демалыс',
-          'attendance': 'Қатысу статистикасы',
           'attendance_date': 'Күнді таңдаңыз',
           'attendance_in': 'Кіру',
           'attendance_out': 'Шығу',
           'no_attendance_data': 'Бұл күн үшін деректер жоқ',
-          'attendance_subtitle': 'Қызметкерлердің өтуі',
           'canteen_menu': 'Асхана мәзірі',
           'menu_for_today': 'Бүгінгі мәзір',
           'no_menu_today': 'Бүгінгі мәзір қосылмаған',
@@ -422,7 +418,6 @@ class LocaleString extends Translations {
           ...businessTripStringsRu,
           ...medicalStringsRu,
           ...techStringsRu,
-          ...receptionStringsRu,
           ...telegramStringsRu,
           'send report exc': 'Отправить отчёт Excel',
           'send report csv': 'Отправить отчёт CSV',
@@ -727,12 +722,10 @@ class LocaleString extends Translations {
           'loaded_until': 'Проходы загружены по @date',
           'select_employee_hint': 'Добавьте сотрудника для просмотра отчёта',
           'upcoming_leave': 'Предстоящий отпуск',
-          'attendance': 'Статистика посещаемости',
           'attendance_date': 'Выберите дату',
           'attendance_in': 'Вход',
           'attendance_out': 'Выход',
           'no_attendance_data': 'Нет данных за этот день',
-          'attendance_subtitle': 'Проходы сотрудников',
           'canteen_menu': 'Меню столовой',
           'menu_for_today': 'Меню на сегодня',
           'no_menu_today': 'Меню на сегодня не добавлено',

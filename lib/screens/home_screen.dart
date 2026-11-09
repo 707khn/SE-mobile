@@ -20,7 +20,6 @@ import '../widgets/app_drawer.dart';
 import '../widgets/motion.dart';
 import '../widgets/notification_bell.dart';
 import 'admin_panel_screen.dart';
-import 'attendance_screen.dart';
 import 'it_requests_screen.dart';
 import 'assignments_screen.dart';
 import 'menu_screen.dart';
@@ -311,13 +310,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             fullName: widget.fullName,
                             job: widget.job,
                           )),
-                    ),
-                    _buildActionCard(
-                      icon: Icons.badge_outlined,
-                      label: 'attendance'.tr,
-                      subtitle: 'attendance_subtitle'.tr,
-                      color: const Color(0xFF00695C),
-                      onTap: () => Get.to(() => const AttendanceScreen()),
                     ),
                   ],
                 ]),

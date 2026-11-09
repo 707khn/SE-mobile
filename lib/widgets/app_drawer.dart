@@ -5,13 +5,11 @@ import '../chat/chat_bridge.dart';
 import '../chat/chat_config.dart';
 
 import '../screens/admin_panel_screen.dart';
-import '../screens/attendance_screen.dart';
 import '../screens/business_trips_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
 import '../screens/assignments_screen.dart';
 import '../screens/tech_screen.dart';
-import '../screens/reception_screen.dart';
 import '../screens/news_screen.dart';
 import '../screens/payslips_admin_screen.dart';
 import '../screens/main_screen_2.dart';
@@ -194,11 +192,6 @@ class _AppDrawerState extends State<AppDrawer> {
                       onTap: () => Get.to(
                           () => MainPage2(fullName: _fullName, job: _job)),
                     ),
-                    _item(
-                      icon: Icons.insights_outlined,
-                      label: 'attendance'.tr,
-                      onTap: () => Get.to(() => const AttendanceScreen()),
-                    ),
                   ],
                 ],
                 // Листки из 1С загружают с компьютера бухгалтерии: файл
@@ -251,11 +244,6 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.health_and_safety_outlined,
                   label: 'md_title'.tr,
                   onTap: () => Get.to(() => const MedicalScreen()),
-                ),
-                _item(
-                  icon: Icons.event_seat_outlined,
-                  label: 'rc_title'.tr,
-                  onTap: () => Get.to(() => const ReceptionScreen()),
                 ),
                 const SizedBox(height: 8),
                 const Divider(height: 1, indent: 28, endIndent: 28),
