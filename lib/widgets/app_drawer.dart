@@ -5,7 +5,6 @@ import '../chat/chat_bridge.dart';
 import '../chat/chat_config.dart';
 
 import '../screens/admin_panel_screen.dart';
-import '../screens/attendance_screen.dart';
 import '../screens/business_trips_screen.dart';
 import '../screens/directory_screen.dart';
 import '../screens/it_requests_screen.dart';
@@ -192,11 +191,6 @@ class _AppDrawerState extends State<AppDrawer> {
                       label: 'drawer_staff_report'.tr,
                       onTap: () => Get.to(
                           () => MainPage2(fullName: _fullName, job: _job)),
-                    ),
-                    _item(
-                      icon: Icons.insights_outlined,
-                      label: 'attendance'.tr,
-                      onTap: () => Get.to(() => const AttendanceScreen()),
                     ),
                   ],
                 ],

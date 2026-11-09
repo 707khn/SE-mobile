@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:se_mobile/screens/attendance_screen.dart';
 import 'package:se_mobile/screens/menu_screen.dart';
 import 'package:se_mobile/utils/lang.dart';
 import 'package:se_mobile/utils/localization.dart';
@@ -18,7 +17,7 @@ import 'support/fake_server.dart';
 ///
 /// Стрелки работают и пока день грузится. В столовой, где связь то есть, то
 /// нет, ответ за среду мог прийти позже ответа за четверг — и под
-/// «четвергом» стояло меню среды. Табель проходов — так же.
+/// «четвергом» стояло меню среды.
 void main() {
   String day(int back) => DateFormat('yyyy-MM-dd')
       .format(DateTime.now().subtract(Duration(days: back)));
@@ -78,58 +77,5 @@ void main() {
             }));
     expect(find.text('Суп ${day(2)}'), findsOneWidget);
     expect(find.text('Суп ${day(1)}'), findsNothing);
-  });
-
-  testWidgets('табель: под днём — проходы этого дня', (tester) async {
-    await twoDaysBack(
-        tester,
-        const AttendanceScreen(),
-        server((date) => {
-              'message': 'Success',
-              'date': date,
-              'events': [
-                {
-                  'employee_id': 'TEST0001',
-                  'full_name': 'Тестов $date',
-                  'direction': 'in',
-                  'timestamp': '${date}T08:01:00',
-                },
-              ],
-            }));
-    expect(find.text('Тестов ${day(2)}'), findsOneWidget);
-    expect(find.text('Тестов ${day(1)}'), findsNothing);
-  });
-
-  testWidgets('табель: ФИО с двойным пробелом — строка на месте',
-      (tester) async {
-    // На пустом «слове» между двумя пробелами строка табеля падала.
-    await tester.runAsync(Lang.initDates);
-    SharedPreferences.setMockInitialValues({});
-    FlutterSecureStorage.setMockInitialValues({});
-    final fake = FakeServer.routed((method, url, body) => (
-          200,
-          jsonEncode({
-            'message': 'Success',
-            'events': [
-              {
-                'employee_id': 'TEST0001',
-                'full_name': 'Тестов  Аман',
-                'direction': 'in',
-                'timestamp': '2031-05-06T08:01:00',
-              },
-            ],
-          })
-        ));
-    await HttpOverrides.runWithHttpOverrides(() async {
-      await tester.pumpWidget(GetMaterialApp(
-        translations: LocaleString(),
-        locale: const Locale('ru'),
-        home: const AttendanceScreen(),
-      ));
-      await settle(tester);
-    }, fake);
-    expect(tester.takeException(), isNull);
-    expect(find.text('Тестов  Аман'), findsOneWidget);
-    expect(find.text('ТА'), findsOneWidget);
   });
 }
