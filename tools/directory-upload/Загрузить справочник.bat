@@ -3,7 +3,7 @@ rem Drag the directory spreadsheet onto this file, or just double-click it.
 rem Comments are in English on purpose: cmd reads .bat in the OEM codepage
 rem and Cyrillic here would come out garbled.
 setlocal
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0upload_directory.ps1" "%~1"
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0upload_directory.ps1" "%~1"
 if errorlevel 1 (
   echo.
   echo ---------------------------------------------

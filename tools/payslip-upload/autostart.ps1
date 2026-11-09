@@ -36,7 +36,8 @@ function Show-Message($text, $icon) {
 function Stop-Watcher {
     # Только свои процессы: чужие сеансы на этом компьютере не трогаем.
     $mine = [System.Diagnostics.Process]::GetCurrentProcess().SessionId
-    Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+    # Get-WmiObject, а не Get-CimInstance: того нет в PowerShell 2.0 (Windows 7).
+    Get-WmiObject Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -like '*watch_payslips.ps1*' -and $_.SessionId -eq $mine } |
         ForEach-Object {
             Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
@@ -47,6 +48,7 @@ function Stop-Watcher {
 try {
     if ($Enable) {
         if (-not (Test-Path $watchScript)) { throw "Рядом нет файла watch_payslips.ps1." }
+        if (-not (Test-Path (Join-Path $scriptDir 'common.ps1'))) { throw "Рядом нет файла common.ps1." }
         $settingsPath = Join-Path $scriptDir 'settings.txt'
         if (-not (Test-Path $settingsPath)) { throw "Рядом нет файла settings.txt." }
 
@@ -67,8 +69,8 @@ try {
         Write-Log 'слежение запущено'
 
         Show-Message ("Автозагрузка расчётных листков включена." + [Environment]::NewLine + [Environment]::NewLine +
-            "Теперь достаточно сохранить отчёт «Расчетный листок» из 1С в Excel на рабочий стол " +
-            "или в «Документы». Через несколько секунд программа покажет, что в файле, и спросит, " +
+            "Теперь достаточно сохранить отчёт «Расчетный листок» из 1С в Excel в папку " +
+            "«Документы\Расчетные листы» или скопировать его туда. Через несколько секунд программа покажет, что в файле, и спросит, " +
             "отправлять ли листки сотрудникам." +
             [Environment]::NewLine + [Environment]::NewLine +
             "Слежение запускается само при каждом входе в Windows.") 'Information'

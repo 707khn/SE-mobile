@@ -30,51 +30,41 @@ function Show-Message($text, $title, $icon) {
     }
 }
 
+# Всё в одном try: при сбое до окна выбора ошибку всё равно есть чем показать.
 try {
-    Write-Log "--- запуск, аргумент: '$FilePath' ---"
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    . (Join-Path $scriptDir 'common.ps1')
+
+    # Windows 7 со встроенным PowerShell 2.0 работает на .NET 2.0, где нет
+    # TLS 1.2. Если новый .NET установлен — перезапускаемся на нём.
+    $argLine = ''
+    if ($FilePath) { $argLine = "-FilePath `"$FilePath`"" }
+    $code = Restart-OnNet4 $MyInvocation.MyCommand.Path $argLine
+    if ($code -ne $null) { exit $code }
+
+    Write-Log "--- запуск, аргумент: '$FilePath', PowerShell $($PSVersionTable.PSVersion), .NET $($PSVersionTable.CLRVersion) ---"
 
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
-    Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
-
-    # .NET Framework по умолчанию может брать TLS 1.0, а сервер принимает 1.2.
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    if (-not (Enable-Tls12)) { Write-Log 'TLS 1.2 недоступен на этом .NET' }
 
     # --- настройки ---------------------------------------------------------
-    $settingsPath = Join-Path $scriptDir 'settings.txt'
-    if (-not (Test-Path $settingsPath)) {
-        throw "Не найден файл settings.txt рядом со скриптом."
-    }
-
-    $settings = @{}
-    foreach ($line in Get-Content $settingsPath) {
-        $trimmed = $line.Trim()
-        if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
-        $parts = $trimmed -split '=', 2
-        if ($parts.Count -eq 2) { $settings[$parts[0].Trim()] = $parts[1].Trim() }
-    }
-    foreach ($key in 'server', 'login', 'password') {
-        if (-not $settings.ContainsKey($key) -or $settings[$key] -eq '') {
-            throw "В settings.txt не заполнено поле '$key'."
-        }
-    }
+    $settings = Read-Settings $scriptDir
     Write-Log "сервер: $($settings['server']), логин: $($settings['login'])"
 
     # --- выбор файла -------------------------------------------------------
-    if ([string]::IsNullOrWhiteSpace($FilePath)) {
+    if (-not $FilePath -or $FilePath.Trim() -eq '') {
         $dialog = New-Object System.Windows.Forms.OpenFileDialog
         $dialog.Title = 'Выберите файл справочника'
-        $dialog.Filter = 'Excel (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls'
+        $dialog.Filter = 'Excel (*.xlsx;*.xlsm)|*.xlsx;*.xlsm'
         # В folder может быть несколько папок через «;» — для автозагрузки.
         # Окно выбора открываем в первой.
-        $firstFolder = if ($settings.ContainsKey('folder')) { ($settings['folder'] -split ';')[0].Trim() } else { '' }
-        $dialog.InitialDirectory =
-            if ($firstFolder -ne '' -and (Test-Path $firstFolder)) {
-                $firstFolder
-            } else {
-                [Environment]::GetFolderPath('MyDocuments')
-            }
+        $firstFolder = ''
+        if ($settings.ContainsKey('folder')) { $firstFolder = ($settings['folder'] -split ';')[0].Trim() }
+        if ($firstFolder -ne '' -and (Test-Path $firstFolder)) {
+            $dialog.InitialDirectory = $firstFolder
+        } else {
+            $dialog.InitialDirectory = [Environment]::GetFolderPath('MyDocuments')
+        }
         if ($dialog.ShowDialog() -ne 'OK') { Write-Log "выбор файла отменён"; exit 0 }
         $FilePath = $dialog.FileName
     }
@@ -84,36 +74,26 @@ try {
     Write-Log "файл: $FilePath"
 
     # --- отправка ----------------------------------------------------------
-    # Через HttpClient, а не Invoke-RestMethod -Form: параметр -Form есть
-    # только в PowerShell 7, а в Windows встроен 5.1.
+    # Send-Form из common.ps1: HttpClient и Invoke-RestMethod -Form есть не
+    # везде, а HttpWebRequest — и в PowerShell 2.0 на Windows 7.
     $url = $settings['server'].TrimEnd('/') + '/api/directory/import-excel'
-    $client = New-Object System.Net.Http.HttpClient
-    $client.Timeout = [TimeSpan]::FromSeconds(180)
-
-    $content = New-Object System.Net.Http.MultipartFormDataContent
-    $content.Add((New-Object System.Net.Http.StringContent($settings['login'])), 'login')
-    $content.Add((New-Object System.Net.Http.StringContent($settings['password'])), 'password')
-
-    $bytes = [System.IO.File]::ReadAllBytes($FilePath)
-    $fileContent = New-Object System.Net.Http.ByteArrayContent -ArgumentList (, $bytes)
-    $fileContent.Headers.ContentType =
-        [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/octet-stream')
-    $content.Add($fileContent, 'file', [System.IO.Path]::GetFileName($FilePath))
-
+    $fields = @{ login = $settings['login']; password = $settings['password'] }
+    $bytes = Read-SharedBytes $FilePath
     Write-Log "отправка на $url ..."
-    $response = $client.PostAsync($url, $content).GetAwaiter().GetResult()
-    $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-    $client.Dispose()
-    Write-Log "ответ $($response.StatusCode): $body"
+    try {
+        $r = Send-Form $url $fields $FilePath $bytes 180
+    } catch {
+        $hint = Get-OldNetHint
+        if ($hint) { throw ($_.Exception.Message + $hint) }
+        throw
+    }
+    Write-Log "ответ $($r.Status): $($r.Text)"
 
-    $parsed = $null
-    try { $parsed = $body | ConvertFrom-Json } catch { }
-    $text = if ($parsed -and $parsed.message) { $parsed.message } else { $body }
-
-    if ($response.IsSuccessStatusCode) {
-        Show-Message $text 'Справочник загружен' 'Information'
+    if ($r.Ok) {
+        Show-Message $r.Text 'Справочник загружен' 'Information'
         exit 0
     }
+    $text = $r.Text
     throw $text
 }
 catch {

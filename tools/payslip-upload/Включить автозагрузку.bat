@@ -4,5 +4,5 @@ rem Windows logon, and sends each new 1C payslip report saved to Excel.
 rem Comments are in English on purpose: cmd reads .bat in the OEM codepage
 rem and Cyrillic here would come out garbled.
 setlocal
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0autostart.ps1" -Enable
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0autostart.ps1" -Enable
 if errorlevel 1 pause

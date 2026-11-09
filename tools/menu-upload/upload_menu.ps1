@@ -34,51 +34,40 @@ function Show-Message($text, $title, $icon) {
 # Всё в одном try: раньше Add-Type стоял снаружи, и при сбое показывать ошибку
 # было уже нечем — окно просто не появлялось.
 try {
-    Write-Log "--- запуск, аргумент: '$FilePath', на сегодня: $Today ---"
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    . (Join-Path $scriptDir 'common.ps1')
+
+    # Windows 7 со встроенным PowerShell 2.0 работает на .NET 2.0, где нет
+    # TLS 1.2. Если новый .NET установлен — перезапускаемся на нём.
+    $argLine = ''
+    if ($FilePath) { $argLine += "-FilePath `"$FilePath`" " }
+    if ($Today) { $argLine += '-Today' }
+    $code = Restart-OnNet4 $MyInvocation.MyCommand.Path $argLine
+    if ($code -ne $null) { exit $code }
+
+    Write-Log "--- запуск, аргумент: '$FilePath', на сегодня: $Today, PowerShell $($PSVersionTable.PSVersion), .NET $($PSVersionTable.CLRVersion) ---"
 
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
-    Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
-
-    # .NET Framework по умолчанию может брать TLS 1.0, а сервер принимает 1.2.
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    if (-not (Enable-Tls12)) { Write-Log 'TLS 1.2 недоступен на этом .NET' }
 
     # --- настройки ---------------------------------------------------------
-    $settingsPath = Join-Path $scriptDir 'settings.txt'
-    if (-not (Test-Path $settingsPath)) {
-        throw "Не найден файл settings.txt рядом со скриптом."
-    }
-
-    $settings = @{}
-    foreach ($line in Get-Content $settingsPath) {
-        $trimmed = $line.Trim()
-        if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
-        $parts = $trimmed -split '=', 2
-        if ($parts.Count -eq 2) { $settings[$parts[0].Trim()] = $parts[1].Trim() }
-    }
-    foreach ($key in 'server', 'login', 'password') {
-        if (-not $settings.ContainsKey($key) -or $settings[$key] -eq '') {
-            throw "В settings.txt не заполнено поле '$key'."
-        }
-    }
+    $settings = Read-Settings $scriptDir
     Write-Log "сервер: $($settings['server']), логин: $($settings['login'])"
 
     # --- выбор файла -------------------------------------------------------
-    if ([string]::IsNullOrWhiteSpace($FilePath)) {
+    if (-not $FilePath -or $FilePath.Trim() -eq '') {
         $dialog = New-Object System.Windows.Forms.OpenFileDialog
-        $dialog.Title = if ($Today) {
-            'Выберите файл меню — оно встанет на сегодня'
+        if ($Today) {
+            $dialog.Title = 'Выберите файл меню — оно встанет на сегодня'
         } else {
-            'Выберите файл меню, выгруженный из 1С'
+            $dialog.Title = 'Выберите файл меню, выгруженный из 1С'
         }
         $dialog.Filter = 'Excel (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls'
-        $dialog.InitialDirectory =
-            if ($settings.ContainsKey('folder') -and $settings['folder'] -ne '' -and (Test-Path $settings['folder'])) {
-                $settings['folder']
-            } else {
-                [Environment]::GetFolderPath('MyDocuments')
-            }
+        if ($settings.ContainsKey('folder') -and $settings['folder'] -ne '' -and (Test-Path $settings['folder'])) {
+            $dialog.InitialDirectory = $settings['folder']
+        } else {
+            $dialog.InitialDirectory = [Environment]::GetFolderPath('Desktop')
+        }
         if ($dialog.ShowDialog() -ne 'OK') { Write-Log "выбор файла отменён"; exit 0 }
         $FilePath = $dialog.FileName
     }
@@ -88,46 +77,27 @@ try {
     Write-Log "файл: $FilePath"
 
     # --- отправка ----------------------------------------------------------
-    # Через HttpClient, а не Invoke-RestMethod -Form: параметр -Form есть
-    # только в PowerShell 7, а в Windows встроен 5.1.
     $url = $settings['server'].TrimEnd('/') + '/api/menu/import-excel'
-    $client = New-Object System.Net.Http.HttpClient
-    # Render на бесплатном тарифе засыпает — первый запрос ждёт пробуждения.
-    $client.Timeout = [TimeSpan]::FromSeconds(180)
-
-    $content = New-Object System.Net.Http.MultipartFormDataContent
-    $content.Add((New-Object System.Net.Http.StringContent($settings['login'])), 'login')
-    $content.Add((New-Object System.Net.Http.StringContent($settings['password'])), 'password')
+    $fields = @{ login = $settings['login']; password = $settings['password'] }
     if ($settings.ContainsKey('default_date') -and $settings['default_date'] -ne '') {
-        $content.Add((New-Object System.Net.Http.StringContent($settings['default_date'])), 'date')
+        $fields['date'] = $settings['default_date']
     }
     if ($Today) {
-        $todayIso = (Get-Date).ToString('yyyy-MM-dd')
-        $content.Add((New-Object System.Net.Http.StringContent($todayIso)), 'force_date')
-        Write-Log "меню ставится на сегодня: $todayIso"
+        $fields['force_date'] = (Get-Date).ToString('yyyy-MM-dd')
+        Write-Log "меню ставится на сегодня: $($fields['force_date'])"
     }
-
-    $bytes = [System.IO.File]::ReadAllBytes($FilePath)
-    $fileContent = New-Object System.Net.Http.ByteArrayContent -ArgumentList (, $bytes)
-    $fileContent.Headers.ContentType =
-        [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/octet-stream')
-    $content.Add($fileContent, 'file', [System.IO.Path]::GetFileName($FilePath))
 
     Write-Log "отправка на $url ..."
-    $response = $client.PostAsync($url, $content).GetAwaiter().GetResult()
-    $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-    $client.Dispose()
-    Write-Log "ответ $($response.StatusCode): $body"
+    $bytes = Read-SharedBytes $FilePath
+    # Сервер может просыпаться — первый запрос ждёт дольше обычного.
+    $r = Send-Form $url $fields $FilePath $bytes 180
+    Write-Log "ответ $($r.Status): $($r.Body)"
 
-    $parsed = $null
-    try { $parsed = $body | ConvertFrom-Json } catch { }
-    $text = if ($parsed -and $parsed.message) { $parsed.message } else { $body }
-
-    if ($response.IsSuccessStatusCode) {
-        Show-Message $text 'Меню загружено' 'Information'
+    if ($r.Ok) {
+        Show-Message $r.Text 'Меню загружено' 'Information'
         exit 0
     }
-    throw $text
+    throw $r.Text
 }
 catch {
     # У сетевых сбоев внешнее сообщение всегда одно — «Произошла ошибка при
@@ -135,9 +105,11 @@ catch {
     # недоверенный сертификат, закрытый порт, неизвестное имя — лежит во
     # вложенном исключении, поэтому разворачиваем всю цепочку.
     $messages = @()
+    $network = $false
     $error_ = $_.Exception
     while ($error_) {
         $messages += $error_.Message
+        if ($error_ -is [System.Net.WebException]) { $network = $true }
         Write-Log ("ОШИБКА: " + $error_.GetType().FullName + ': ' + $error_.Message)
         $error_ = $error_.InnerException
     }
@@ -149,6 +121,9 @@ catch {
     if ($messages.Count -gt 1) {
         $detail = $messages[0] + [Environment]::NewLine + [Environment]::NewLine +
                   'Причина: ' + $messages[-1]
+    }
+    if ($network -and (Get-Command Get-OldNetHint -ErrorAction SilentlyContinue)) {
+        $detail += Get-OldNetHint
     }
     Show-Message ("Не удалось загрузить меню." + [Environment]::NewLine + [Environment]::NewLine + $detail + [Environment]::NewLine + [Environment]::NewLine + "Подробности в файле upload_log.txt") 'Меню столовой' 'Error'
     exit 1
