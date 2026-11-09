@@ -1,12 +1,15 @@
-﻿# Автозагрузка расчётных листков: следит за рабочим столом и «Документами»
-# (или папкой из settings.txt) и сама отправляет на сервер каждый новый отчёт
-# 1С «Расчетный листок», сохранённый в Excel.
+﻿# Автозагрузка расчётных листков: следит за папкой «Документы\Расчетные
+# листы» (вместе с вложенными папками), а заодно за рабочим столом и самими
+# «Документами» — или за папками из settings.txt — и сама отправляет на
+# сервер каждый новый отчёт 1С «Расчетный листок», сохранённый в Excel.
 #
 # Запускается при входе в Windows ярлыком из папки «Автозагрузка», который
 # создаёт «Включить автозагрузку.bat». Окна нет — только значок у часов,
 # вопрос «Отправить?» и всплывающие уведомления.
 #
-# Какие файлы берёт: Excel (.xls, .xlsx), изменён сегодня, и внутри — отчёт
+# Какие файлы берёт: Excel (.xls, .xlsx), изменён за последние три дня (если
+# компьютер выключили сразу после сохранения, файл уйдёт на следующий день),
+# и внутри — отчёт
 # «Расчетный листок» (есть строка «Месяц начисления»). По имени не судим:
 # бухгалтер может назвать файл как угодно, хоть «июль.xls».
 #
@@ -18,8 +21,12 @@
 # Вход тот же, что в приложении: логин и пароль бухгалтера расчётной группы.
 # Сервер сам проверит, что ей можно загружать листки.
 #
-# Файл сохранён в UTF-8 С BOM: Windows PowerShell 5.1 читает .ps1 без BOM
-# как ANSI, и кириллица ломается ещё на разборе скрипта.
+# Работает и на Windows 7 со встроенным PowerShell 2.0: всё, чего там нет,
+# заменено в common.ps1 (см. там же). Поэтому здесь нет HttpClient,
+# ConvertFrom-Json, оператора -in и Get-ChildItem -File.
+#
+# Файл сохранён в UTF-8 С BOM: Windows PowerShell читает .ps1 без BOM как
+# ANSI, и кириллица ломается ещё на разборе скрипта.
 
 param([switch]$Announce)
 
@@ -36,11 +43,17 @@ function Write-Log($text) {
 }
 
 try {
+    . (Join-Path $scriptDir 'common.ps1')
+    # Windows 7 со встроенным PowerShell 2.0: перезапуск на .NET 4, где есть
+    # TLS 1.2. Копия запускается сама, эта — выходит.
+    $argLine = ''
+    if ($Announce) { $argLine = '-Announce' }
+    if ((Restart-OnNet4 $MyInvocation.MyCommand.Path $argLine -NoWait) -ne $null) { exit 0 }
+
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
-    Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
-    Add-Type -AssemblyName System.IO.Compression -ErrorAction Stop
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    if (-not (Enable-Tls12)) { Write-Log 'TLS 1.2 недоступен на этом .NET' }
+    Write-Log "PowerShell $($PSVersionTable.PSVersion), .NET $($PSVersionTable.CLRVersion)"
 } catch {
     Write-Log "ОШИБКА запуска: $($_.Exception.Message)"
     exit 1
@@ -58,21 +71,7 @@ if (-not $createdNew) {
 # --- настройки -------------------------------------------------------------
 $settings = @{}
 try {
-    $settingsPath = Join-Path $scriptDir 'settings.txt'
-    if (-not (Test-Path $settingsPath)) {
-        throw "Не найден файл settings.txt рядом со скриптом."
-    }
-    foreach ($line in Get-Content $settingsPath -Encoding UTF8) {
-        $trimmed = $line.Trim()
-        if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
-        $parts = $trimmed -split '=', 2
-        if ($parts.Count -eq 2) { $settings[$parts[0].Trim()] = $parts[1].Trim() }
-    }
-    foreach ($key in 'server', 'login', 'password') {
-        if (-not $settings.ContainsKey($key) -or $settings[$key] -eq '') {
-            throw "В settings.txt не заполнено поле '$key'."
-        }
-    }
+    $settings = Read-Settings $scriptDir
 } catch {
     Write-Log "ОШИБКА настроек: $($_.Exception.Message)"
     [System.Windows.Forms.MessageBox]::Show(
@@ -88,22 +87,40 @@ if ($settings.ContainsKey('confirm') -and $settings['confirm'] -match '^(нет|
     $script:confirm = $false
 }
 
-# Папки: из settings.txt (можно несколько через «;»), иначе рабочий стол и
-# «Документы» — туда 1С предлагает сохранить отчёт. С учётом OneDrive:
-# обе могут лежать не в профиле.
-$script:watchDirs = @()
+# Папки: из settings.txt (можно несколько через «;»), иначе «Документы\
+# Расчетные листы» — её бухгалтер завела под листки, — плюс рабочий стол и
+# сами «Документы»: туда 1С предлагает сохранить отчёт. С учётом OneDrive:
+# они могут лежать не в профиле. Свою папку смотрим вместе с вложенными
+# (вдруг листки разложат по годам), остальные — только верхний уровень.
+$script:watchDirs = @()     # @{ Path; Recurse }
 if ($settings.ContainsKey('folder') -and $settings['folder'] -ne '') {
     foreach ($dir in $settings['folder'] -split ';') {
         $dir = $dir.Trim()
-        if ($dir -ne '') { $script:watchDirs += $dir }
+        if ($dir -ne '') { $script:watchDirs += @{ Path = $dir; Recurse = $true } }
     }
 }
 if ($script:watchDirs.Count -eq 0) {
+    $documents = [Environment]::GetFolderPath('MyDocuments')
+    $ownDir = Join-Path $documents 'Расчетные листы'
+    # Если папку назвали через «ё», берём её.
+    $altDir = Join-Path $documents 'Расчётные листы'
+    if (-not (Test-Path -LiteralPath $ownDir) -and (Test-Path -LiteralPath $altDir)) { $ownDir = $altDir }
+    if (-not (Test-Path -LiteralPath $ownDir)) {
+        try {
+            New-Item -ItemType Directory -Path $ownDir -ErrorAction Stop | Out-Null
+            Write-Log "создана папка $ownDir"
+        } catch {
+            Write-Log "не удалось создать папку $($ownDir): $($_.Exception.Message)"
+        }
+    }
     $script:watchDirs = @(
-        [Environment]::GetFolderPath('Desktop'),
-        [Environment]::GetFolderPath('MyDocuments'))
+        @{ Path = $ownDir; Recurse = $true },
+        @{ Path = [Environment]::GetFolderPath('Desktop'); Recurse = $false },
+        @{ Path = $documents; Recurse = $false })
 }
-Write-Log "запуск, слежу за папками: $($script:watchDirs -join '; ')"
+$script:watchNames = @()
+foreach ($w in $script:watchDirs) { $script:watchNames += $w.Path }
+Write-Log "запуск, слежу за папками: $($script:watchNames -join '; ')"
 
 # --- что уже отправлено ----------------------------------------------------
 # Ключ — путь, время изменения и размер: исправленный в 1С и заново
@@ -123,8 +140,55 @@ function Set-Done($key, $result) {
     # settings.txt, снова нажали «Включить автозагрузку» — и тот же файл
     # уходит ещё раз. Запоминаем навсегда только отправленное и то, от чего
     # бухгалтер отказалась сама кнопкой «Нет».
-    if ($result -ne 'ok' -and $result -ne 'declined') { return }
+    if (@('ok', 'declined', 'baseline') -notcontains $result) { return }
     try { Add-Content -Path $statePath -Value "$key`t$result" -Encoding UTF8 } catch { }
+}
+
+# Когда файл появился в папке. Сохранённый из 1С — по времени изменения.
+# Скопированный — по времени создания: копия сохраняет старое время
+# изменения, а создана она сейчас.
+function Get-Stamp($file) {
+    if ($file.CreationTime -gt $file.LastWriteTime) { return $file.CreationTime }
+    return $file.LastWriteTime
+}
+
+function Get-Key($file) {
+    return "$($file.FullName)|$($file.LastWriteTimeUtc.Ticks)|$($file.Length)"
+}
+
+function Get-ExcelFiles($w) {
+    if ($w.Recurse) {
+        $items = Get-ChildItem -LiteralPath $w.Path -Recurse -ErrorAction SilentlyContinue
+    } else {
+        $items = Get-ChildItem -LiteralPath $w.Path -ErrorAction SilentlyContinue
+    }
+    return $items | Where-Object {
+        -not $_.PSIsContainer -and
+        @('.xls', '.xlsx') -contains $_.Extension.ToLower() -and
+        -not $_.Name.StartsWith('~$') -and
+        $_.Length -gt 0
+    }
+}
+
+# В папке под листки смотрим не на дату, а на то, был ли файл там раньше:
+# файл, перенесённый туда мышью, сохраняет и старое время изменения, и
+# старое время создания. Поэтому при первом запуске запоминаем, что в папке
+# уже лежит со старых времён (старше трёх дней), а всё, что появится
+# потом, — сохранённое, скопированное или перенесённое — отправляем.
+$script:since = (Get-Date).Date.AddDays(-2)
+foreach ($w in $script:watchDirs) {
+    if (-not $w.Recurse -or -not (Test-Path -LiteralPath $w.Path)) { continue }
+    $marker = "baseline|$($w.Path)"
+    if ($script:done.ContainsKey($marker)) { continue }
+    $old = 0
+    foreach ($file in @(Get-ExcelFiles $w)) {
+        if ((Get-Stamp $file) -lt $script:since) {
+            Set-Done (Get-Key $file) 'baseline'
+            $old++
+        }
+    }
+    Set-Done $marker 'baseline'
+    Write-Log "первый запуск для $($w.Path): старых файлов $old, их не трогаю"
 }
 
 $script:seenOnce = @{}   # путь -> ключ на прошлой проверке
@@ -132,6 +196,7 @@ $script:notPayslip = @{} # ключ -> $true: Excel, но не расчётны�
 $script:retryAt = @{}    # ключ -> когда пробовать снова
 $script:attempts = @{}   # ключ -> сколько раз не удалось из-за сети
 $script:token = $null
+$script:loginRefused = $false   # сервер не принял логин — до перезапуска молчим
 $script:busy = $false
 
 # --- значок у часов ---------------------------------------------------------
@@ -187,19 +252,8 @@ $exitItem.add_Click({
 $script:tray.ContextMenuStrip = $menu
 
 # --- чтение файла -----------------------------------------------------------
-# Бухгалтер может держать файл открытым в Excel — читать его это не мешает,
-# поэтому открываем с разрешением чужой записи.
-function Read-Shared($path) {
-    $stream = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
-    try {
-        $buffer = New-Object System.IO.MemoryStream
-        $stream.CopyTo($buffer)
-        return , $buffer.ToArray()
-    } finally {
-        $stream.Close()
-    }
-}
-
+# Бухгалтер может держать файл открытым в Excel — читать его это не мешает
+# (Read-SharedBytes в common.ps1).
 function Test-Readable($path) {
     try {
         $stream = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
@@ -215,6 +269,18 @@ function Test-Readable($path) {
 # лежит в UTF-16, в .xlsx — в UTF-8 внутри zip (sharedStrings или сам лист).
 $script:markers = @('Месяц начисления', 'Расчетный листок', 'Расчётный листок')
 
+function Import-Zip {
+    if ($script:zipReady -ne $null) { return $script:zipReady }
+    try {
+        [void][Reflection.Assembly]::Load('System.IO.Compression, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
+        $script:zipReady = $true
+    } catch {
+        Write-Log 'нет System.IO.Compression: .xlsx узнаю только по имени'
+        $script:zipReady = $false
+    }
+    return $script:zipReady
+}
+
 function Test-Payslip($bytes, $extension) {
     if ($extension -eq '.xls') {
         # Строка может начинаться и с чётного байта, и с нечётного — читаем
@@ -224,6 +290,11 @@ function Test-Payslip($bytes, $extension) {
             foreach ($m in $script:markers) { if ($text.Contains($m)) { return $true } }
         }
         return $false
+    }
+    # .xlsx — это zip. Читать его умеет .NET 4.5 (он же нужен для TLS 1.2);
+    # если сборки нет, решаем по имени файла.
+    if (-not (Import-Zip)) {
+        return ($script:fileName -match 'расч|листк|листы')
     }
     $zip = $null
     try {
@@ -245,45 +316,45 @@ function Test-Payslip($bytes, $extension) {
 }
 
 # --- сервер -----------------------------------------------------------------
-function Get-Json($body) {
-    try { return ($body | ConvertFrom-Json) } catch { return $null }
-}
-
-# Возвращает @{ Ok; Status (0 — до сервера не достучались); Text; Data }.
-function Invoke-Server($client, $request) {
+# Возвращает @{ Ok; Status (0 — до сервера не достучались); Text; Data; Body }.
+function Invoke-Server([scriptblock]$call) {
     try {
-        $response = $client.SendAsync($request).GetAwaiter().GetResult()
-        $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-        $parsed = Get-Json $body
-        $text = if ($parsed -and $parsed.message) { [string]$parsed.message } else { $body }
-        return @{ Ok = $response.IsSuccessStatusCode; Status = [int]$response.StatusCode
-                  Text = $text; Data = $parsed; Body = $body }
+        $r = & $call
+        $r['Data'] = Read-Json $r.Body
+        return $r
     } catch {
         # Настоящая причина сетевого сбоя лежит во вложенном исключении.
         $e = $_.Exception
-        while ($e.InnerException) { $e = $e.InnerException }
+        $network = $false
+        while ($e.InnerException) {
+            if ($e -is [System.Net.WebException]) { $network = $true }
+            $e = $e.InnerException
+        }
+        if ($e -is [System.Net.WebException]) { $network = $true }
         Write-Log "ОШИБКА связи: $($e.GetType().FullName): $($e.Message)"
-        return @{ Ok = $false; Status = 0; Text = $e.Message; Data = $null; Body = '' }
+        $text = $e.Message
+        if ($network) { $text += (Get-OldNetHint) }
+        return @{ Ok = $false; Status = 0; Text = $text; Data = $null; Body = '' }
     }
 }
 
-function Get-Token($client) {
+function Get-Token {
     $url = $settings['server'].TrimEnd('/') + '/login'
-    $json = @{ login = $settings['login']; password = $settings['password'] } | ConvertTo-Json -Compress
-    $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Post, $url)
-    $request.Content = New-Object System.Net.Http.StringContent($json, [System.Text.Encoding]::UTF8, 'application/json')
-    $r = Invoke-Server $client $request
+    $data = @{ login = $settings['login']; password = $settings['password'] }
+    $r = Invoke-Server { Send-Json $url $data 60 }
     # Пароль в журнал не пишем — только итог.
     if ($r.Status -eq 0) { return $r }
     if ($r.Status -eq 429) {
         $minutes = 1
-        if ($r.Data -and $r.Data.retry_after) { $minutes = [Math]::Max(1, [Math]::Ceiling([double]$r.Data.retry_after / 60)) }
+        $wait = Get-Field $r.Data 'retry_after'
+        if ($wait) { $minutes = [Math]::Max(1, [Math]::Ceiling([double]$wait / 60)) }
         Write-Log "вход: слишком много неверных попыток"
         return @{ Ok = $false; Status = 429; Text = "Слишком много неверных попыток входа. Попробуйте через $minutes мин." }
     }
-    if ($r.Ok -and $r.Data -and $r.Data.token) {
-        $script:token = [string]$r.Data.token
-        Write-Log "вход выполнен: $($r.Data.full_name)"
+    $token = Get-Field $r.Data 'token'
+    if ($r.Ok -and $token) {
+        $script:token = [string]$token
+        Write-Log "вход выполнен: $(Get-Field $r.Data 'full_name')"
         return @{ Ok = $true; Status = 200; Text = '' }
     }
     if ($r.Ok) {
@@ -295,29 +366,23 @@ function Get-Token($client) {
     return $r
 }
 
-function Send-Payslips($client, $path, $bytes, [bool]$dryRun) {
+function Send-Payslips($path, $bytes, [bool]$dryRun) {
     $url = $settings['server'].TrimEnd('/') + '/api/payslips/import-excel'
+    $r = $null
     for ($try = 0; $try -lt 2; $try++) {
         if (-not $script:token) {
-            $login = Get-Token $client
+            $login = Get-Token
             if (-not $login.Ok) { return $login }
         }
-        $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Post, $url)
-        $request.Headers.Authorization =
-            New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $script:token)
-        $content = New-Object System.Net.Http.MultipartFormDataContent
-        if ($dryRun) {
-            $content.Add((New-Object System.Net.Http.StringContent('1')), 'dry_run')
-        }
-        $fileContent = New-Object System.Net.Http.ByteArrayContent -ArgumentList (, $bytes)
-        $fileContent.Headers.ContentType =
-            [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/octet-stream')
-        $content.Add($fileContent, 'file', [System.IO.Path]::GetFileName($path))
-        $request.Content = $content
+        $fields = @{}
+        if ($dryRun) { $fields['dry_run'] = '1' }
+        $headers = @{ Authorization = "Bearer $script:token" }
 
-        $what = if ($dryRun) { 'проверка' } else { 'отправка' }
+        $what = 'отправка'
+        if ($dryRun) { $what = 'проверка' }
         Write-Log "$what $path ($([Math]::Round($bytes.Length / 1MB, 1)) МБ)"
-        $r = Invoke-Server $client $request
+        # 25 МБ по медленной сети плюс разбор на сервере.
+        $r = Invoke-Server { Send-Form $url $fields $path $bytes 600 $headers }
         if ($r.Status -ne 0) { Write-Log "ответ $($r.Status): $($r.Text)" }
         # Пропуск истёк — входим заново, один раз.
         if ($r.Status -eq 401 -and $try -eq 0) {
@@ -330,14 +395,17 @@ function Send-Payslips($client, $path, $bytes, [bool]$dryRun) {
 }
 
 function Format-Summary($data) {
-    $periods = @($data.periods) -join ', '
-    $lines = @("$periods — листков: $($data.count)")
-    if ([int]$data.replaced -gt 0) {
-        $lines += "Из них заменят уже загруженные: $($data.replaced)"
+    $periods = @(Get-Field $data 'periods') -join ', '
+    $lines = @("$periods — листков: $(Get-Field $data 'count')")
+    $replaced = [int](Get-Field $data 'replaced')
+    if ($replaced -gt 0) {
+        $lines += "Из них заменят уже загруженные: $replaced"
     }
-    $unknown = @($data.unknown)
+    $unknown = @()
+    $list = Get-Field $data 'unknown'
+    if ($list) { foreach ($u in $list) { $unknown += [string](Get-Field $u 'full_name') } }
     if ($unknown.Count -gt 0) {
-        $names = ($unknown | Select-Object -First 5 | ForEach-Object { $_.full_name }) -join ', '
+        $names = ($unknown | Select-Object -First 5) -join ', '
         if ($unknown.Count -gt 5) { $names += " и ещё $($unknown.Count - 5)" }
         $lines += "Нет в приложении ($($unknown.Count)): $names"
     }
@@ -346,11 +414,7 @@ function Format-Summary($data) {
 
 # --- одна попытка над одним файлом -----------------------------------------
 function Send-File($file, $key, $bytes) {
-    $client = New-Object System.Net.Http.HttpClient
-    # 25 МБ по медленной сети плюс разбор на сервере.
-    $client.Timeout = [TimeSpan]::FromSeconds(600)
-    try {
-        $r = Send-Payslips $client $file.FullName $bytes $true
+        $r = Send-Payslips $file.FullName $bytes $true
         if ($r.Ok) {
             $summary = Format-Summary $r.Data
             if ($script:confirm) {
@@ -363,7 +427,7 @@ function Send-File($file, $key, $bytes) {
                     return
                 }
             }
-            $r = Send-Payslips $client $file.FullName $bytes $false
+            $r = Send-Payslips $file.FullName $bytes $false
             if ($r.Ok) {
                 Set-Done $key 'ok'
                 Show-Note 'Расчётные листки отправлены' $summary 'Info'
@@ -371,9 +435,20 @@ function Send-File($file, $key, $bytes) {
             }
         }
 
+        if (@(401, 403, 429) -contains $r.Status) {
+            # Неверный пароль, нет прав или вход уже закрыт. Дальше не шлём
+            # ничего — ни этот файл, ни следующие: каждая попытка с неверным
+            # паролем засчитывается как ошибка входа, и сервер закрывает вход
+            # и бухгалтеру в приложении. После исправления settings.txt и
+            # «Включить автозагрузку» этот же файл уйдёт снова.
+            $script:loginRefused = $true
+            Set-Done $key 'failed'
+            Show-Note 'Листки НЕ отправлены' "$($file.Name)`n$($r.Text)`nИсправьте settings.txt и снова запустите «Включить автозагрузку»." 'Error'
+            return
+        }
+
         if ($r.Status -ge 400 -and $r.Status -lt 500) {
-            # Неверный пароль, нет прав, файл не разобрался — повтор не
-            # поможет, а повтор с неверным паролем ещё и закроет вход.
+            # Файл не разобрался или слишком большой — повтор не поможет.
             Set-Done $key 'failed'
             Show-Note 'Листки НЕ отправлены' "$($file.Name)`n$($r.Text)`nЕсли дело в settings.txt — исправьте его и снова запустите «Включить автозагрузку»." 'Error'
             return
@@ -389,24 +464,19 @@ function Send-File($file, $key, $bytes) {
         if ($n -eq 1) {
             Show-Note 'Листки пока не отправлены' "Нет связи с сервером: $($r.Text)`nПопробую ещё раз сам." 'Warning'
         }
-    } finally {
-        $client.Dispose()
-    }
 }
 
 function Find-NewFiles {
-    $today = (Get-Date).Date
-    foreach ($dir in $script:watchDirs) {
-        if (-not (Test-Path -LiteralPath $dir)) { continue }
-        $files = Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.Extension -in '.xls', '.xlsx' -and
-                -not $_.Name.StartsWith('~$') -and
-                $_.Length -gt 0 -and
-                $_.LastWriteTime -ge $today
-            }
-        foreach ($file in $files) {
-            $key = "$($file.FullName)|$($file.LastWriteTimeUtc.Ticks)|$($file.Length)"
+    if ($script:loginRefused) { return }
+    $since = (Get-Date).Date.AddDays(-2)
+    foreach ($w in $script:watchDirs) {
+        if (-not (Test-Path -LiteralPath $w.Path)) { continue }
+        foreach ($file in @(Get-ExcelFiles $w)) {
+            if ($script:loginRefused) { return }
+            # На рабочем столе и в «Документах» — только свежие файлы; в
+            # папке под листки — любой новый (см. «первый запуск» выше).
+            if (-not $w.Recurse -and (Get-Stamp $file) -lt $since) { continue }
+            $key = Get-Key $file
             if ($script:done.ContainsKey($key)) { continue }
             if ($script:notPayslip.ContainsKey($key)) { continue }
             if ($script:retryAt.ContainsKey($key) -and (Get-Date) -lt $script:retryAt[$key]) { continue }
@@ -417,7 +487,8 @@ function Find-NewFiles {
                 continue
             }
             if (-not (Test-Readable $file.FullName)) { continue }
-            $bytes = Read-Shared $file.FullName
+            $bytes = Read-SharedBytes $file.FullName
+            $script:fileName = $file.Name
             if (-not (Test-Payslip $bytes $file.Extension.ToLower())) {
                 $script:notPayslip[$key] = $true
                 continue
@@ -444,7 +515,7 @@ $script:timer.add_Tick({
 $script:timer.Start()
 
 if ($Announce) {
-    Show-Note 'Автозагрузка листков включена' "Слежу за папками:`n$($script:watchDirs -join "`n")`nСохраните «Расчетный листок» из 1С в Excel — остальное я сделаю сам." 'Info'
+    Show-Note 'Автозагрузка листков включена' "Слежу за папками:`n$($script:watchNames -join "`n")`nСохраните «Расчетный листок» из 1С в Excel — остальное я сделаю сам." 'Info'
 }
 
 [System.Windows.Forms.Application]::Run()
