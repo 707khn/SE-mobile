@@ -115,7 +115,7 @@ def test_apply_resets_everyone_but_the_list(app, client, accounts, tmp_path):
         assert app_module._authenticate(_OWNER, _OWN) is None
         assert app_module._authenticate(_NUMBER, _NUMBER) is None
         for login, code in codes.items():
-            assert len(code) == 4 and code.isdigit() and code != login
+            assert len(code) == 5 and code.isdigit() and code != login
             assert app_module._authenticate(login, code) == login.zfill(10)
             assert db.session.get(UserAccount, login).must_change_password
     # Пропуск, выданный до сброса, больше не действует.
