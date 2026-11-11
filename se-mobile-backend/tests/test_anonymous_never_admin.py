@@ -110,7 +110,7 @@ def test_admin_with_a_pass_still_resets(app, client):
                          headers={'Authorization': f'Bearer {token}'})
     assert answer.status_code == 200
     code = answer.get_json()['temporary_password']
-    assert code != '2114' and len(code) == 4 and code.isdigit()
+    assert code != '2114' and len(code) == 5 and code.isdigit()
     with app.app_context():
         assert app_module._authenticate('2114', '2114') is None
         assert app_module._authenticate('2114', code) is not None
