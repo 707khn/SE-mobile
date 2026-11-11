@@ -12,7 +12,6 @@ import '../widgets/custom_text.dart';
 import '../widgets/fields_dialog.dart';
 import '../widgets/load_error_view.dart';
 import '../widgets/person_picker_dialog.dart';
-import 'it_request_form_screen.dart';
 
 const outageKinds = [
   'power',
@@ -417,19 +416,6 @@ class _TechScreenState extends State<TechScreen> {
                   leading: Icon(_assetIcon(a.kind)),
                   title: Text(a.model),
                   subtitle: Text(_assetLine(a)),
-                  trailing: IconButton(
-                    key: Key('ta_mine_report_${a.id}'),
-                    icon: const Icon(Icons.support_agent_outlined),
-                    tooltip: 'ta_it_request'.tr,
-                    onPressed: () => Get.to(() => ItRequestFormScreen(
-                        description: [
-                              a.model,
-                              if (a.inventoryNo.isNotEmpty)
-                                'ta_inventory_no'
-                                    .trParams({'no': a.inventoryNo}),
-                            ].join(', ') +
-                            ': ')),
-                  ),
                 );
               },
             ),

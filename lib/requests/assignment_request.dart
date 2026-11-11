@@ -7,7 +7,7 @@ import '../utils/api.dart';
 import '../utils/iso_day.dart';
 import '../utils/load_problem.dart';
 import '../utils/variables.dart';
-import 'it_request.dart' show ItPerson;
+import 'person.dart' show ItPerson;
 
 DateTime? _time(Object? raw) =>
     raw is String ? DateTime.tryParse(raw)?.toLocal() : null;
