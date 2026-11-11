@@ -24,9 +24,9 @@ class DesktopLayout extends StatefulWidget {
 }
 
 class _DesktopLayoutState extends State<DesktopLayout> {
-  /// Навигатор переезжает в дереве, когда панель появляется или прячется.
-  /// С ключом он переезжает целиком, а не создаётся заново — иначе вход или
-  /// изменение размера окна закрывали бы все открытые экраны.
+  /// Навигатор не переезжает, когда панель появляется или прячется (см.
+  /// build). Ключ — страховка: если дерево вокруг всё же поменяется,
+  /// навигатор переедет целиком, а не создастся заново и не закроет экраны.
   final _navigatorKey = GlobalKey();
 
   @override
@@ -45,21 +45,33 @@ class _DesktopLayoutState extends State<DesktopLayout> {
             child: KeyedSubtree(key: _navigatorKey, child: widget.child),
           ),
         );
-        if (!sidebar) return content;
+        // Навигатор стоит на одном и том же месте дерева и с панелью, и без
+        // неё: меняется только ширина панели. Прежде без панели навигатор
+        // переезжал из Row наверх (по GlobalKey) — и переезд случался ровно
+        // при выходе, когда экран входа уже показан, а оболочка закрывается.
+        // На Windows 10 окно в этот момент переставало отвечать: на экране
+        // оставались и панель вошедшего, и форма входа.
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(
-              width: kDesktopSidebarWidth,
-              child: _Sidebar(),
+            SizedBox(
+              width: sidebar ? kDesktopSidebarWidth : 0,
+              child: sidebar ? const _Sidebar() : null,
             ),
-            VerticalDivider(width: 1, color: context.hairlineColor),
+            SizedBox(
+              width: sidebar ? 1 : 0,
+              child: sidebar
+                  ? VerticalDivider(width: 1, color: context.hairlineColor)
+                  : null,
+            ),
             Expanded(
               child: MediaQuery(
-                data: media.copyWith(
-                  size: Size(media.size.width - kDesktopSidebarWidth - 1,
-                      media.size.height),
-                ),
+                data: sidebar
+                    ? media.copyWith(
+                        size: Size(media.size.width - kDesktopSidebarWidth - 1,
+                            media.size.height),
+                      )
+                    : media,
                 child: content,
               ),
             ),
