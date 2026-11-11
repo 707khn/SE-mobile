@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -23,12 +24,30 @@ class OfflineCache {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
+  /// В браузере личное не сохраняем вовсе.
+  ///
+  /// «Защищённое хранилище» в браузере — это localStorage, и ключ шифрования
+  /// лежит там же, рядом с данными: кто сел за компьютер после сотрудника,
+  /// достанет листок через инструменты разработчика за минуту. Телефонного
+  /// Keystore у браузера нет. А без сети веб-версия и сама не откроется,
+  /// так что копия на случай «нет связи» ей ни к чему.
+  static bool get keepsPrivate => !(debugWebOverride ?? kIsWeb);
+
+  /// Для тестов: `true` — притвориться браузером, `null` — как на самом деле.
+  @visibleForTesting
+  static bool? debugWebOverride;
+
   /// Когда ответ был получен. Приложение показывает это в пометке.
   static const String stampKey = 'cached_at';
 
   /// [private] — личное (расчётный лист): кладём в защищённое хранилище.
   static Future<void> save(String key, Map<String, dynamic> body,
       {bool private = false}) async {
+    if (private && !keepsPrivate) {
+      // Копия от прежней сборки, если осталась, — убираем.
+      await _forget(key);
+      return;
+    }
     try {
       final copy = Map<String, dynamic>.from(body)
         ..[stampKey] = DateTime.now().toIso8601String();
@@ -50,6 +69,10 @@ class OfflineCache {
   /// что данные не свежие.
   static Future<Map<String, dynamic>?> read(String key,
       {bool private = false}) async {
+    if (private && !keepsPrivate) {
+      await _forget(key);
+      return null;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       String? raw;
@@ -106,6 +129,16 @@ class OfflineCache {
           await (await SharedPreferences.getInstance()).remove(key);
         }
       }
+    } catch (_) {}
+  }
+
+  /// Стирает личную копию по ключу — из обоих хранилищ.
+  static Future<void> _forget(String key) async {
+    try {
+      await _secure.delete(key: '$_prefix$key');
+    } catch (_) {}
+    try {
+      await (await SharedPreferences.getInstance()).remove('$_prefix$key');
     } catch (_) {}
   }
 
