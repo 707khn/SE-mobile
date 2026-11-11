@@ -9,18 +9,16 @@ import '../utils/app_version.dart';
 import '../utils/biometric.dart';
 import '../utils/colors.dart';
 import '../utils/lang.dart';
-import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/theme_pref.dart';
 import '../utils/variables.dart';
 import 'about_screen.dart';
-import 'change_password_screen.dart';
 import 'pin_screen.dart';
 import 'telegram_screen.dart';
 
 /// «Настройки» — всё, что меняют под себя, на одном экране.
 ///
-/// Раньше оформление, язык, пароль, код и «О программе» лежали в боковом
+/// Раньше оформление, язык, код и «О программе» лежали в боковом
 /// меню вперемешку с разделами приложения, и меню не помещалось на экран.
 /// Теперь там один пункт, а здесь — группы: внешний вид, уведомления (в
 /// браузере), безопасность, о приложении. Текущее значение видно справа, не
@@ -35,8 +33,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String _lang = Lang.ru;
   ThemeMode _themeMode = ThemePref.defaultMode();
-  String _fullName = '';
-  String _job = '';
 
   /// Есть ли на телефоне датчик с заведённым отпечатком. Нет — строки
   /// «Вход по отпечатку» не показываем вовсе, чтобы не обещать лишнего.
@@ -66,16 +62,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final storage = SecureStorageHelper.instance;
-    final fullName = await storage.getFullName();
-    final job = await storage.getJob();
     final biometricAvailable = await Biometric.instance.available();
     final biometricOn = await storage.biometricEnabled();
     if (!mounted) return;
     setState(() {
       _lang = Lang.code(prefs.getString(AppValues.LANG));
       _themeMode = ThemePref.read(prefs);
-      _fullName = fullName ?? '';
-      _job = job ?? '';
       _biometricAvailable = biometricAvailable;
       _biometricOn = biometricOn;
     });
@@ -119,24 +111,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
           _section('settings_security'.tr),
-          // Вошедший с телефона или из браузера по одноразовому коду своего
-          // пароля не имеет: пароль ему нужен для входа с компьютера.
-          ValueListenableBuilder<bool>(
-            valueListenable: OwnPassword.has,
-            builder: (context, has, _) => _tile(
-              icon: Icons.lock_outline,
-              label: has
-                  ? 'password_change_title'.tr
-                  : 'password_set_title'.tr,
-              onTap: () => Get.to(() => ChangePasswordScreen(
-                    fullName: _fullName,
-                    job: _job,
-                    currentPassword: '',
-                    mandatory: false,
-                    hasPassword: has,
-                  )),
-            ),
-          ),
           _tile(
             icon: Icons.pin_outlined,
             label: 'pin_change_title'.tr,

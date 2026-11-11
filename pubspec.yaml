@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # Здесь меняют только старшие цифры (1.32), и то редко. Третью цифру и номер
 # сборки ставит сборка в GitHub (.github/scripts/version.sh) — число коммитов
 # в main. Править их в PR не нужно.
-version: 1.35.0+77
+version: 1.35.1+78
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
