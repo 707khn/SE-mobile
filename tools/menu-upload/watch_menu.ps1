@@ -5,7 +5,8 @@
 # создаёт «Включить автозагрузку.bat». Окна нет — только значок у часов и
 # всплывающие уведомления: «меню загружено» или что пошло не так.
 #
-# Какие файлы берёт: Excel, имя начинается с «Меню», изменён сегодня. 1С
+# Какие файлы берёт: Excel, имя начинается с «Меню» или содержит «Меню №»
+# (бывает «Копия Меню № …»), изменён или создан сегодня. 1С
 # называет их «Меню № БК000000245 от 04.11.2026».
 #
 # На какой день ставит меню: на дату из имени файла («от 04.11.2026»), а если
@@ -241,9 +242,14 @@ function Find-NewFiles {
     $files = Get-ChildItem -LiteralPath $script:watchDir -ErrorAction SilentlyContinue |
         Where-Object {
             -not $_.PSIsContainer -and
-            $_.Name -match '^Меню' -and
+            # «Меню № БК…» где угодно в имени: файл бывает и «Копия Меню № …».
+            # Просто «меню» не берём — на рабочем столе столовой полно
+            # других таблиц, и чужая ушла бы в приложение как меню дня.
+            ($_.Name -match '^Меню' -or $_.Name -match 'Меню\s*№') -and
             @('.xlsx', '.xlsm', '.xls') -contains $_.Extension.ToLower() -and
-            $_.LastWriteTime -ge $today
+            # Скопированный файл сохраняет старое время изменения, а время
+            # создания у копии — сегодняшнее.
+            ($_.LastWriteTime -ge $today -or $_.CreationTime -ge $today)
         }
     foreach ($file in $files) {
         $key = "$($file.FullName)|$($file.LastWriteTimeUtc.Ticks)|$($file.Length)"
