@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:se_mobile/functions/export_file.dart';
 import 'package:se_mobile/functions/export_share.dart';
 import 'package:se_mobile/screens/home_shell.dart';
-import 'package:se_mobile/screens/it_request_form_screen.dart';
 import 'package:se_mobile/screens/pin_screen.dart';
 import 'package:se_mobile/utils/app_update.dart';
 import 'package:se_mobile/utils/biometric.dart';
@@ -125,13 +124,6 @@ void main() {
     ));
     await tester.pump();
   }
-
-  testWidgets('заявка в ОИТиС: вместо камеры — файл', (tester) async {
-    await pump(tester, const ItRequestFormScreen());
-    expect(find.text('Снять'), findsNothing);
-    expect(find.text('Из галереи'), findsNothing);
-    expect(find.text('Выбрать файл'), findsOneWidget);
-  });
 
   testWidgets('текст «отправить» уходит в буфер обмена', (tester) async {
     String? copied;

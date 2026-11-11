@@ -13,8 +13,6 @@ import '../widgets/load_error_view.dart';
 import 'medical_screen.dart';
 import 'menu_screen.dart';
 import 'news_admin_screen.dart';
-import 'it_request_detail_screen.dart';
-import 'it_requests_screen.dart';
 import 'business_trip_detail_screen.dart';
 import 'business_trips_screen.dart';
 import 'tech_screen.dart';
@@ -89,11 +87,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Get.to(() => const NewsAdminScreen());
       case 'news':
         Get.to(() => NewsScreen(job: widget.job));
-      case 'it':
-        final id = int.tryParse(notice.ref ?? '');
-        Get.to(() => id == null
-            ? const ItRequestsScreen()
-            : ItRequestDetailScreen(requestId: id));
       case 'trip':
         final id = int.tryParse(notice.ref ?? '');
         Get.to(() => id == null
@@ -213,7 +206,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'payslip' => (Icons.receipt_long, context.accentColor),
       'menu' => (Icons.restaurant_menu, const Color(0xFFC62828)),
       'queue' => (Icons.pending_actions, const Color(0xFF4527A0)),
-      'it' => (Icons.support_agent, const Color(0xFF37474F)),
       'payslip_q' => (Icons.contact_support_outlined, context.accentColor),
       'assignment' => (Icons.task_alt, const Color(0xFF0277BD)),
       'medical' => (Icons.health_and_safety_outlined, const Color(0xFF00838F)),

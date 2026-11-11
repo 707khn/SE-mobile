@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../utils/api.dart';
 import '../utils/load_problem.dart';
 import '../utils/variables.dart';
-import 'it_request.dart' show ItPerson;
+import 'person.dart' show ItPerson;
 
 class PayslipQuestionMessage {
   const PayslipQuestionMessage(

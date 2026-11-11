@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:se_mobile/requests/tech_request.dart';
-import 'package:se_mobile/screens/it_request_form_screen.dart';
 import 'package:se_mobile/screens/tech_screen.dart';
 import 'package:se_mobile/utils/lang.dart';
 import 'package:se_mobile/utils/localization.dart';
@@ -130,12 +129,7 @@ void main() {
       await tester.tap(find.text('Моя техника'));
       await tester.pumpAndSettle();
       expect(find.text('Ноутбук · Инв. № ИТ-0042 · каб. 214'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('ta_mine_report_5')));
-      await settle(tester);
     }, server);
-    final form =
-        tester.widget<ItRequestFormScreen>(find.byType(ItRequestFormScreen));
-    expect(form.description, 'HP ProBook 450, Инв. № ИТ-0042: ');
   });
 
   testWidgets('энергетик объявляет отключение для цеха', (tester) async {
