@@ -212,6 +212,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       'outage' => (Icons.power_off_outlined, const Color(0xFFE65100)),
       'itasset' => (Icons.devices_outlined, const Color(0xFF00695C)),
       'trip' => (Icons.flight_takeoff, const Color(0xFF0277BD)),
+      'signin' => (Icons.computer, const Color(0xFF455A64)),
       _ => (Icons.campaign_outlined, const Color(0xFF1565C0)),
     };
     return _card(

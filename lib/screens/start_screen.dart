@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../requests/login_request.dart';
 import '../utils/colors.dart';
+import '../utils/desktop.dart';
 import '../utils/dimensions.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/lang.dart';
@@ -10,6 +11,7 @@ import '../utils/variables.dart';
 import '../widgets/custom_login_field.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/login_button.dart';
+import 'qr_login_pc_screen.dart';
 import '../utils/app_theme.dart';
 
 
@@ -176,6 +178,23 @@ class CustomFormState extends State<CustomForm> {
                   ),
                 ),
               ),
+              // На компьютере можно войти и без пароля — QR-кодом с
+              // телефона, где человек уже вошёл (как WhatsApp на компьютере).
+              if (isDesktop) ...[
+                SizedBox(height: Dimensions.height30 / 2),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Get.to(() => const QrLoginPcScreen()),
+                    icon: const Icon(Icons.qr_code_2),
+                    label: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text('qr_pc_button'.tr,
+                          style: TextStyle(fontSize: Dimensions.fontSize16)),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

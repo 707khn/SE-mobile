@@ -8,12 +8,14 @@ import '../utils/app_theme.dart';
 import '../utils/app_version.dart';
 import '../utils/biometric.dart';
 import '../utils/colors.dart';
+import '../utils/desktop.dart';
 import '../utils/lang.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/theme_pref.dart';
 import '../utils/variables.dart';
 import 'about_screen.dart';
 import 'pin_screen.dart';
+import 'qr_confirm_screen.dart';
 import 'telegram_screen.dart';
 
 /// «Настройки» — всё, что меняют под себя, на одном экране.
@@ -111,6 +113,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
           _section('settings_security'.tr),
+          // Телефон — ключ для входа на компьютере: считать QR-код с его
+          // экрана. На самом компьютере эта строка ни к чему.
+          if (!isDesktop)
+            _tile(
+              icon: Icons.qr_code_scanner,
+              label: 'qr_phone_title'.tr,
+              onTap: () => Get.to(() => const QrConfirmScreen()),
+            ),
           _tile(
             icon: Icons.pin_outlined,
             label: 'pin_change_title'.tr,
