@@ -115,7 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _section('settings_security'.tr),
           // Телефон — ключ для входа на компьютере: считать QR-код с его
           // экрана. На самом компьютере эта строка ни к чему.
-          if (!isDesktop)
+          if (!isDesktop && !isDesktopBrowser)
             _tile(
               icon: Icons.qr_code_scanner,
               label: 'qr_phone_title'.tr,

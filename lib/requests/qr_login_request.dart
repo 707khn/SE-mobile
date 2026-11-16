@@ -189,3 +189,30 @@ String? takeCodeFromAddress() {
 }
 
 bool _addressCodeTaken = false;
+
+/// Браузер и система по строке User-Agent: «Edge, Windows», «Chrome, macOS».
+/// Порядок проверок важен: Edge и Opera называют себя ещё и Chrome, а
+/// Chrome — ещё и Safari.
+String describeUserAgent(String agent) {
+  final browser = agent.contains('Edg/')
+      ? 'Edge'
+      : agent.contains('OPR/') || agent.contains('Opera')
+          ? 'Opera'
+          : agent.contains('YaBrowser')
+              ? 'Яндекс Браузер'
+              : agent.contains('Firefox/')
+                  ? 'Firefox'
+                  : agent.contains('Chrome/')
+                      ? 'Chrome'
+                      : agent.contains('Safari/')
+                          ? 'Safari'
+                          : 'Браузер';
+  final system = agent.contains('Windows')
+      ? 'Windows'
+      : agent.contains('Mac OS X') || agent.contains('Macintosh')
+          ? 'macOS'
+          : agent.contains('Linux')
+              ? 'Linux'
+              : '';
+  return system.isEmpty ? browser : '$browser, $system';
+}

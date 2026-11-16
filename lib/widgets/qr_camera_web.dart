@@ -5,6 +5,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../requests/qr_login_request.dart' show describeUserAgent;
+
 /// Есть ли камера для QR-кода: браузер даёт её только на https.
 bool get qrCameraSupported {
   try {
@@ -251,4 +253,18 @@ void forgetCodeInAddress() {
         .getProperty<JSObject>('history'.toJS)
         .callMethodVarArgs('replaceState'.toJS, [null, ''.toJS, '$path$hash'.toJS]);
   } catch (_) {}
+}
+
+/// «Chrome, Windows» — чтобы на телефоне было видно, какой компьютер
+/// просится войти: имени компьютера браузер не скажет.
+String browserDescription() {
+  try {
+    final agent = globalContext
+        .getProperty<JSObject>('navigator'.toJS)
+        .getProperty<JSString>('userAgent'.toJS)
+        .toDart;
+    return describeUserAgent(agent);
+  } catch (_) {
+    return 'Браузер';
+  }
 }

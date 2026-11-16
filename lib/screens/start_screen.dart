@@ -180,7 +180,8 @@ class CustomFormState extends State<CustomForm> {
               ),
               // На компьютере можно войти и без пароля — QR-кодом с
               // телефона, где человек уже вошёл (как WhatsApp на компьютере).
-              if (isDesktop) ...[
+              // И в программе для Windows, и в браузере на компьютере.
+              if (isDesktop || isDesktopBrowser) ...[
                 SizedBox(height: Dimensions.height30 / 2),
                 SizedBox(
                   width: double.infinity,

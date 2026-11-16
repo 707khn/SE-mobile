@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -21,6 +22,21 @@ bool get isDesktop =>
 
 /// Для тестов: `true` или `false` — притвориться, `null` — как на самом деле.
 bool? debugDesktopOverride;
+
+/// Веб-версия открыта в браузере на компьютере, а не на телефоне.
+///
+/// Нужно для входа по QR-коду: на компьютере его показывают, на телефоне —
+/// считывают. iPad, который называет себя Mac, Flutter узнаёт сам и
+/// компьютером не считает.
+bool get isDesktopBrowser =>
+    debugDesktopBrowserOverride ??
+    (kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.linux));
+
+/// Для тестов: `true` или `false` — притвориться, `null` — как на самом деле.
+bool? debugDesktopBrowserOverride;
 
 /// Ширина колонки с содержимым на большом мониторе, пока человек не вошёл.
 ///
