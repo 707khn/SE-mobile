@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../chat/chat_bridge.dart';
+import '../requests/qr_login_request.dart';
 import '../chat/chat_config.dart';
 import '../services/fcm_service.dart';
 import '../utils/colors.dart';
@@ -16,6 +17,7 @@ import 'leave_screen.dart';
 import 'main_screen_1.dart';
 import 'menu_screen.dart';
 import 'payslip_screen.dart';
+import 'qr_confirm_screen.dart';
 import '../utils/app_theme.dart';
 import '../widgets/motion.dart';
 
@@ -63,6 +65,13 @@ class _HomeShellState extends State<HomeShell> {
     _registerForPush();
     // Нажатие на уведомление чата открывает вкладку «Чат».
     ChatBridge.start();
+    // Веб-версию открыли камерой телефона по QR-коду с компьютера —
+    // спросить, впустить ли компьютер, как только человек вошёл.
+    final pcCode = takeCodeFromAddress();
+    if (pcCode != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) => Get.to(() => QrConfirmScreen(initialCode: pcCode)));
+    }
   }
 
   /// Вкладок пять, а с чатом — шесть. Без адреса сервера чата в сборке

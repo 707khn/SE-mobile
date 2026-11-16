@@ -407,3 +407,31 @@ class AuthMiss(db.Model):
     # Этот словарь — последнее место, где пароли лежат открытым текстом, и
     # удалить его можно ровно тогда, когда здесь несколько дней подряд ноль.
     fallback_logins = db.Column(db.Integer, nullable=False, default=0)
+
+
+class QrLogin(db.Model):
+    """Вход на компьютере по QR-коду с телефона, пока он не закончился.
+
+    Компьютер показывает QR-код, телефон, где человек уже вошёл, его
+    считывает, человек подтверждает — и компьютер получает свой пропуск.
+    Строка живёт пару минут и удаляется, как только компьютер забрал
+    пропуск; протухшие подчищает каждый новый запрос.
+
+    Ни секрет компьютера, ни код из QR в базе не лежат — только их хеши:
+    по утёкшей базе не войти и в эти две минуты.
+    """
+    __tablename__ = 'qr_logins'
+    # SHA-256 секрета, который знает только компьютер: по нему он
+    # спрашивает, подтвердили ли вход, и забирает пропуск.
+    id = db.Column(db.String(64), primary_key=True)
+    # SHA-256 кода из QR (его же можно набрать руками).
+    code_hash = db.Column(db.String(64), nullable=False, unique=True)
+    # Имя компьютера, как он сам назвался, — его видит человек на телефоне.
+    device = db.Column(db.String(64), nullable=False, default='')
+    # waiting → scanned → approved, или rejected.
+    status = db.Column(db.String(10), nullable=False, default='waiting')
+    # Кто считал код и кто подтвердил: подтвердить может только тот, кто
+    # считал.
+    employee_id = db.Column(db.String(10), db.ForeignKey('employees.employee_id'))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
