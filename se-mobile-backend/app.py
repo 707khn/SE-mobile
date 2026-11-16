@@ -1426,20 +1426,38 @@ def _may_upload_access(employee):
     return _is_system_admin(employee.job_title) or employee.employee_id in extra
 
 
+def _access_doors_kept(door):
+    """Какие двери грузить из отчёта СКУД. Табель и «Турникет» — это приход
+    и уход, поэтому только турникеты на проходной; считыватели у кабинетов
+    (ИТиС, серверная, библиотека) и парадный вход в отчёт не нужны.
+    ACCESS_DOORS — слова через запятую, по вхождению, без учёта регистра."""
+    words = [w.strip().lower() for w in
+             os.environ.get('ACCESS_DOORS', 'турникет').split(',') if w.strip()]
+    low = (door or '').lower()
+    return any(w in low for w in words)
+
+
 def _import_access_passes(passes, dry_run=False):
     """Кладёт проходы из отчёта СКУД в базу. Возвращает сводку.
+
+    Берём только турникеты (_access_doors_kept). Проходы по остальным
+    дверям того же отчёта, если они уже лежат в базе за его период, —
+    убираем: так однажды загруженное лишнее исчезает следующей загрузкой.
 
     Сотрудника узнаём по ФИО — табельного в отчёте нет. Тёзок не угадываем:
     такой человек попадает в список «не узнаны» вместе с теми, кого в
     приложении нет вовсе.
 
     Направления в отчёте тоже нет: у турникета один считыватель на обе
-    стороны. Проставляем его по порядку в течение дня — первый проход через
-    дверь на улицу «Вход», следующий «Выход» и так далее. День пересчитываем
-    целиком, вместе с тем, что уже лежало в базе: иначе отчёт, загруженный
-    частями, начинал бы каждую часть со «Входа». У внутренних дверей
-    направления нет — там «Проход», как и в августовской выгрузке.
+    стороны. Проставляем его по порядку в течение дня — первый проход
+    «Вход», следующий «Выход» и так далее. День пересчитываем целиком,
+    вместе с тем, что уже лежало в базе: иначе отчёт, загруженный частями,
+    начинал бы каждую часть со «Входа».
     """
+    other_doors = sorted({p['door'] for p in passes
+                          if not _access_doors_kept(p['door'])})
+    kept = [p for p in passes if _access_doors_kept(p['door'])]
+
     by_name = {}
     for emp in Employee.query.all():
         by_name.setdefault(_norm_name(emp.full_name.replace('ё', 'е')
@@ -1447,7 +1465,7 @@ def _import_access_passes(passes, dry_run=False):
 
     unmatched = {}
     rows = []
-    for p in passes:
+    for p in kept:
         ids = by_name.get(_norm_name(p['name'].replace('ё', 'е').replace('Ё', 'Е')))
         if not ids or len(ids) > 1:
             entry = unmatched.setdefault(p['name'], {
@@ -1458,30 +1476,56 @@ def _import_access_passes(passes, dry_run=False):
         rows.append((next(iter(ids)), p['at'].date(),
                      p['at'].strftime('%H:%M'), p['door']))
 
-    result = {'passes_in_file': len(passes), 'added': 0, 'already_loaded': 0,
-              'employees': 0, 'unmatched_people': len(unmatched),
+    result = {'passes_in_file': len(kept), 'added': 0, 'already_loaded': 0,
+              'removed': 0, 'employees': 0,
+              'skipped_doors': other_doors,
+              'skipped_passes': len(passes) - len(kept),
+              'unmatched_people': len(unmatched),
               'unmatched_passes': sum(u['passes'] for u in unmatched.values()),
               'unmatched': sorted(unmatched.values(),
                                   key=lambda u: -u['passes'])}
-    if passes:
-        result['from'] = passes[0]['at'].date().isoformat()
-        result['to'] = passes[-1]['at'].date().isoformat()
-    if not rows:
+    if not passes:
         return result
-
-    emp_ids = {r[0] for r in rows}
-    first = min(r[1] for r in rows)
-    last = max(r[1] for r in rows)
-    existing = {}
-    for rec in AccessRecord.query.filter(
-            AccessRecord.employee_id.in_(emp_ids),
-            AccessRecord.access_date >= first,
-            AccessRecord.access_date <= last):
-        existing[(rec.employee_id, rec.access_date, rec.access_time,
-                  rec.door_location)] = rec
+    first = passes[0]['at'].date()
+    last = passes[-1]['at'].date()
+    result['from'] = first.isoformat()
+    result['to'] = last.isoformat()
 
     touched = set()
+
+    # Лишние двери за период отчёта — прочь.
+    stale = []
+    if other_doors:
+        stale = AccessRecord.query.filter(
+            AccessRecord.door_location.in_(other_doors),
+            AccessRecord.access_date >= first,
+            AccessRecord.access_date <= last).all()
+    result['removed'] = len(stale)
+    stale_stamps = set()
+    for rec in stale:
+        touched.add((rec.employee_id, rec.access_date))
+        hour, minute = (int(x) for x in rec.access_time.split(':'))
+        d = rec.access_date
+        stale_stamps.add((rec.employee_id,
+                          datetime(d.year, d.month, d.day, hour, minute)))
+        if not dry_run:
+            db.session.delete(rec)
+
+    stale_ids = {rec.id for rec in stale}
+    emp_ids = {r[0] for r in rows} | {e for e, _ in touched}
+    existing = {}
+    if emp_ids:
+        for rec in AccessRecord.query.filter(
+                AccessRecord.employee_id.in_(emp_ids),
+                AccessRecord.access_date >= first,
+                AccessRecord.access_date <= last):
+            if rec.id in stale_ids:
+                continue
+            existing[(rec.employee_id, rec.access_date, rec.access_time,
+                      rec.door_location)] = rec
+
     loaded_before = set(existing)
+    added_for = set()
     for key in rows:
         if key in existing:
             # Два прохода в одну минуту через ту же дверь — в отчёте так
@@ -1495,18 +1539,19 @@ def _import_access_passes(passes, dry_run=False):
         existing[key] = rec
         result['added'] += 1
         touched.add((emp_id, day))
+        added_for.add(emp_id)
         if not dry_run:
             db.session.add(rec)
-    result['employees'] = len({e for e, _ in touched})
+    result['employees'] = len(added_for)
     if dry_run or not touched:
         db.session.rollback()
         return result
 
     # Направления: день целиком, по порядку.
-    by_day = {}
+    by_day = {key: [] for key in touched}
     for (emp_id, day, at, door), rec in existing.items():
         if (emp_id, day) in touched and is_outer_door(door):
-            by_day.setdefault((emp_id, day), []).append(rec)
+            by_day[(emp_id, day)].append(rec)
 
     stamps = {}
     for (emp_id, day), recs in by_day.items():
@@ -1518,14 +1563,16 @@ def _import_access_passes(passes, dry_run=False):
             stamp = datetime(day.year, day.month, day.day, hour, minute)
             stamps[(emp_id, stamp)] = direction
 
-    # Табель считается по turnstile_events — переписываем там те же минуты.
+    # Табель считается по turnstile_events — переписываем там те же минуты,
+    # а минуты убранных дверей стираем.
     start = datetime.combine(first, datetime.min.time())
     end = datetime.combine(last + _ONE_DAY, datetime.min.time())
     for ev in TurnstileEvent.query.filter(
             TurnstileEvent.employee_id.in_(emp_ids),
             TurnstileEvent.timestamp >= start,
             TurnstileEvent.timestamp < end):
-        if (ev.employee_id, ev.timestamp) in stamps:
+        key = (ev.employee_id, ev.timestamp)
+        if key in stamps or key in stale_stamps:
             db.session.delete(ev)
     db.session.flush()
     for (emp_id, stamp), direction in stamps.items():
@@ -1541,11 +1588,19 @@ def _access_import_summary(result, dry_run):
     lines = []
     period = (f" с {ru_date(result.get('from'))} по {ru_date(result.get('to'))}"
               if result.get('from') else '')
-    lines.append(f"В отчёте {result['passes_in_file']} проходов{period}.")
+    lines.append(f"В отчёте {result['passes_in_file']} проходов через "
+                 f"турникеты{period}.")
     verb = 'Будет добавлено' if dry_run else 'Добавлено'
     lines.append(f"{verb}: {result['added']} (сотрудников: {result['employees']}).")
     if result['already_loaded']:
         lines.append(f"Уже были загружены раньше: {result['already_loaded']}.")
+    if result.get('skipped_passes'):
+        lines.append(f"Другие двери не загружаются ({result['skipped_passes']} "
+                     f"проходов): {', '.join(result['skipped_doors'])}.")
+    if result.get('removed'):
+        verb = 'Будет убрано' if dry_run else 'Убрано'
+        lines.append(f"{verb} загруженных раньше по другим дверям: "
+                     f"{result['removed']}.")
     if result['unmatched_people']:
         names = ', '.join(u['name'] for u in result['unmatched'][:10])
         more = result['unmatched_people'] - 10

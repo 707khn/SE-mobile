@@ -115,13 +115,14 @@ def test_upload_adds_passes_with_directions(app, client):
     r = _post(client, gzip.compress(_xml(_REPORT)), name='Отчет.xls.gz')
     assert r.status_code == 200, r.get_json()
     body = r.get_json()
-    assert body['added'] == 5
+    # Только турникеты: библиотека и парадный вход не грузятся.
+    assert body['added'] == 3
+    assert body['skipped_doors'] == ['Парадный вход', 'Техническая библиотека']
     assert body['unmatched_people'] == 2   # тёзки и человек не из приложения
     assert {u['reason'] for u in body['unmatched']} == {'тёзки', 'нет в приложении'}
 
     assert _records(app, _A) == [
         ('2026-10-01', '07:47', 'Вход', 'Турникет 2'),
-        ('2026-10-01', '10:15', 'Проход', 'Техническая библиотека'),
         ('2026-10-01', '17:08', 'Выход', 'Турникет 2'),
     ]
     with app.app_context():
@@ -129,7 +130,7 @@ def test_upload_adds_passes_with_directions(app, client):
                   .filter_by(employee_id=_A).order_by(TurnstileEvent.timestamp)]
     assert events == [('in', datetime(2026, 10, 1, 7, 47)),
                       ('out', datetime(2026, 10, 1, 17, 8))]
-    assert _records(app, _B)[1] == ('2026-10-02', '09:00', 'Выход', 'Парадный вход')
+    assert _records(app, _B) == [('2026-10-02', '08:01', 'Вход', 'Турникет 1')]
     assert _records(app, _TWIN1) == [] and _records(app, _TWIN2) == []
 
 
@@ -147,7 +148,7 @@ def test_repeat_and_continuation_do_not_double_or_restart(app, client):
 
 def test_dry_run_writes_nothing(app, client):
     body = _post(client, _xml(_REPORT), dry_run=True).get_json()
-    assert body['added'] == 5
+    assert body['added'] == 3
     assert 'Будет добавлено' in body['message']
     assert _records(app, _A) == []
 
@@ -160,3 +161,38 @@ def test_only_admin_uploads(client):
 def test_not_a_report(client):
     assert _post(client, b'<?xml version="1.0"?><a/>').status_code == 422
     assert _post(client, b'hello').status_code == 422
+
+
+def test_other_doors_loaded_earlier_are_removed(app, client):
+    """Первая выкладка грузила все двери; следующая загрузка убирает лишнее
+    за период отчёта и пересчитывает направления дня."""
+    with app.app_context():
+        for at, door, event in [('07:47', 'Турникет 2', 'Вход'),
+                                ('09:00', 'Парадный вход', 'Выход'),
+                                ('10:15', 'считыватель ИТиС', 'Проход'),
+                                ('17:08', 'Турникет 2', 'Вход')]:
+            db.session.add(AccessRecord(employee_id=_A,
+                                        access_date=date(2026, 10, 1),
+                                        access_time=at, event_type=event,
+                                        door_location=door))
+        db.session.add(TurnstileEvent(employee_id=_A, direction='out',
+                                      timestamp=datetime(2026, 10, 1, 9, 0)))
+        db.session.commit()
+
+    report = (_both('Тестов Тест Тестович', '01.10.2026 7:47:41')
+              + [_pass('Тестов Тест Тестович', '01.10.2026 9:00:00',
+                       'Парадный вход', 'Доступ предоставлен'),
+                 _pass('Тестов Тест Тестович', '01.10.2026 10:15:00',
+                       'считыватель ИТиС')]
+              + _both('Тестов Тест Тестович', '01.10.2026 17:08:18'))
+    body = _post(client, _xml(report)).get_json()
+    assert body['removed'] == 2 and body['added'] == 0
+    assert _records(app, _A) == [
+        ('2026-10-01', '07:47', 'Вход', 'Турникет 2'),
+        ('2026-10-01', '17:08', 'Выход', 'Турникет 2'),
+    ]
+    with app.app_context():
+        events = [(e.direction, e.timestamp.strftime('%H:%M')) for e in
+                  TurnstileEvent.query.filter_by(employee_id=_A)
+                  .order_by(TurnstileEvent.timestamp)]
+    assert events == [('in', '07:47'), ('out', '17:08')]
