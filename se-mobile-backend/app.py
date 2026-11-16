@@ -30,6 +30,7 @@ from parser_directory_excel import (parse_directory_excel, split_phones,
 from parser_news_feed import parse_news_feed, looks_like_feed, feed_links
 from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
+from parser_access_report import parse_access_report, is_outer_door
 from privacy import privacy_page
 import it_requests
 import retired  # noqa: F401 — таблицы снятых разделов, см. retired.py
@@ -1413,6 +1414,145 @@ def _may_upload_directory(employee):
              if p.strip()}
     return ('офис менеджер' in job or _is_system_admin(job)
             or employee.employee_id in extra)
+
+
+def _may_upload_access(employee):
+    """Проходы загружает администратор. ACCESS_STAFF в окружении —
+    табельные номера сверх этого: например, сотрудник проходной."""
+    if employee is None:
+        return False
+    extra = {p.strip() for p in os.environ.get('ACCESS_STAFF', '').split(',')
+             if p.strip()}
+    return _is_system_admin(employee.job_title) or employee.employee_id in extra
+
+
+def _import_access_passes(passes, dry_run=False):
+    """Кладёт проходы из отчёта СКУД в базу. Возвращает сводку.
+
+    Сотрудника узнаём по ФИО — табельного в отчёте нет. Тёзок не угадываем:
+    такой человек попадает в список «не узнаны» вместе с теми, кого в
+    приложении нет вовсе.
+
+    Направления в отчёте тоже нет: у турникета один считыватель на обе
+    стороны. Проставляем его по порядку в течение дня — первый проход через
+    дверь на улицу «Вход», следующий «Выход» и так далее. День пересчитываем
+    целиком, вместе с тем, что уже лежало в базе: иначе отчёт, загруженный
+    частями, начинал бы каждую часть со «Входа». У внутренних дверей
+    направления нет — там «Проход», как и в августовской выгрузке.
+    """
+    by_name = {}
+    for emp in Employee.query.all():
+        by_name.setdefault(_norm_name(emp.full_name.replace('ё', 'е')
+                                      .replace('Ё', 'Е')), set()).add(emp.employee_id)
+
+    unmatched = {}
+    rows = []
+    for p in passes:
+        ids = by_name.get(_norm_name(p['name'].replace('ё', 'е').replace('Ё', 'Е')))
+        if not ids or len(ids) > 1:
+            entry = unmatched.setdefault(p['name'], {
+                'name': p['name'], 'department': p['department'],
+                'passes': 0, 'reason': 'тёзки' if ids else 'нет в приложении'})
+            entry['passes'] += 1
+            continue
+        rows.append((next(iter(ids)), p['at'].date(),
+                     p['at'].strftime('%H:%M'), p['door']))
+
+    result = {'passes_in_file': len(passes), 'added': 0, 'already_loaded': 0,
+              'employees': 0, 'unmatched_people': len(unmatched),
+              'unmatched_passes': sum(u['passes'] for u in unmatched.values()),
+              'unmatched': sorted(unmatched.values(),
+                                  key=lambda u: -u['passes'])}
+    if passes:
+        result['from'] = passes[0]['at'].date().isoformat()
+        result['to'] = passes[-1]['at'].date().isoformat()
+    if not rows:
+        return result
+
+    emp_ids = {r[0] for r in rows}
+    first = min(r[1] for r in rows)
+    last = max(r[1] for r in rows)
+    existing = {}
+    for rec in AccessRecord.query.filter(
+            AccessRecord.employee_id.in_(emp_ids),
+            AccessRecord.access_date >= first,
+            AccessRecord.access_date <= last):
+        existing[(rec.employee_id, rec.access_date, rec.access_time,
+                  rec.door_location)] = rec
+
+    touched = set()
+    loaded_before = set(existing)
+    for key in rows:
+        if key in existing:
+            # Два прохода в одну минуту через ту же дверь — в отчёте так
+            # бывает (провернул турникет дважды); в базе минута одна.
+            if key in loaded_before:
+                result['already_loaded'] += 1
+            continue
+        emp_id, day, at, door = key
+        rec = AccessRecord(employee_id=emp_id, access_date=day, access_time=at,
+                           event_type='Проход', door_location=door)
+        existing[key] = rec
+        result['added'] += 1
+        touched.add((emp_id, day))
+        if not dry_run:
+            db.session.add(rec)
+    result['employees'] = len({e for e, _ in touched})
+    if dry_run or not touched:
+        db.session.rollback()
+        return result
+
+    # Направления: день целиком, по порядку.
+    by_day = {}
+    for (emp_id, day, at, door), rec in existing.items():
+        if (emp_id, day) in touched and is_outer_door(door):
+            by_day.setdefault((emp_id, day), []).append(rec)
+
+    stamps = {}
+    for (emp_id, day), recs in by_day.items():
+        recs.sort(key=lambda r: (r.access_time, r.door_location))
+        for i, rec in enumerate(recs):
+            direction = 'in' if i % 2 == 0 else 'out'
+            rec.event_type = 'Вход' if direction == 'in' else 'Выход'
+            hour, minute = (int(x) for x in rec.access_time.split(':'))
+            stamp = datetime(day.year, day.month, day.day, hour, minute)
+            stamps[(emp_id, stamp)] = direction
+
+    # Табель считается по turnstile_events — переписываем там те же минуты.
+    start = datetime.combine(first, datetime.min.time())
+    end = datetime.combine(last + _ONE_DAY, datetime.min.time())
+    for ev in TurnstileEvent.query.filter(
+            TurnstileEvent.employee_id.in_(emp_ids),
+            TurnstileEvent.timestamp >= start,
+            TurnstileEvent.timestamp < end):
+        if (ev.employee_id, ev.timestamp) in stamps:
+            db.session.delete(ev)
+    db.session.flush()
+    for (emp_id, stamp), direction in stamps.items():
+        db.session.add(TurnstileEvent(employee_id=emp_id, direction=direction,
+                                      timestamp=stamp))
+    db.session.commit()
+    return result
+
+
+def _access_import_summary(result, dry_run):
+    def ru_date(iso):
+        return '.'.join(reversed(iso.split('-'))) if iso else ''
+    lines = []
+    period = (f" с {ru_date(result.get('from'))} по {ru_date(result.get('to'))}"
+              if result.get('from') else '')
+    lines.append(f"В отчёте {result['passes_in_file']} проходов{period}.")
+    verb = 'Будет добавлено' if dry_run else 'Добавлено'
+    lines.append(f"{verb}: {result['added']} (сотрудников: {result['employees']}).")
+    if result['already_loaded']:
+        lines.append(f"Уже были загружены раньше: {result['already_loaded']}.")
+    if result['unmatched_people']:
+        names = ', '.join(u['name'] for u in result['unmatched'][:10])
+        more = result['unmatched_people'] - 10
+        tail = f' и ещё {more}' if more > 0 else ''
+        lines.append(f"Не узнаны по ФИО ({result['unmatched_people']} чел., "
+                     f"{result['unmatched_passes']} проходов): {names}{tail}.")
+    return '\n'.join(lines)
 
 
 def _may_edit_menu():
@@ -4099,6 +4239,45 @@ def register_routes(app):
                       emp.full_name, direction, ts_str, employee_id)
 
         return jsonify({'message': 'Success', 'id': event.id})
+
+    # ── Отчёт СКУД: проходы файлом ─────────────────────────────────────────────
+
+    @app.route('/api/access/import-report', methods=['POST'])
+    def import_access_report():
+        """Проходы из отчёта программы турникета, сохранённого в Excel.
+
+        Как у справочника и меню: логин и пароль в теле запроса, отправляет
+        программка с компьютера (tools/access-upload). Она же сжимает файл:
+        отчёт за полтора месяца весит 50 МБ, сжатый — меньше одного, и
+        пролезает в общий предел загрузок nginx без отдельного правила.
+
+        Повторная загрузка того же или перекрывающегося отчёта ничего не
+        задваивает. `dry_run=1` — только посчитать.
+        """
+        login = (request.form.get('login') or '').strip()
+        password = (request.form.get('password') or '').strip()
+        employee_id = _authenticate(login, password)
+        if not employee_id:
+            return _credentials_refused(login)
+        if not _may_upload_access(Employee.query.get(employee_id)):
+            return jsonify({'message': 'Загружать проходы может администратор',
+                            'error': True}), 403
+
+        upload = request.files.get('file')
+        if upload is None:
+            return jsonify({'message': 'Файл не передан', 'error': True}), 400
+        try:
+            passes = parse_access_report(upload.read())
+        except ValueError as e:
+            return jsonify({'message': str(e), 'error': True}), 422
+
+        dry_run = (request.form.get('dry_run') or '').strip() in ('1', 'true')
+        result = _import_access_passes(passes, dry_run=dry_run)
+        result['message'] = _access_import_summary(result, dry_run)
+        logging.info('Проходы из отчёта (%s): %s', login,
+                     {k: v for k, v in result.items()
+                      if k not in ('unmatched', 'message')})
+        return jsonify(result)
 
     # ── Attendance statistics ─────────────────────────────────────────────────
 
