@@ -21,4 +21,21 @@ void main() {
   test('код для глаз — двумя четвёрками', () {
     expect(qrLoginCodeForEyes('ABCD2345'), 'ABCD 2345');
   });
+
+  test('браузер на компьютере называется браузером и системой', () {
+    expect(
+        describeUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36'),
+        'Chrome, Windows');
+    expect(
+        describeUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36 '
+            'Edg/131.0'),
+        'Edge, Windows');
+    expect(
+        describeUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) '
+            'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15'),
+        'Safari, macOS');
+    expect(describeUserAgent('что-то странное'), 'Браузер');
+  });
 }

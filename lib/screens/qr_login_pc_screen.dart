@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -9,6 +10,7 @@ import '../utils/app_theme.dart';
 import '../utils/colors.dart';
 import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
+import '../widgets/qr_camera.dart' show browserDescription;
 import '../widgets/qr_view.dart';
 import 'pin_screen.dart';
 
@@ -59,6 +61,8 @@ class _QrLoginPcScreenState extends State<QrLoginPcScreen> {
   }
 
   static String get _deviceName {
+    // Браузер имени компьютера не скажет — называемся браузером и системой.
+    if (kIsWeb) return browserDescription();
     try {
       return Platform.localHostname;
     } catch (_) {

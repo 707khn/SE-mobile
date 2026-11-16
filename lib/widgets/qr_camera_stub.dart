@@ -18,3 +18,6 @@ class QrCamera extends StatelessWidget {
 
 /// Убрать код из адресной строки — только у веб-версии.
 void forgetCodeInAddress() {}
+
+/// Каким браузером открыта веб-версия — только у веб-версии.
+String browserDescription() => '';
