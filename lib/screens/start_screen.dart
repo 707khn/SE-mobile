@@ -14,7 +14,6 @@ import '../widgets/login_button.dart';
 import 'qr_login_pc_screen.dart';
 import '../utils/app_theme.dart';
 
-
 class StartPage extends StatelessWidget {
   const StartPage({Key? key}) : super(key: key);
 
@@ -71,7 +70,9 @@ class CustomFormState extends State<CustomForm> {
       _lang = Lang.code(prefs.getString(AppValues.LANG));
     });
     final savedLogin = await SecureStorageHelper.instance.getLogin();
-    if (savedLogin != null && savedLogin.isNotEmpty && loginController.text.isEmpty) {
+    if (savedLogin != null &&
+        savedLogin.isNotEmpty &&
+        loginController.text.isEmpty) {
       loginController.text = savedLogin;
     }
   }
@@ -87,121 +88,134 @@ class CustomFormState extends State<CustomForm> {
         ),
       ),
       child: SingleChildScrollView(
-        child: Container(
-          margin: EdgeInsets.symmetric(horizontal: Dimensions.width20),
-          padding: EdgeInsets.symmetric(
-            horizontal: Dimensions.width20,
-            vertical: Dimensions.height30,
-          ),
-          decoration: BoxDecoration(
-            color: context.cardSurface,
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black38,
-                offset: Offset(0, 8),
-                blurRadius: 24,
-              )
-            ],
-            borderRadius: BorderRadius.all(Radius.circular(Dimensions.radius25 * 0.8)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: _changeLanguage,
-                  // The flag shows the language you switch *to*, so the caption
-                  // names that same language rather than the current one.
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: Dimensions.width20 * 1.25,
-                        height: Dimensions.height30 * 1.25,
-                        child: Image.asset(
-                            Lang.isKazakh(_lang) ? 'assets/ru.png' : 'assets/kz.png'),
+        // Карточка входа не шире телефона: в браузере на большом мониторе
+        // поля и кнопка «Войти» растягивались во всю ширину окна.
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _maxCardWidth),
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: Dimensions.width20),
+              padding: EdgeInsets.symmetric(
+                horizontal: Dimensions.width20,
+                vertical: Dimensions.height30,
+              ),
+              decoration: BoxDecoration(
+                color: context.cardSurface,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black38,
+                    offset: Offset(0, 8),
+                    blurRadius: 24,
+                  )
+                ],
+                borderRadius: BorderRadius.all(
+                    Radius.circular(Dimensions.radius25 * 0.8)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: _changeLanguage,
+                      // The flag shows the language you switch *to*, so the caption
+                      // names that same language rather than the current one.
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: Dimensions.width20 * 1.25,
+                            height: Dimensions.height30 * 1.25,
+                            child: Image.asset(Lang.isKazakh(_lang)
+                                ? 'assets/ru.png'
+                                : 'assets/kz.png'),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            Lang.isKazakh(_lang) ? 'RU' : 'KZ',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: context.mutedColor,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        Lang.isKazakh(_lang) ? 'RU' : 'KZ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: context.mutedColor,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: Dimensions.height30 / 2),
-              SizedBox(
-                height: Dimensions.height100 * 1.3,
-                child: Image.asset('assets/logo.png'),
-              ),
-              SizedBox(height: Dimensions.height30),
-              CustomLoginField(
-                hintText: 'login'.tr,
-                obscureText: false,
-                controller: loginController,
-                fontSize: Dimensions.fontSize20,
-                // Most logins are tabular numbers, but "admin" is letters —
-                // the text keyboard covers both.
-                keyboardType: TextInputType.text,
-                maxLength: 20,
-                textInputAction: TextInputAction.next,
-                onSubmitted: () => _passwordFocus.requestFocus(),
-              ),
-              SizedBox(height: Dimensions.height30 / 3),
-              CustomLoginField(
-                hintText: 'password'.tr,
-                obscureText: true,
-                controller: passwordController,
-                fontSize: Dimensions.fontSize20,
-                keyboardType: TextInputType.visiblePassword,
-                maxLength: 50,
-                focusNode: _passwordFocus,
-                onSubmitted: () => _loginButtonKey.currentState?.submit(),
-              ),
-              SizedBox(height: Dimensions.height30),
-              SizedBox(
-                width: double.infinity,
-                child: LoginButton(
-                  key: _loginButtonKey,
-                  inButton: BigText(
-                    fontWeight: FontWeight.bold,
-                    overflow: TextOverflow.visible,
-                    content: "log in".tr,
-                    color: AppColors.niceWhite,
-                  ),
-                ),
-              ),
-              // На компьютере можно войти и без пароля — QR-кодом с
-              // телефона, где человек уже вошёл (как WhatsApp на компьютере).
-              // И в программе для Windows, и в браузере на компьютере.
-              if (isDesktop || isDesktopBrowser) ...[
-                SizedBox(height: Dimensions.height30 / 2),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Get.to(() => const QrLoginPcScreen()),
-                    icon: const Icon(Icons.qr_code_2),
-                    label: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text('qr_pc_button'.tr,
-                          style: TextStyle(fontSize: Dimensions.fontSize16)),
                     ),
                   ),
-                ),
-              ],
-            ],
+                  SizedBox(height: Dimensions.height30 / 2),
+                  SizedBox(
+                    height: Dimensions.height100 * 1.3,
+                    child: Image.asset('assets/logo.png'),
+                  ),
+                  SizedBox(height: Dimensions.height30),
+                  CustomLoginField(
+                    hintText: 'login'.tr,
+                    obscureText: false,
+                    controller: loginController,
+                    fontSize: Dimensions.fontSize20,
+                    // Most logins are tabular numbers, but "admin" is letters —
+                    // the text keyboard covers both.
+                    keyboardType: TextInputType.text,
+                    maxLength: 20,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: () => _passwordFocus.requestFocus(),
+                  ),
+                  SizedBox(height: Dimensions.height30 / 3),
+                  CustomLoginField(
+                    hintText: 'password'.tr,
+                    obscureText: true,
+                    controller: passwordController,
+                    fontSize: Dimensions.fontSize20,
+                    keyboardType: TextInputType.visiblePassword,
+                    maxLength: 50,
+                    focusNode: _passwordFocus,
+                    onSubmitted: () => _loginButtonKey.currentState?.submit(),
+                  ),
+                  SizedBox(height: Dimensions.height30),
+                  SizedBox(
+                    width: double.infinity,
+                    child: LoginButton(
+                      key: _loginButtonKey,
+                      inButton: BigText(
+                        fontWeight: FontWeight.bold,
+                        overflow: TextOverflow.visible,
+                        content: "log in".tr,
+                        color: AppColors.niceWhite,
+                      ),
+                    ),
+                  ),
+                  // На компьютере можно войти и без пароля — QR-кодом с
+                  // телефона, где человек уже вошёл (как WhatsApp на компьютере).
+                  // И в программе для Windows, и в браузере на компьютере.
+                  if (isDesktop || isDesktopBrowser) ...[
+                    SizedBox(height: Dimensions.height30 / 2),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Get.to(() => const QrLoginPcScreen()),
+                        icon: const Icon(Icons.qr_code_2),
+                        label: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text('qr_pc_button'.tr,
+                              style:
+                                  TextStyle(fontSize: Dimensions.fontSize16)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
+
+  /// Наибольшая ширина карточки входа.
+  static const double _maxCardWidth = 460;
 
   _changeLanguage() async {
     final prefs = await SharedPreferences.getInstance();
