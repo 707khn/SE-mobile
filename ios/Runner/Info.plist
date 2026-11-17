@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+		<key>NSCameraUsageDescription</key>
+		<string>Камера нужна, чтобы считать QR-код для входа на компьютере.</string>
 		<key>NSFaceIDUsageDescription</key>
 		<string>Вход в приложение по лицу вместо кода</string>
 		<key>CFBundleDevelopmentRegion</key>
