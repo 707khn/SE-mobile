@@ -36,6 +36,23 @@ _TITLE = re.compile(r'^Расч[её]тный листок за\s+(\S+)\s+(\d{4}
 # Так payslip_xlsx узнаёт натуральные доходы среди справочных строк.
 NATURAL_PREFIX = 'Натуральный доход: '
 
+# С октября 2026 1С печатает в шапке строку итогов с начала года:
+#   «С нач.года: начисл. дох.: 6 754 725,00 | необл. дох.: … | ОПВ: … |
+#    Выч.: … | ИПН: …»
+# Подписи у ячеек короткие, а «с начала года» стоит только в первой. Без
+# этого приложение теряло начисленный доход с начала года, а ОПВ и ИПН за
+# год показывало как будто за месяц: «ОПВ 668 984» рядом с удержанными
+# за месяц 49 295.
+_YEAR_TO_DATE = re.compile(r'^С\s*нач(?:ала|\.)\s*года\s*:\s*', re.IGNORECASE)
+_YEAR_TO_DATE_NAMES = {
+    'начисл. дох.': 'Начисленный доход',
+    'необл. дох.': 'Необлагаемый доход',
+    'опв': 'ОПВ',
+    'выч.': 'Вычеты',
+    'ипн': 'ИПН',
+}
+YEAR_TO_DATE_SUFFIX = ' с начала года'
+
 
 def _text(value):
     if value is None:
@@ -293,6 +310,15 @@ def parse_payslip_excel(data: bytes) -> list[dict]:
             continue
         if values[0] == 'Подразделение организации':
             # Строка группировки отчёта между листками, не часть листка.
+            continue
+
+        if _YEAR_TO_DATE.match(values[0]):
+            for c, v in sorted(row.items()):
+                label, value = _labelled(_YEAR_TO_DATE.sub('', _text(v)))
+                if label is None:
+                    continue
+                name = _YEAR_TO_DATE_NAMES.get(label.lower(), label)
+                slip.header(name + YEAR_TO_DATE_SUFFIX, value)
             continue
 
         labels = [_labelled(v) for v in values]
