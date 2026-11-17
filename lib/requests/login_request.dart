@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
-import 'account_request.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/pin_screen.dart';
 import '../utils/dimensions.dart';
@@ -93,14 +92,13 @@ Future<void> loginToAccount(
         // присылает — тогда поле пустое и заголовок просто не уходит.
         token: body['token'] as String?,
       );
-      // Выданный пароль (одноразовый код или, у старых учёток, табельный
-      // номер) знает не только владелец. На телефоне и в браузере его просто
-      // гасим и сразу просим код из четырёх цифр: свой пароль тут не нужен
-      // (во вкладке на iPhone — не гасим, см. settleIssuedPassword). На
-      // компьютере, или если сервер не согласился, — как прежде, сначала
-      // придумать пароль.
+      // Выданный пароль (одноразовый код из ОИТиС или, у старых учёток,
+      // табельный номер) знает не только владелец. Везде — на телефоне, в
+      // браузере, на компьютере — сначала придумать свой, от восьми
+      // символов: по нему потом входят снова (после выхода, на новом
+      // телефоне, со значка на iPhone), а выданный код гаснет.
       final mustChange = body['must_change_password'] == true;
-      if (mustChange && !await settleIssuedPassword()) {
+      if (mustChange) {
         Get.to(() => ChangePasswordScreen(
               fullName: body['full_name'],
               job: body['job'],

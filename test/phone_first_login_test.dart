@@ -6,9 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:se_mobile/requests/account_request.dart';
 import 'package:se_mobile/screens/change_password_screen.dart';
-import 'package:se_mobile/utils/desktop.dart';
 import 'package:se_mobile/utils/lang.dart';
 import 'package:se_mobile/utils/localization.dart';
 import 'package:se_mobile/utils/logout_helper.dart';
@@ -17,120 +15,66 @@ import 'package:se_mobile/utils/secure_storage_helper.dart';
 
 import 'support/fake_server.dart';
 
-/// Первый вход с телефона и из браузера: код с бумажки и сразу код из
-/// четырёх цифр.
+/// Первый вход по коду из ОИТиС: везде — свой пароль от восьми символов.
 ///
-/// Свой пароль на телефоне придумывали и тут же забывали: дальше вход по
-/// коду или пальцем. Теперь телефон и браузер гасят выданный код на сервере,
-/// а пароль задают позже в «Настройках» — те, кому нужен вход с компьютера.
+/// Было: телефон и браузер гасили выданный код, и своего пароля не
+/// оставалось — выйдя или сменив телефон, человек возвращался только по
+/// новому коду, а значок на iPhone снова просил пароль. Теперь после кода
+/// везде «Придумайте пароль», а у кого пароля нет — задают в «Настройках».
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     OwnPassword.has.value = true;
   });
-  tearDown(() {
-    debugDesktopOverride = null;
-    debugIosBrowserTabOverride = null;
-  });
 
-  test('пароль при первом входе нужен только на компьютере', () {
-    debugDesktopOverride = false;
-    expect(passwordNeededToStart, isFalse);
-    debugDesktopOverride = true;
-    expect(passwordNeededToStart, isTrue);
-  });
-
-  test('вне браузера вкладки на iPhone не бывает', () {
-    debugDesktopOverride = false;
-    expect(iosBrowserTab, isFalse);
-    expect(spendIssuedPasswordHere, isTrue);
-  });
-
-  /// Сервер, который гасит выданный код, как настоящий.
-  FakeServer codeServer({int status = 200, bool hasPassword = false}) =>
-      FakeServer.routed((method, url, body) =>
-          url.path == '/api/account/code-used'
-              ? (
-                  status,
-                  status == 200
-                      ? jsonEncode(
-                          {'message': 'Success', 'has_password': hasPassword})
-                      : jsonEncode(
-                          {'message': 'Failure', 'error': 'password_required'})
-                )
+  group('после входа по коду', () {
+    Future<FakeServer> open(WidgetTester tester, String error) async {
+      await tester.runAsync(Lang.initDates);
+      FlutterSecureStorage.setMockInitialValues({'token': 't'});
+      final server = FakeServer.routed((method, url, body) =>
+          url.path == '/change-password'
+              ? (400, jsonEncode({'message': 'Failure', 'error': error}))
               : (404, '{}'));
+      await tester.pumpWidget(GetMaterialApp(
+        translations: LocaleString(),
+        locale: const Locale('ru'),
+        home: const ChangePasswordScreen(
+            fullName: 'Цехов Тест', job: 'Слесарь', currentPassword: '48213'),
+      ));
+      return server;
+    }
 
-  group('вошли с выданным паролем', () {
-    setUp(() => FlutterSecureStorage.setMockInitialValues({'token': 't'}));
+    Future<void> submit(
+            WidgetTester tester, FakeServer server, String password) =>
+        HttpOverrides.runWithHttpOverrides(() async {
+          final fields = find.byType(TextField);
+          await tester.enterText(fields.at(0), password);
+          await tester.enterText(fields.at(1), password);
+          await tester.tap(find.byType(ElevatedButton));
+          for (var i = 0; i < 5; i++) {
+            await tester.runAsync(
+                () => Future.delayed(const Duration(milliseconds: 40)));
+            await tester.pump();
+          }
+        }, server);
 
-    test('на телефоне и в браузере — гасим и пускаем без своего пароля',
-        () async {
-      debugDesktopOverride = false;
-      debugIosBrowserTabOverride = false;
-      final server = codeServer();
-      final ok = await HttpOverrides.runWithHttpOverrides(
-          settleIssuedPassword, server);
-      expect(ok, isTrue);
-      expect(server.requests, hasLength(1));
-      expect(OwnPassword.has.value, isFalse);
+    testWidgets('просят придумать пароль, код с входа уже подставлен',
+        (tester) async {
+      await open(tester, 'too_short');
+      expect(find.text('Придумайте пароль'), findsOneWidget);
+      expect(find.text('Текущий пароль'), findsNothing);
+      expect(find.textContaining('Не короче 8 символов'), findsOneWidget);
     });
 
-    test('во вкладке на iPhone — пускаем, а код не гасим: им войдут со значка',
-        () async {
-      debugDesktopOverride = false;
-      debugIosBrowserTabOverride = true;
-      expect(spendIssuedPasswordHere, isFalse);
-      final server = codeServer();
-      final ok = await HttpOverrides.runWithHttpOverrides(
-          settleIssuedPassword, server);
-      expect(ok, isTrue);
-      expect(server.requests, isEmpty);
-      expect(OwnPassword.has.value, isTrue);
+    testWidgets('короткий пароль — сервер не принял, объясняем',
+        (tester) async {
+      final server = await open(tester, 'too_short');
+      await submit(tester, server, 'Цех-202');
+      final sent = jsonDecode(server.requests.single) as Map<String, dynamic>;
+      expect(sent['old_password'], '48213');
+      expect(sent['new_password'], 'Цех-202');
+      expect(find.text('Нужно не меньше 8 символов'), findsOneWidget);
     });
-
-    test('на компьютере — придумать пароль, сервер не трогаем', () async {
-      debugDesktopOverride = true;
-      final server = codeServer();
-      final ok = await HttpOverrides.runWithHttpOverrides(
-          settleIssuedPassword, server);
-      expect(ok, isFalse);
-      expect(server.requests, isEmpty);
-    });
-
-    test('сервер не согласился (admin) — придумать пароль, как прежде',
-        () async {
-      debugDesktopOverride = false;
-      debugIosBrowserTabOverride = false;
-      final server = codeServer(status: 403);
-      final ok = await HttpOverrides.runWithHttpOverrides(
-          settleIssuedPassword, server);
-      expect(ok, isFalse);
-      expect(OwnPassword.has.value, isTrue);
-    });
-  });
-
-  test('сервер погасил код — своего пароля нет', () async {
-    FlutterSecureStorage.setMockInitialValues({'token': 't'});
-    final server = FakeServer.routed((method, url, body) =>
-        url.path == '/api/account/code-used'
-            ? (200, jsonEncode({'message': 'Success', 'has_password': false}))
-            : (404, '{}'));
-    final ok = await HttpOverrides.runWithHttpOverrides(
-        spendOneTimeCode, server);
-    expect(ok, isTrue);
-    expect(OwnPassword.has.value, isFalse);
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getBool('has_password'), isFalse);
-  });
-
-  test('старый сервер адреса не знает — просим пароль, как прежде', () async {
-    FlutterSecureStorage.setMockInitialValues({'token': 't'});
-    final server = FakeServer.routed(
-        (method, url, body) => (404, jsonEncode({'message': 'Failure'})));
-    final ok = await HttpOverrides.runWithHttpOverrides(
-        spendOneTimeCode, server);
-    expect(ok, isFalse);
-    expect(OwnPassword.has.value, isTrue);
   });
 
   testWidgets('без пароля выход предупреждает, что вернуться — по новому коду',
@@ -154,7 +98,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  group('пароль для входа с компьютера', () {
+  group('пароля нет — задать в «Настройках»', () {
     Future<FakeServer> open(WidgetTester tester) async {
       await tester.runAsync(Lang.initDates);
       FlutterSecureStorage.setMockInitialValues({'token': 't', 'pin': '2580'});
@@ -191,7 +135,7 @@ void main() {
 
     testWidgets('вместо старого пароля спрашивают код', (tester) async {
       await open(tester);
-      expect(find.text('Пароль для входа с компьютера'), findsOneWidget);
+      expect(find.text('Задать пароль'), findsOneWidget);
       expect(find.text('Код для входа в приложение'), findsOneWidget);
       expect(find.text('Текущий пароль'), findsNothing);
     });

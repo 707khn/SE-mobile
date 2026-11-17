@@ -6,7 +6,6 @@ import '../utils/api.dart';
 import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/variables.dart';
-import 'account_request.dart' show settleIssuedPassword;
 
 /// Вход из Safari — значку на экране «Домой» (сервер — web_handoff.py).
 ///
@@ -58,10 +57,10 @@ Future<bool> claimLoginFromSafari() async {
     );
     final hasPassword = body['has_password'];
     if (hasPassword is bool) await OwnPassword.save(hasPassword);
-    // В Safari вошли выданным кодом — во вкладке его не гасят как раз
-    // ради значка (см. spendIssuedPasswordHere). Значок вошёл — гасим.
+    // Пароль ещё выданный — после кода из четырёх цифр значок попросит
+    // придумать свой (pin_screen.dart, _openApp).
     if (body['must_change_password'] == true) {
-      await settleIssuedPassword();
+      await SecureStorageHelper.instance.markPasswordExpired();
     }
     return true;
   } catch (_) {

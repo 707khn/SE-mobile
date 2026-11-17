@@ -982,7 +982,21 @@ def _authenticate(login, password):
     return None
 
 
-_MIN_PASSWORD_LENGTH = 6
+# Свой пароль — не короче восьми символов, любых: буквы, цифры, знаки.
+# Раньше хватало шести, но тогда пароль нужен был только на компьютере.
+# Теперь его придумывает каждый при первом входе по коду из ОИТиС, и по нему
+# входят снова — после выхода, на новом телефоне, со значка на iPhone.
+# Прежние шестизначные пароли продолжают работать: правило — только для
+# нового пароля.
+_MIN_PASSWORD_LENGTH = 8
+
+
+def _is_digit_run(password):
+    """«12345678», «87654321», «01234567» — цифры подряд по порядку."""
+    if not password.isdigit() or len(password) < 3:
+        return False
+    steps = {int(b) - int(a) for a, b in zip(password, password[1:])}
+    return steps in ({1}, {-1})
 
 
 def _password_problem(password, login):
@@ -991,8 +1005,6 @@ def _password_problem(password, login):
     Правило про табельный номер здесь главное: именно им пароли и были,
     и ради этого всё затевалось.
     """
-    if len(password) < _MIN_PASSWORD_LENGTH:
-        return 'too_short'
     login = (login or '').strip()
     if password.strip().lower() == login.lower():
         return 'same_as_login'
@@ -1002,7 +1014,10 @@ def _password_problem(password, login):
     if (password.isdigit() and login.isdigit()
             and password.lstrip('0') == login.lstrip('0')):
         return 'same_as_login'
-    if password.isdigit() and len(set(password)) <= 2:
+    if len(password) < _MIN_PASSWORD_LENGTH:
+        return 'too_short'
+    # «11111111», «12121212», «aaaaaaaa», «12345678» — подбираются первыми.
+    if len(set(password.lower())) <= 2 or _is_digit_run(password):
         return 'too_simple'
     return None
 
@@ -1710,13 +1725,12 @@ def _must_change_password(login):
     return bool(account and account.must_change_password)
 
 
-# «Пароля нет». На телефоне и в браузере первый вход — это код с бумажки и
-# сразу код из четырёх цифр для входа: свой пароль человек придумал бы и тут
-# же забыл, потому что дальше входит по коду или пальцем. Выданный код при этом
-# гасится (см. /api/account/code-used) — его видел тот, кто раздавал, — и
-# вместо хеша остаётся эта метка. Ни один пароль с ней не сходится:
-# check_password_hash на строке без «$» отвечает False. Пароль задают потом в
-# «Настройках» — тем, кому нужен вход с компьютера.
+# «Пароля нет». Так было у тех, кто входил с телефона или из браузера, пока
+# свой пароль там не спрашивали: выданный код гасился (/api/account/code-used),
+# и вместо хеша оставалась эта метка. Ни один пароль с ней не сходится:
+# check_password_hash на строке без «$» отвечает False. Теперь при первом
+# входе пароль придумывают везде, а у кого метка осталась — задают его в
+# «Настройках».
 _NO_PASSWORD = '!'
 
 
@@ -3162,20 +3176,18 @@ def register_routes(app):
     @app.route('/api/account/code-used', methods=['POST'])
     @require_auth
     def one_time_code_used():
-        """Вход по одноразовому коду с телефона или из браузера: код погасить.
+        """Погасить выданный код без своего пароля — больше так нельзя.
 
-        Телефон зовёт это сразу после входа с выданным паролем — одноразовым
-        кодом или, у старых учёток, табельным номером. Выданный пароль знает
-        не только владелец, поэтому прежде приложение заставляло придумать
-        свой. Теперь на телефоне это лишний шаг: дальше человек входит кодом
-        из четырёх цифр или пальцем, а пароль, придуманный на бегу, забыл бы.
-        Выданный пароль при этом перестаёт действовать — так же, как после
-        смены, — а свой можно задать позже в «Настройках».
+        Раньше телефон и браузер звали это сразу после входа по коду из
+        ОИТиС: код гас, а своего пароля у человека не было вовсе. Выйдя или
+        сменив телефон, он мог вернуться только по новому коду, а значок на
+        iPhone, у которого своё хранилище, снова просил пароль, которого нет.
+        Теперь при первом входе везде придумывают свой пароль
+        (/change-password), и код гаснет уже тогда.
 
-        Браузер зовёт это так же, как телефон, — кроме вкладки на iPhone:
-        значок с экрана «Домой» входит заново тем же кодом и гасит его сам.
-        Программа для компьютера сюда не ходит: там пароль нужен, чтобы
-        войти снова. Учётке admin пароль нужен всегда.
+        Адрес оставлен для приложений прежних версий: на «password_required»
+        они, как и раньше при отказе, открывают экран «придумайте пароль».
+        Код при этом действует, пока пароль не задан.
         """
         viewer = getattr(g, 'employee', None)
         if viewer is None:
@@ -3184,17 +3196,9 @@ def register_routes(app):
             employee_id=viewer.employee_id, is_active=True).first()
         if account is None:
             return jsonify({'message': 'Failure', 'error': 'no_account'}), 404
-        if account.login == 'admin' or not account.login.isdigit():
+        if account.must_change_password:
             return jsonify({'message': 'Failure',
                             'error': 'password_required'}), 403
-        if account.must_change_password:
-            account.password_hash = _NO_PASSWORD
-            account.must_change_password = False
-            account.failed_attempts = 0
-            account.locked_until = None
-            db.session.commit()
-            logging.info('Одноразовый код %r погашен: вход с телефона',
-                         account.login)
         return jsonify({'message': 'Success',
                         'has_password': _has_password(account)})
 

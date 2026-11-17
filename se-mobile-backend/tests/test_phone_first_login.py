@@ -1,9 +1,10 @@
-"""Первый вход с телефона: код с бумажки и сразу код из четырёх цифр.
+"""Первый вход по коду из ОИТиС: везде — свой пароль от восьми символов.
 
-Свой пароль на телефоне человек придумывал и тут же забывал: дальше он
-входит кодом или пальцем. Теперь телефон гасит выданный код сам
-(/api/account/code-used), пароля у учётки нет, а задать его можно позже в
-«Настройках» — тем, кому нужен вход с компьютера.
+Было: телефон и браузер гасили выданный код (/api/account/code-used), и
+своего пароля у учётки не оставалось. Выйдя или сменив телефон, человек
+возвращался только по новому коду, а значок на iPhone просил пароль,
+которого нет. Теперь код гаснет, только когда придуман свой пароль
+(/change-password); /api/account/code-used больше ничего не гасит.
 """
 
 from werkzeug.security import generate_password_hash
@@ -38,50 +39,99 @@ def _auth(token):
     return {'Authorization': f'Bearer {token}'}
 
 
-def test_code_is_spent_and_password_is_not_asked(app, client):
+def test_code_is_not_spent_without_own_password(app, client):
+    """Приложение прежней версии просит погасить код — сервер отказывает,
+    и оно, как при любом отказе, открывает «придумайте пароль»."""
     with app.app_context():
-        _make('9401', '4821')
+        _make('9401', '48213')
     try:
-        body = _login(client, '9401', '4821')
+        body = _login(client, '9401', '48213')
         assert body['message'] == 'Success'
         assert body['must_change_password'] is True
         token = body['token']
 
         answer = client.post('/api/account/code-used', headers=_auth(token))
-        assert answer.status_code == 200
-        assert answer.get_json() == {'message': 'Success',
-                                     'has_password': False}
+        assert answer.status_code == 403
+        assert answer.get_json()['error'] == 'password_required'
 
-        # Пропуск телефона остался годным: человек уже внутри.
         me = client.get('/api/me', headers=_auth(token)).get_json()
-        assert me['must_change_password'] is False
-        assert me['has_password'] is False
-
-        # А код с бумажки больше не пускает — ни в какой форме.
-        assert _login(client, '9401', '4821')['message'] == 'Failure'
-        assert _login(client, '9401', '!')['message'] == 'Failure'
-        assert _login(client, '9401', '')['message'] == 'Failure'
+        assert me['must_change_password'] is True
+        assert me['has_password'] is True
+        # Код ещё действует: свой пароль не задан.
+        assert _login(client, '9401', '48213')['message'] == 'Success'
     finally:
         with app.app_context():
             _drop('9401')
 
 
-def test_password_is_set_later_without_old_one(app, client):
+def test_own_password_replaces_the_code(app, client):
     with app.app_context():
-        _make('9402', '5933')
+        _make('9402', '59331')
     try:
-        token = _login(client, '9402', '5933')['token']
-        client.post('/api/account/code-used', headers=_auth(token))
-
+        token = _login(client, '9402', '59331')['token']
         answer = client.post('/change-password', headers=_auth(token),
-                             json={'old_password': '',
+                             json={'old_password': '59331',
                                    'new_password': 'Цех-2026-ok'})
         assert answer.status_code == 200
         new_token = answer.get_json()['token']
 
         me = client.get('/api/me', headers=_auth(new_token)).get_json()
+        assert me['must_change_password'] is False
         assert me['has_password'] is True
         assert _login(client, '9402', 'Цех-2026-ok')['message'] == 'Success'
+        # Код из ОИТиС больше не пускает.
+        assert _login(client, '9402', '59331')['message'] == 'Failure'
+    finally:
+        with app.app_context():
+            _drop('9402')
+
+
+def test_password_rules():
+    problem = app_module._password_problem
+    assert problem('Abc-123', '9405') == 'too_short'       # семь символов
+    assert problem('Abc-1234', '9405') is None             # восемь — можно
+    assert problem('48213907', '9405') is None             # и одни цифры
+    assert problem('11111111', '9405') == 'too_simple'
+    assert problem('12121212', '9405') == 'too_simple'
+    assert problem('aaaaaaaa', '9405') == 'too_simple'
+    assert problem('12345678', '9405') == 'too_simple'
+    assert problem('87654321', '9405') == 'too_simple'
+    assert problem('0000009405', '9405') == 'same_as_login'
+
+
+def test_short_password_is_refused(app, client):
+    with app.app_context():
+        _make('9406', '70412')
+    try:
+        token = _login(client, '9406', '70412')['token']
+        answer = client.post('/change-password', headers=_auth(token),
+                             json={'old_password': '70412',
+                                   'new_password': 'Цех-202'})
+        assert answer.status_code == 400
+        assert answer.get_json()['error'] == 'too_short'
+        assert _login(client, '9406', '70412')['message'] == 'Success'
+    finally:
+        with app.app_context():
+            _drop('9406')
+
+
+def test_who_had_no_password_sets_it_without_old_one(app, client):
+    """Кто входил по коду, пока пароль не спрашивали, остался без пароля
+    (метка «!»). Задать его в «Настройках» можно без старого."""
+    with app.app_context():
+        _make('9407', 'не-важно-1', must_change=False)
+        token = app_module._issue_token('0000009407')
+        db.session.get(UserAccount, '9407').password_hash = '!'
+        db.session.commit()
+    try:
+        answer = client.post('/change-password', headers=_auth(token),
+                             json={'old_password': '',
+                                   'new_password': 'Цех-2026-ok'})
+        assert answer.status_code == 200
+        new_token = answer.get_json()['token']
+        me = client.get('/api/me', headers=_auth(new_token)).get_json()
+        assert me['has_password'] is True
+        assert _login(client, '9407', 'Цех-2026-ok')['message'] == 'Success'
 
         # Пароль появился — дальше без старого его не сменить.
         again = client.post('/change-password', headers=_auth(new_token),
@@ -91,7 +141,7 @@ def test_password_is_set_later_without_old_one(app, client):
         assert again.get_json()['error'] == 'wrong_password'
     finally:
         with app.app_context():
-            _drop('9402')
+            _drop('9407')
 
 
 def test_own_password_is_never_dropped(app, client):
@@ -123,24 +173,18 @@ def test_needs_a_token(client):
 
 
 def test_reset_gives_a_code_again(app, client):
-    """Потерял телефон — администратор выдаёт новый код, как и раньше."""
+    """Забыл пароль или потерял телефон — администратор выдаёт новый код."""
     with app.app_context():
-        _make('9404', '6044')
+        _make('9404', 'Свой-пароль-1', must_change=False)
     try:
-        token = _login(client, '9404', '6044')['token']
-        client.post('/api/account/code-used', headers=_auth(token))
-
         admin = _login(client, 'admin', 'test-admin-password')['token']
         reset = client.post('/api/admin/accounts/9404/reset',
                             headers=_auth(admin)).get_json()
         code = reset['temporary_password']
+        assert _login(client, '9404', 'Свой-пароль-1')['message'] == 'Failure'
         body = _login(client, '9404', code)
         assert body['message'] == 'Success'
         assert body['must_change_password'] is True
-
-        rows = client.get('/api/admin/accounts', headers=_auth(admin)).get_json()
-        row = next(r for r in rows['accounts'] if r['login'] == '9404')
-        assert row['has_password'] is True
     finally:
         with app.app_context():
             _drop('9404')

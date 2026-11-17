@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
-import '../requests/account_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/biometric.dart';
 import '../utils/colors.dart';
@@ -576,23 +575,16 @@ class _PinScreenState extends State<PinScreen> {
     final fullName = await secure.getFullName() ?? widget.fullName;
     final job = await secure.getJob() ?? widget.job;
 
-    // Пароль выданный (у старых учёток — табельный номер), а человек уже
-    // вошёл. На телефоне и в браузере выданный просто гасим: дальше вход по
-    // коду, свой пароль тут не нужен. Не вышло (нет связи, старый сервер)
-    // или это компьютер — спрашиваем новый здесь, а не на входе: на вход
-    // теперь попадают редко.
+    // Пароль выданный (сбросили, пока человек был внутри, или значок на
+    // iPhone вошёл из Safari по коду), а человек уже вошёл. Свой пароль
+    // спрашиваем здесь, а не на входе: на вход теперь попадают редко.
     if (await secure.passwordExpired()) {
-      if (!await settleIssuedPassword()) {
-        Get.offAll(() => ChangePasswordScreen(
-              fullName: fullName,
-              job: job,
-              currentPassword: '',
-            ));
-        return;
-      }
-      // Во вкладке на iPhone выданный ещё жив, и при следующем запуске
-      // сервер скажет об этом снова — флаг встанет заново, а пустят так же.
-      await secure.clearPasswordExpired();
+      Get.offAll(() => ChangePasswordScreen(
+            fullName: fullName,
+            job: job,
+            currentPassword: '',
+          ));
+      return;
     }
     Get.offAll(() => HomeShell(fullName: fullName, job: job));
   }
