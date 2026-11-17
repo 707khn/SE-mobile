@@ -391,6 +391,31 @@ class AuthToken(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
 
 
+class WebHandoff(db.Model):
+    """Вход, который вкладка Safari передаёт значку на экране «Домой».
+
+    На iPhone значок, поставленный через «Поделиться» → «На экран Домой»,
+    хранит своё отдельно от Safari: вход из вкладки туда не попадает, и
+    значок снова спрашивал пароль. Одно iOS всё же переносит — куки, один
+    раз, в ту минуту, когда значок ставят. Вошедшая вкладка держит такую
+    куку (web_handoff.py), значок при первом запуске предъявляет её и
+    получает свой пропуск.
+
+    В базе — хеш секрета из куки и ключ пропуска вкладки (тот же хеш, что
+    в auth_tokens). Пропуск вкладки погасили — выходом, сменой или сбросом
+    пароля, отключением учётки, — и передать вход уже нельзя: отдельно
+    гасить эти строки не нужно.
+    """
+    __tablename__ = 'web_handoffs'
+    # SHA-256 секрета из куки.
+    id = db.Column(db.String(64), primary_key=True)
+    # auth_tokens.token вкладки, которая завела строку. Без внешнего ключа:
+    # пропуск удаляют многими путями, и каждый из них ломался бы о строку.
+    source_token = db.Column(db.String(64), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+
+
 class AuthMiss(db.Model):
     """Сколько за день пришло запросов без пропуска.
 

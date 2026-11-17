@@ -43,6 +43,7 @@ import planned_outages
 import chat_link
 import reception
 import qr_login
+import web_handoff
 import telegram_bot
 from payslip_xlsx import build_payslip_xlsx, file_name as payslip_file_name
 
@@ -2158,6 +2159,7 @@ def create_app():
     planned_outages.register(app, sys.modules[__name__])
     reception.register(app, sys.modules[__name__])
     qr_login.register(app, sys.modules[__name__])
+    web_handoff.register(app, sys.modules[__name__])
     telegram_bot.register(app, sys.modules[__name__])
 
     @app.errorhandler(Exception)

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../chat/chat_bridge.dart';
 import '../requests/qr_login_request.dart';
+import '../requests/web_handoff_request.dart';
 import '../chat/chat_config.dart';
 import '../services/fcm_service.dart';
 import '../utils/colors.dart';
@@ -67,6 +70,9 @@ class _HomeShellState extends State<HomeShell> {
     ChatBridge.start();
     // Веб-версию открыли камерой телефона по QR-коду с компьютера —
     // спросить, впустить ли компьютер, как только человек вошёл.
+    // Вкладка Safari на iPhone: оставить вход для значка на экране
+    // «Домой», если человек его поставит, — иначе значок спросит пароль.
+    unawaited(offerLoginToHomeScreenIcon());
     final pcCode = takeCodeFromAddress();
     if (pcCode != null) {
       WidgetsBinding.instance.addPostFrameCallback(

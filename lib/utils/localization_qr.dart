@@ -1,5 +1,22 @@
 /// Надписи входа на компьютере по QR-коду с телефона — своим файлом.
 const Map<String, String> qrStringsKk = {
+  // Значок с экрана «Домой» на iPhone: вход через Safari
+  'qr_safari_button': 'Safari арқылы кіру',
+  'qr_safari_title': 'Safari арқылы кіру',
+  'qr_safari_device': 'iPhone-дағы SE-mobile белгішесі',
+  'qr_safari_open': 'Safari-де растау',
+  'qr_safari_scanned': 'Safari-де растаңыз',
+  'qr_safari_scanned_hint': 'Safari-де «Кіру» батырмасын басып, осында '
+      'қайта оралыңыз.',
+  'qr_safari_step1': '«Safari-де растау» батырмасын басыңыз — SE-mobile '
+      'Safari-де ашылады, онда сіз кіріп қойғансыз.',
+  'qr_safari_step2': 'Кіруді растап, осы белгішеге қайта оралыңыз — кіру '
+      'өздігінен орындалады.',
+  'qr_safari_step3': 'Safari ашылмаса: Safari-де SE-mobile → Мәзір → '
+      '«Баптаулар» → «Компьютерге кіру» → «Кодты қолмен теру» және '
+      'жоғарыдағы кодты теріңіз.',
+  'qr_safari_safety': 'Құпия сөз керек емес: белгіше сіз Safari-де '
+      'растағаннан кейін ғана кіреді.',
   // Компьютер
   'qr_pc_button': 'Телефондағы QR-кодпен кіру',
   'qr_pc_title': 'QR-кодпен кіру',
@@ -55,6 +72,22 @@ const Map<String, String> qrStringsKk = {
 };
 
 const Map<String, String> qrStringsRu = {
+  // Значок с экрана «Домой» на iPhone: вход через Safari
+  'qr_safari_button': 'Войти через Safari',
+  'qr_safari_title': 'Вход через Safari',
+  'qr_safari_device': 'Значок SE-mobile на iPhone',
+  'qr_safari_open': 'Подтвердить в Safari',
+  'qr_safari_scanned': 'Подтвердите в Safari',
+  'qr_safari_scanned_hint': 'Нажмите в Safari «Войти» и вернитесь сюда.',
+  'qr_safari_step1': 'Нажмите «Подтвердить в Safari» — SE-mobile откроется '
+      'в Safari, где вы уже вошли.',
+  'qr_safari_step2': 'Подтвердите вход и вернитесь к этому значку — он '
+      'войдёт сам.',
+  'qr_safari_step3': 'Если Safari не открылся: в Safari откройте SE-mobile → '
+      'Меню → «Настройки» → «Вход на компьютере» → «Ввести код вручную» и '
+      'наберите код выше.',
+  'qr_safari_safety': 'Пароль не нужен: значок войдёт только после того, '
+      'как вы подтвердите вход в Safari.',
   // Компьютер
   'qr_pc_button': 'Войти по QR-коду с телефона',
   'qr_pc_title': 'Вход по QR-коду',
