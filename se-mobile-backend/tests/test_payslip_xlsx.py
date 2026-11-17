@@ -98,6 +98,16 @@ def test_classify_sorts_reference_rows_like_1c():
         ('Обязательные пенсионные взносы работодателя', 6)]
 
 
+def test_year_to_date_totals_go_to_header():
+    groups = classify([], [('Начисленный доход с начала года', 1),
+                           ('Вычеты с начала года', 2),
+                           ('ОППВ за месяц', 3)])
+    assert groups['header'] == [('Начисленный доход с начала года', 1),
+                                ('Вычеты с начала года', 2),
+                                ('ОППВ за месяц', 3)]
+    assert groups['natural'] == groups['tax'] == []
+
+
 def test_period_is_written_like_1c():
     assert period_label('07.2026') == 'Июл 26'
     assert period_label('20-30 Апр 26') == '20-30 Апр 26'

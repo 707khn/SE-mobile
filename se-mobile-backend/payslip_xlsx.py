@@ -28,7 +28,8 @@ _MONTHS_SHORT = ('Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'И
                  'Сен', 'Окт', 'Ноя', 'Дек')
 
 # Строки, которые 1С печатает в шапке: взносы с начала года и за месяц.
-_HEADER_PREFIXES = ('ОПВР', 'ООСМС', 'ВОСМС')
+_HEADER_PREFIXES = ('ОПВР', 'ООСМС', 'ВОСМС', 'ОППВ')
+_YEAR_TO_DATE = ' с начала года'
 _NATURAL_PREFIX = 'Натуральный доход:'
 
 _MONEY = '#,##0.00'
@@ -53,7 +54,9 @@ def classify(benefits, reference):
         if not name:
             continue
         lower = name.lower()
-        if name.startswith(_HEADER_PREFIXES):
+        if name.startswith(_HEADER_PREFIXES) or lower.endswith(_YEAR_TO_DATE):
+            # «Начисленный доход с начала года» — шапка, а не натуральный
+            # доход, хоть в названии и есть «доход».
             group = 'header'
         elif name.startswith(_NATURAL_PREFIX):
             group, name = 'natural', name[len(_NATURAL_PREFIX):].strip()
@@ -164,10 +167,15 @@ def build_payslip_xlsx(ps, employee_name):
     s.next()
     # Взносы с начала года и за месяц — как в 1С: ОПВР своей строкой,
     # ООСМС и ВОСМС следующей, не больше трёх в строке.
+    # Сначала итоги с начала года (доход, ОПВ, вычеты, ИПН) — в 1С это
+    # первая строка шапки.
     header = groups['header']
-    opvr = [row for row in header if row[0].startswith('ОПВР')]
-    medical = [row for row in header if not row[0].startswith('ОПВР')]
-    for line in [opvr[i:i + 3] for i in range(0, len(opvr), 3)] + \
+    totals = [row for row in header
+              if not row[0].startswith(_HEADER_PREFIXES)]
+    opvr = [row for row in header if row[0].startswith(('ОПВР', 'ОППВ'))]
+    medical = [row for row in header if row[0].startswith(('ООСМС', 'ВОСМС'))]
+    for line in [totals[i:i + 3] for i in range(0, len(totals), 3)] + \
+            [opvr[i:i + 3] for i in range(0, len(opvr), 3)] + \
             [medical[i:i + 3] for i in range(0, len(medical), 3)]:
         for (name, amount), (col, last) in zip(
                 line, (('A', 'B'), ('C', 'E'), ('F', 'H'))):
