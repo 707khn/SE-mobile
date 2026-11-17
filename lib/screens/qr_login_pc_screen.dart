@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import '../requests/qr_login_request.dart';
 import '../utils/app_theme.dart';
 import '../utils/colors.dart';
+import '../utils/open_in_safari.dart';
 import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import '../widgets/qr_camera.dart' show browserDescription;
@@ -24,8 +25,16 @@ import 'pin_screen.dart';
 /// Код живёт две минуты; не дождавшись, экран сам берёт новый — несколько
 /// раз, а дальше просит нажать кнопку, чтобы забытая на экране программа не
 /// спрашивала сервер весь день.
+///
+/// [viaSafari] — то же для значка с экрана «Домой» на iPhone: свой вход
+/// значок не получил (см. web_handoff_request.dart), а в Safari на этом же
+/// телефоне человек уже вошёл. Код подтверждают там: кнопка открывает
+/// Safari сразу на нужном экране. QR-кода нет — камерой свой же экран не
+/// считать.
 class QrLoginPcScreen extends StatefulWidget {
-  const QrLoginPcScreen({super.key});
+  const QrLoginPcScreen({super.key, this.viaSafari = false});
+
+  final bool viaSafari;
 
   @override
   State<QrLoginPcScreen> createState() => _QrLoginPcScreenState();
@@ -60,7 +69,8 @@ class _QrLoginPcScreenState extends State<QrLoginPcScreen> {
     super.dispose();
   }
 
-  static String get _deviceName {
+  String get _deviceName {
+    if (widget.viaSafari) return 'qr_safari_device'.tr;
     // Браузер имени компьютера не скажет — называемся браузером и системой.
     if (kIsWeb) return browserDescription();
     try {
@@ -160,7 +170,9 @@ class _QrLoginPcScreenState extends State<QrLoginPcScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('qr_pc_title'.tr)),
+      appBar: AppBar(
+          title: Text(
+              widget.viaSafari ? 'qr_safari_title'.tr : 'qr_pc_title'.tr)),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -191,10 +203,12 @@ class _QrLoginPcScreenState extends State<QrLoginPcScreen> {
             child: Center(child: CircularProgressIndicator()));
       case _Stage.waiting:
         inner = Column(mainAxisSize: MainAxisSize.min, children: [
-          QrView(data: qrLoginLink(ticket!.code), size: size),
-          const SizedBox(height: 12),
+          if (!widget.viaSafari) ...[
+            QrView(data: qrLoginLink(ticket!.code), size: size),
+            const SizedBox(height: 12),
+          ],
           SelectableText(
-            qrLoginCodeForEyes(ticket.code),
+            qrLoginCodeForEyes(ticket!.code),
             style: TextStyle(
               fontSize: 22,
               letterSpacing: 4,
@@ -204,9 +218,17 @@ class _QrLoginPcScreenState extends State<QrLoginPcScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Text('qr_pc_code_hint'.tr,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, color: context.mutedColor)),
+          if (widget.viaSafari) ...[
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => openInSafari(qrLoginLink(ticket.code)),
+              icon: const Icon(Icons.open_in_new),
+              label: Text('qr_safari_open'.tr),
+            ),
+          ] else
+            Text('qr_pc_code_hint'.tr,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: context.mutedColor)),
           if (_offline) ...[
             const SizedBox(height: 8),
             Text('qr_pc_offline'.tr,
@@ -218,8 +240,10 @@ class _QrLoginPcScreenState extends State<QrLoginPcScreen> {
         inner = _message(
           context,
           icon: Icons.phone_android,
-          title: 'qr_pc_scanned'.tr,
-          hint: 'qr_pc_scanned_hint'.tr,
+          title: widget.viaSafari ? 'qr_safari_scanned'.tr : 'qr_pc_scanned'.tr,
+          hint: widget.viaSafari
+              ? 'qr_safari_scanned_hint'.tr
+              : 'qr_pc_scanned_hint'.tr,
           busy: true,
         );
       case _Stage.rejected:
@@ -303,7 +327,9 @@ class _QrLoginPcScreenState extends State<QrLoginPcScreen> {
   }
 
   Widget _steps(BuildContext context) {
-    final steps = ['qr_pc_step1'.tr, 'qr_pc_step2'.tr, 'qr_pc_step3'.tr];
+    final steps = widget.viaSafari
+        ? ['qr_safari_step1'.tr, 'qr_safari_step2'.tr, 'qr_safari_step3'.tr]
+        : ['qr_pc_step1'.tr, 'qr_pc_step2'.tr, 'qr_pc_step3'.tr];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -335,7 +361,7 @@ class _QrLoginPcScreenState extends State<QrLoginPcScreen> {
             ),
           ),
         const SizedBox(height: 8),
-        Text('qr_pc_safety'.tr,
+        Text(widget.viaSafari ? 'qr_safari_safety'.tr : 'qr_pc_safety'.tr,
             style: TextStyle(
                 fontSize: 12.5, height: 1.4, color: context.mutedColor)),
       ],

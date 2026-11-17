@@ -5,6 +5,7 @@ import '../requests/login_request.dart';
 import '../utils/colors.dart';
 import '../utils/desktop.dart';
 import '../utils/dimensions.dart';
+import '../utils/own_password.dart';
 import '../utils/secure_storage_helper.dart';
 import '../utils/lang.dart';
 import '../utils/variables.dart';
@@ -199,6 +200,26 @@ class CustomFormState extends State<CustomForm> {
                         label: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Text('qr_pc_button'.tr,
+                              style:
+                                  TextStyle(fontSize: Dimensions.fontSize16)),
+                        ),
+                      ),
+                    ),
+                  ],
+                  // Значок с экрана «Домой» на iPhone: Safari рядом, и в нём
+                  // человек обычно уже вошёл. Вход оттуда обычно приходит
+                  // сам, при первом запуске; не пришёл — подтвердить там.
+                  if (iosHomeScreenIcon) ...[
+                    SizedBox(height: Dimensions.height30 / 2),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Get.to(
+                            () => const QrLoginPcScreen(viaSafari: true)),
+                        icon: const Icon(Icons.ios_share),
+                        label: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text('qr_safari_button'.tr,
                               style:
                                   TextStyle(fontSize: Dimensions.fontSize16)),
                         ),

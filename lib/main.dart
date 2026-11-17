@@ -23,6 +23,7 @@ import 'utils/error_log.dart';
 import 'utils/lang.dart';
 import 'utils/own_password.dart';
 import 'utils/secure_storage_helper.dart';
+import 'requests/web_handoff_request.dart';
 import 'widgets/motion.dart';
 import 'widgets/desktop_layout.dart';
 
@@ -223,7 +224,11 @@ class MyApp extends StatelessWidget {
     // Пароль, оставшийся в хранилище от прежних сборок: теперь он не нужен
     // ни для чего, а лежать на телефоне ему незачем.
     await secure.forgetStoredPassword();
-    final isLogged = await secure.isLoggedIn();
+    var isLogged = await secure.isLoggedIn();
+    // Значок с экрана «Домой» на iPhone, ещё не вошедший: вход мог прийти
+    // из Safari, где человек уже вошёл (web_handoff_request.dart). Тогда
+    // пароль не спрашиваем — только придумать код из четырёх цифр.
+    if (!isLogged && await claimLoginFromSafari()) isLogged = true;
     if (isLogged) {
       await PayrollAccess.load();
       await ManagerAccess.load();

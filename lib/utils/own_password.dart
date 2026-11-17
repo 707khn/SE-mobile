@@ -34,6 +34,18 @@ bool get iosBrowserTab =>
 /// Для тестов: `true` или `false` — притвориться, `null` — как на самом деле.
 bool? debugIosBrowserTabOverride;
 
+/// SE-mobile открыт на iPhone или iPad значком с экрана «Домой». У такого
+/// значка своё хранилище, отдельно от Safari: вход из вкладки сюда сам не
+/// попадает (см. web_handoff_request.dart).
+bool get iosHomeScreenIcon =>
+    debugIosHomeScreenIconOverride ??
+    (kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.iOS &&
+        openedFromHomeScreen);
+
+/// Для тестов: `true` или `false` — притвориться, `null` — как на самом деле.
+bool? debugIosHomeScreenIconOverride;
+
 /// Есть ли у человека свой пароль — по слову сервера (/api/me,
 /// `has_password`). Нет — значит, он вошёл с телефона или из браузера по
 /// одноразовому коду, и «Настройки» предлагают задать пароль для входа с
