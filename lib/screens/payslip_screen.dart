@@ -871,13 +871,10 @@ class _PayslipPageState extends State<PayslipPage> {
               ),
           ],
         ),
-        trailing: showTotal
-            ? Text(
-                '${_numberFormat.format(total)} ₸',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 13, color: color),
-              )
-            : null,
+        trailing: Text(
+          '${_numberFormat.format(total)} ₸',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
+        ),
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(
@@ -970,10 +967,13 @@ class _PayslipPageState extends State<PayslipPage> {
         title: Text(title,
             style: TextStyle(
                 fontWeight: FontWeight.bold, fontSize: 15, color: color)),
-        trailing: Text(
-          '${_numberFormat.format(total)} ₸',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
-        ),
+        trailing: showTotal
+            ? Text(
+                '${_numberFormat.format(total)} ₸',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 13, color: color),
+              )
+            : null,
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(
