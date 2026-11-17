@@ -277,7 +277,12 @@ class _PayslipPageState extends State<PayslipPage> {
     buf.writeln('');
     buf.writeln('${'accruals'.tr}: ${_numberFormat.format(payslip.totalAccruals)} ₸');
     buf.writeln('${'deductions'.tr}: ${_numberFormat.format(payslip.totalDeductions)} ₸');
-    buf.writeln('${'net pay'.tr}: ${_numberFormat.format(payslip.netPay)} ₸');
+    buf.writeln('${'payslip_net_calc'.tr}: ${_numberFormat.format(payslip.netPay)} ₸');
+    if (payslip.hasSettlement) {
+      buf.writeln(payslip.toPay < 0
+          ? '${'payslip_worker_debt'.tr}: ${_numberFormat.format(-payslip.toPay)} ₸'
+          : '${'payslip_to_pay'.tr}: ${_numberFormat.format(payslip.toPay)} ₸');
+    }
     shareText(context, buf.toString());
   }
 
@@ -671,10 +676,13 @@ class _PayslipPageState extends State<PayslipPage> {
                           ],
                           if (_payslip!.reference.isNotEmpty) ...[
                             SizedBox(height: Dimensions.height30 / 2),
+                            // Здесь суммы с начала года вперемешку с суммами
+                            // за месяц — складывать их нечего.
                             _buildSimpleExpandable(
                               title: 'payslip_reference'.tr,
                               items: _payslip!.reference,
                               color: context.mutedColor,
+                              showTotal: false,
                             ),
                           ],
                           // Чужой листок (из панели администратора) —
@@ -705,9 +713,17 @@ class _PayslipPageState extends State<PayslipPage> {
     final deductPct = ps.totalAccruals > 0
         ? (ps.totalDeductions / ps.totalAccruals * 100).clamp(0.0, 100.0)
         : 0.0;
+    // Крупно — то же, что внизу листка 1С: долг за организацией на конец
+    // месяца. «Начислено минус удержано» с ним расходится, когда в месяце
+    // уже что-то выплатили (аванс, касса), — оно мелко ниже.
+    final workerOwes = ps.toPay < 0;
+    final headline = ps.hasSettlement
+        ? (workerOwes ? 'payslip_worker_debt'.tr : 'payslip_to_pay'.tr)
+        : 'net pay'.tr;
+    final amount = workerOwes ? -ps.toPay : ps.toPay;
     return GestureDetector(
       onLongPress: () {
-        Clipboard.setData(ClipboardData(text: '${_numberFormat.format(ps.netPay)} ₸'));
+        Clipboard.setData(ClipboardData(text: '${_numberFormat.format(amount)} ₸'));
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('copied'.tr),
           duration: const Duration(seconds: 1),
@@ -734,12 +750,14 @@ class _PayslipPageState extends State<PayslipPage> {
         child: Column(
           children: [
             Text(
-              'net pay'.tr,
+              headline,
+              key: const Key('payslip_headline'),
               style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
             const SizedBox(height: 6),
             Text(
-              '${_numberFormat.format(ps.netPay)} ₸',
+              '${_numberFormat.format(amount)} ₸',
+              key: const Key('payslip_headline_amount'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 28,
@@ -747,10 +765,10 @@ class _PayslipPageState extends State<PayslipPage> {
                 letterSpacing: 0.5,
               ),
             ),
-            if (ps.debtEnd != 0.0) ...[
+            if (ps.hasSettlement) ...[
               const SizedBox(height: 4),
               Text(
-                '${'payslip_debt'.tr}: ${_numberFormat.format(ps.debtEnd)} ₸',
+                '${'payslip_net_calc'.tr}: ${_numberFormat.format(ps.netPay)} ₸',
                 style: const TextStyle(color: Colors.white60, fontSize: 12),
               ),
             ],
@@ -853,10 +871,13 @@ class _PayslipPageState extends State<PayslipPage> {
               ),
           ],
         ),
-        trailing: Text(
-          '${_numberFormat.format(total)} ₸',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
-        ),
+        trailing: showTotal
+            ? Text(
+                '${_numberFormat.format(total)} ₸',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 13, color: color),
+              )
+            : null,
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(
@@ -935,6 +956,7 @@ class _PayslipPageState extends State<PayslipPage> {
     required String title,
     required List<PayslipItem> items,
     required Color color,
+    bool showTotal = true,
   }) {
     final total = items.fold(0.0, (s, e) => s + e.amount);
     return Card(
