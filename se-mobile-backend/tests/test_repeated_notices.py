@@ -121,4 +121,4 @@ def test_password_equal_to_number_in_other_form_is_refused(login, password):
 
 
 def test_other_digit_passwords_still_allowed():
-    assert app_module._password_problem('4501987', '450') is None
+    assert app_module._password_problem('45019876', '450') is None

@@ -14,11 +14,14 @@ import '../widgets/load_error_view.dart';
 
 /// Экран «придумайте пароль».
 ///
-/// Показывается сразу после входа с компьютера, если пароль временный —
-/// выданный код или табельный номер. Пропустить его нельзя: пока пароль
-/// выданный, учётная запись открыта любому, кто его знает. На телефоне и в
-/// браузере выданный пароль вместо этого гасят (см. settleIssuedPassword), а
-/// сюда попадают, только если сервер не согласился.
+/// Показывается сразу после входа, если пароль временный — код из ОИТиС
+/// или табельный номер, — на телефоне, в браузере и на компьютере.
+/// Пропустить его нельзя: пока пароль выданный, учётная запись открыта
+/// любому, кто его знает. Свой пароль — от восьми символов; по нему входят
+/// снова: после выхода, на новом телефоне, со значка на iPhone. Сервер
+/// гасит выданный код, как только пароль задан.
+///
+/// Из «Настроек» сюда приходят сменить пароль или, у кого его нет, задать.
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({
     Key? key,
@@ -171,9 +174,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: !widget.mandatory,
-          title: Text(widget.hasPassword
-              ? 'password_change_title'.tr
-              : 'password_set_title'.tr),
+          title: Text(widget.mandatory
+              ? 'password_create_title'.tr
+              : widget.hasPassword
+                  ? 'password_change_title'.tr
+                  : 'password_set_title'.tr),
           actions: [
             if (widget.mandatory)
               TextButton(

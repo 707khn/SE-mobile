@@ -38,8 +38,6 @@ void main() {
           return (200, jsonEncode(claim));
         case '/api/web-handoff':
           return (200, jsonEncode({'message': 'Success'}));
-        case '/api/account/code-used':
-          return (200, jsonEncode({'message': 'Success', 'has_password': false}));
       }
       return (404, '{}');
     });
@@ -82,16 +80,16 @@ void main() {
     expect(await secure.hasPin(), isFalse);
   });
 
-  test('в Safari вошли выданным кодом — значок его гасит', () async {
-    debugDesktopOverride = false;
-    debugIosBrowserTabOverride = false;
+  test('пароль ещё выданный — значок попросит придумать свой', () async {
     debugIosHomeScreenIconOverride = true;
     final (fake, paths) =
         server({...approved, 'must_change_password': true});
     final ok =
         await HttpOverrides.runWithHttpOverrides(claimLoginFromSafari, fake);
     expect(ok, isTrue);
-    expect(paths, ['/api/web-handoff/claim', '/api/account/code-used']);
+    // Без своего пароля код больше не гасят.
+    expect(paths, ['/api/web-handoff/claim']);
+    expect(await SecureStorageHelper.instance.passwordExpired(), isTrue);
   });
 
   test('передавать нечего — обычный экран входа', () async {
