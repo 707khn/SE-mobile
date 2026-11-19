@@ -1,136 +1,141 @@
 # SE-Mobile
 
-Мобильное приложение для учёта посещаемости и управления отчётами сотрудников компании **Semey Engineering (SE-BTRZ)**.
+A mobile app for attendance tracking and report management for employees of **Semey Engineering (SE-BTRZ)**.
 
 ---
 
-## Описание
+## Overview
 
-**SE-Mobile** — приложение сотрудника Semey Engineering (SE-BTRZ) на Flutter:
-телефон (Android), компьютер (Windows) и браузер (для iPhone —
-https://api.se-btrz.com/web/). Сервер — Flask + PostgreSQL в
-`se-mobile-backend/`, развёртывание и обслуживание — `deploy/README.md`.
-
----
-
-## Основные возможности
-
-- **Вход** по табельному номеру и паролю; новым учёткам и при сбросе выдаётся
-  одноразовый код. После кода везде — на телефоне, в браузере, на компьютере —
-  придумывают свой пароль не короче 8 символов (буквы, цифры, знаки), и
-  выданный код гаснет; на телефоне и в браузере дальше вход кодом из четырёх
-  цифр. Сменить пароль, а у кого его нет — задать, можно в «Настройках»
-- **Вход на компьютере по QR-коду** — как в WhatsApp: программа показывает
-  QR-код, человек считывает его на телефоне («Настройки» → «Вход на
-  компьютере») и подтверждает; пароль на компьютере не нужен. Код живёт две
-  минуты и годится один раз (`se-mobile-backend/qr_login.py`)
-- **Главный экран** — проходы за сегодня, меню столовой, новости, оповещения
-- **Проходы и табель** — свои; начальник видит свой отдел
-- **Расчётные листки** — свои; расчётная группа загружает листки из 1С
-- **Отпуска, командировки, поручения, медосмотры**
-- **Справочник** внутренних телефонов
-- **Конфиденциальный чат** (SE-chat), если задан его адрес
-- **Уведомления** на телефон через Firebase, в веб-версии — через бота в
-  Telegram; в обоих случаях без содержимого
-- **Админ-панель** — сотрудники, учётки, доступы, экран «Обновление»
-- Казахский и русский языки, светлая и тёмная тема
+**SE-Mobile** is the Semey Engineering (SE-BTRZ) employee app, built with Flutter:
+phone (Android), computer (Windows) and browser (for iPhone —
+https://api.se-btrz.com/web/). The server is Flask + PostgreSQL in
+`se-mobile-backend/`; deployment and maintenance are described in `deploy/README.md`.
 
 ---
 
-## Роли
+## Key features
 
-| Роль | Кто | Доступ |
+- **Login** with personnel number and password; new accounts and password resets
+  get a one-time code. After entering the code, everywhere (phone, browser,
+  computer) the user creates their own password of at least 8 characters
+  (letters, digits, symbols), and the issued code expires; on the phone and in
+  the browser, subsequent logins use a four-digit PIN. The password can be
+  changed (or set, for those who don't have one) in "Settings" («Настройки»)
+- **QR-code login on the computer** — like WhatsApp: the program shows a
+  QR code, the user scans it on their phone ("Settings" → "Desktop login",
+  «Настройки» → «Вход на компьютере») and confirms; no password is needed on
+  the computer. The code lives for two minutes and can be used once
+  (`se-mobile-backend/qr_login.py`)
+- **Home screen** — today's entries/exits, canteen menu, news, announcements
+- **Turnstile passes and timesheet** — your own; a manager sees their department
+- **Payslips** — your own; the payroll group uploads payslips from 1C
+- **Vacations, business trips, assignments, medical checkups**
+- **Directory** of internal phone numbers
+- **Confidential chat** (SE-chat), if its address is configured
+- **Notifications** to the phone via Firebase, in the web version via a
+  Telegram bot; in both cases without message content
+- **Admin panel** — employees, accounts, permissions, the "Update" screen
+- Kazakh and Russian languages, light and dark theme
+
+---
+
+## Roles
+
+| Role | Who | Access |
 |------|-----|--------|
-| Сотрудник | все | свои данные |
-| Начальник | по должности (руководитель, начальник, директор, главный…, заместитель; не «главный менеджер» и не «главный специалист») или вручную в админ-панели | проходы и табель своего отдела |
-| Расчётная группа | по должности или вручную в админ-панели | загрузка и просмотр расчётных листков |
-| Администратор системы | учётка `admin` | всё |
+| Employee | everyone | their own data |
+| Manager | by job title (head, chief, director, chief …, deputy; but not "chief manager" or "chief specialist") or manually in the admin panel | passes and timesheet of their department |
+| Payroll group | by job title or manually in the admin panel | uploading and viewing payslips |
+| System administrator | the `admin` account | everything |
 
 ---
 
-## Технологический стек
+## Tech stack
 
-- **Приложение**: Flutter (Dart), GetX, http, shared_preferences,
+- **App**: Flutter (Dart), GetX, http, shared_preferences,
   flutter_secure_storage, Firebase Messaging, excel/csv
-- **Сервер**: Python 3.12, Flask, SQLAlchemy, PostgreSQL 16, gunicorn (gthread)
-- **Сборка и выпуск**: GitHub Actions, раз в неделю (`.github/workflows/release.yml`)
+- **Server**: Python 3.12, Flask, SQLAlchemy, PostgreSQL 16, gunicorn (gthread)
+- **Build and release**: GitHub Actions, once a week (`.github/workflows/release.yml`)
 
 ---
 
-## Устройство репозитория
+## Repository layout
 
 ```
-lib/                     приложение
-├── main.dart            точка входа, вход и обновление профиля
-├── screens/             экраны
-├── requests/            запросы к серверу
-├── services/            уведомления (FCM) и прочее фоновое
-├── chat/                вкладка конфиденциального чата
-├── utils/               роли, переводы, версия, тема, хранилище
-└── widgets/             общие элементы
-se-mobile-backend/       сервер (app.py — ядро; разделы — отдельными модулями)
-deploy/                  установка, выкладка, сторож, копии, nginx — см. deploy/README.md
-tools/                   загрузчики меню и справочника, нагрузочная проверка
-.github/workflows/       проверки PR, выпуск, проверка снаружи
+lib/                     the app
+├── main.dart            entry point, login and profile refresh
+├── screens/             screens
+├── requests/            server requests
+├── services/            notifications (FCM) and other background work
+├── chat/                confidential chat tab
+├── utils/               roles, translations, version, theme, storage
+└── widgets/             shared widgets
+se-mobile-backend/       server (app.py is the core; features are separate modules)
+deploy/                  install, rollout, watchdog, backups, nginx — see deploy/README.md
+tools/                   menu and directory uploaders, load testing
+.github/workflows/       PR checks, release, external availability check
 ```
 
 ---
 
 ## API
 
-Сервер: `https://api.se-btrz.com`. Список адресов — `GET /` и функция
-`register_routes` в `se-mobile-backend/app.py`; разделы регистрируют свои
-адреса в своих модулях (`it_requests.py`, `business_trips.py` и т. д.).
+Server: `https://api.se-btrz.com`. The list of endpoints is available at `GET /`
+and in the `register_routes` function in `se-mobile-backend/app.py`; features
+register their own endpoints in their modules (`it_requests.py`,
+`business_trips.py`, etc.).
 
 ---
 
-## Цветовая схема
+## Color scheme
 
-| Элемент | Цвет |
+| Element | Color |
 |---------|------|
-| Основной | `#018041` (зелёный) |
-| Градиент кнопок | `#308f60` → `#49cc8b` |
-| Ошибка | `#b00B20` (красный) |
-| Фон | `#fffafa` (молочно-белый) |
+| Primary | `#018041` (green) |
+| Button gradient | `#308f60` → `#49cc8b` |
+| Error | `#b00B20` (red) |
+| Background | `#fffafa` (snow white) |
 
 ---
 
-## Сайт компании
+## Company website
 
 [https://se-btrz.com](https://se-btrz.com)
 
 ---
 
-## Сборка приложения
+## Building the app
 
-Выпуск — раз в неделю, по понедельникам в 08:00 по заводу: **Actions →
-Выпуск** собирает APK и AAB, веб-версию и Windows под одним номером и
-выкладывает в **Releases** — релиз на каждую версию, `v<версия>-<номер>`. Если с
-прошлого выпуска приложение не менялось, выпуск пропускается. Срочно — кнопкой
-«Run workflow» там же; галочка «эмулятор» добавляет проверку на виртуальном
-телефоне и ещё минут двенадцать.
+Releases happen once a week, on Mondays at 08:00 plant time: **Actions →
+Выпуск** (Release) builds the APK and AAB, the web version and Windows under a
+single number and publishes them to **Releases** — one release per version,
+`v<version>-<number>`. If the app hasn't changed since the previous release,
+the release is skipped. For an urgent release, use the "Run workflow" button
+in the same place; the "emulator" checkbox adds a test on a virtual phone and
+about twelve more minutes.
 
-Номер версии руками не правят: старшие цифры (`1.32`) берутся из
-`pubspec.yaml`, номер сборки — число коммитов в `main`
-(`.github/scripts/version.sh`), он же третья цифра: `1.32.267+267`.
-Из Releases сервер сам забирает APK в течение десяти минут, и телефоны
-предлагают обновиться — см. `deploy/README.md`, «Сборка приезжает на сервер
-сама».
+The version number is never edited by hand: the major digits (`1.32`) come from
+`pubspec.yaml`, and the build number is the number of commits on `main`
+(`.github/scripts/version.sh`), which is also the third digit: `1.32.267+267`.
+The server picks up the APK from Releases on its own within ten minutes, and
+phones offer to update — see `deploy/README.md`, "The build arrives on the
+server by itself" («Сборка приезжает на сервер сама»).
 
-### Ключ подписи — сделать один раз
+### Signing key — do this once
 
-Пока ключа нет, Android подписывает сборку **отладочным**, а он создаётся
-заново на каждой чистой машине. Значит у каждой сборки своя подпись, и новая
-версия **не встанет поверх установленной**: телефон ответит «приложение не
-установлено». Для пятисот человек это означает «удалите и поставьте заново»
-при каждом обновлении, с потерей кода входа и повторным вводом логина.
+Until there is a key, Android signs the build with a **debug** key, and that
+key is regenerated on every clean machine. So every build has its own
+signature, and a new version **will not install over the installed one**: the
+phone will say "App not installed". For five hundred people this means
+"uninstall and install again" on every update, losing the PIN and having to
+re-enter the login.
 
-Свой ключ делает подпись постоянной. Создаёт его `keytool` — он входит в
-Java. На рабочей Windows-машине Java может не стоять (apk собирается в
-Actions, Android Studio не нужна), поэтому проще сделать ключ на сервере, а
-потом забрать файл себе.
+Your own key makes the signature permanent. It is created by `keytool`, which
+comes with Java. Java may not be installed on the work Windows machine (the APK
+is built in Actions, Android Studio isn't needed), so it's easier to create the
+key on the server and then download the file.
 
-**На сервере** (`ssh -l ubuntu 87.199.130.179`):
+**On the server** (`ssh -l ubuntu 87.199.130.179`):
 
 ```bash
 sudo apt install -y openjdk-17-jre-headless
@@ -140,123 +145,129 @@ keytool -genkeypair -v -keystore ~/se-mobile.jks -storetype PKCS12 \
     -dname "CN=AO Semey Engineering, OU=OITiS, O=AO Semey Engineering, L=Semey, C=KZ"
 ```
 
-Спросит пароль — дважды, и это единственное, что нужно ввести. Хранилище
-PKCS12 держит один пароль на всё, поэтому пароль ключа тот же самый.
+It will ask for a password twice, and that's the only thing you need to enter.
+A PKCS12 keystore uses one password for everything, so the key password is the
+same.
 
-Дальше перевести файл в текст — эту строку целиком кладём в секрет:
+Next, convert the file to text — this whole line goes into the secret:
 
 ```bash
 base64 -w0 ~/se-mobile.jks; echo
 ```
 
-**Забрать файл себе и убрать с сервера.** В PowerShell у себя:
+**Download the file and remove it from the server.** In PowerShell on your machine:
 
 ```powershell
 scp ubuntu@87.199.130.179:~/se-mobile.jks .
 ```
 
-и обратно на сервере:
+and back on the server:
 
 ```bash
 shred -u ~/se-mobile.jks
 ```
 
-**Файл `se-mobile.jks` и пароль храните вне репозитория и не теряйте**: без
-них следующая версия не встанет поверх этой, и всё вернётся к «удалите и
-поставьте заново» — уже навсегда.
+**Keep the `se-mobile.jks` file and the password outside the repository and
+don't lose them**: without them the next version won't install over this one,
+and everything goes back to "uninstall and install again" — this time for good.
 
-И положить в **Settings → Secrets and variables → Actions → New repository
-secret**, четыре штуки:
+Then add them under **Settings → Secrets and variables → Actions → New repository
+secret**, four in total:
 
-| Имя | Что кладём |
+| Name | Value |
 |---|---|
-| `KEYSTORE_BASE64` | то, что только что скопировалось |
-| `KEYSTORE_PASSWORD` | пароль хранилища |
+| `KEYSTORE_BASE64` | what you just copied |
+| `KEYSTORE_PASSWORD` | the keystore password |
 | `KEY_ALIAS` | `se-mobile` |
-| `KEY_PASSWORD` | тот же пароль (в PKCS12 он один) |
+| `KEY_PASSWORD` | the same password (PKCS12 has only one) |
 
-После этого в журнале сборки, в шаге «Чем подписано», будет видно имя
-владельца из вашего ключа, а не `CN=Android Debug`.
+After that, the build log's «Чем подписано» ("What it's signed with") step will
+show the owner name from your key instead of `CN=Android Debug`.
 
-**Переход на свой ключ — один раз с удалением.** Сборка, подписанная новым
-ключом, поверх старой не встанет: подпись другая. Один раз придётся удалить
-приложение и поставить заново — дальше обновления будут вставать поверх
-всегда. Сделать это лучше сейчас, до раздачи на все пятьсот телефонов.
+**Switching to your own key requires one uninstall.** A build signed with the
+new key won't install over the old one, since the signature differs. You'll
+have to uninstall the app and install it again once — after that, updates will
+always install over it. It's best to do this now, before rolling out to all five
+hundred phones.
 
 ---
 
-## Версия для компьютера (Windows)
+## Desktop version (Windows)
 
-Это то же приложение и тот же сервер (`api.se-btrz.com`), собранные под
-Windows: вход по логину и паролю, дальше — по коду, все разделы те же. На
-компьютере по-своему сделано то, чего у него нет:
+This is the same app and the same server (`api.se-btrz.com`), built for
+Windows: login with username and password, then with the PIN, and all the same
+sections. Things the computer doesn't have are done differently:
 
-| На телефоне | На компьютере |
+| On the phone | On the computer |
 |---|---|
-| «Поделиться» отчётом, расчётным листком | Файл ложится в `Загрузки\SE-mobile`, в сообщении — кнопка «Открыть папку» |
-| «Поделиться» текстом (отпуск, «О программе») | Текст копируется в буфер обмена |
-| Код набирают пальцем | Код набирают и с клавиатуры: цифры, цифровой блок, Backspace |
-| Кнопка «назад» | Esc; из поля ввода первый Esc только выводит |
-| Номер телефона в справочнике — позвонить | Номер копируется в буфер обмена |
-| Отпечаток пальца | Нет: только код |
-| Уведомления Firebase | Нет |
-| Обновление: скачать apk с сервера и поставить поверх | Скачать архив с сервера, закрыть приложение и распаковать в ту же папку с заменой |
+| "Share" a report or payslip | The file is saved to `Downloads\SE-mobile`, and the message has an "Open folder" button |
+| "Share" text (vacation, "About") | The text is copied to the clipboard |
+| The PIN is entered with a finger | The PIN can also be typed on the keyboard: digits, numpad, Backspace |
+| The "Back" button | Esc; inside an input field, the first Esc only leaves the field |
+| Phone number in the directory — call it | The number is copied to the clipboard |
+| Fingerprint | None: PIN only |
+| Firebase notifications | None |
+| Update: download the APK from the server and install over the old one | Download the archive from the server, close the app and extract it into the same folder, replacing files |
 
-Окно открывается 900 × 900 точек: слева вкладки (Главная, Турникет,
-Зарплата, Отпуск, Меню), справа экран. Развёрнутое на весь экран —
-содержимое стоит колонкой посередине; суженное до телефонной ширины —
-вкладки уходят вниз, как на телефоне. Второй запуск `SE-mobile.exe`
-не открывает второе окно, а поднимает уже открытое. Вход, код и настройки
-хранятся у пользователя Windows (`%APPDATA%\AO Semey Engineering\SemEng`):
-на общем компьютере у каждого свой вход.
+The window opens at 900 × 900 pixels: tabs on the left (Home, Turnstile,
+Salary, Vacation, Menu), the screen on the right. When maximized, the content
+stays in a centered column; when narrowed to phone width, the tabs move to the
+bottom, like on the phone. Launching `SE-mobile.exe` a second time doesn't open
+a second window but brings the already open one to the front. Login, PIN and
+settings are stored per Windows user (`%APPDATA%\AO Semey Engineering\SemEng`):
+on a shared computer, everyone has their own login.
 
-Раньше приложение называлось SemEng. Папка с входом и настройками осталась
-под прежним именем (`ProductName` в `windows/runner/Runner.rc`), чтобы
-обновившихся не разлогинило; прежним осталось и имя архива — его ищет
-сервер. Установщик при обновлении сам убирает старые `SemEng.exe` и ярлыки.
-Кто ставил из архива, после распаковки новой версии запускает уже
-`SE-mobile.exe`, а старый `SemEng.exe` и ярлык на него удаляет.
+The app used to be called SemEng. The folder with login and settings kept the
+old name (`ProductName` in `windows/runner/Runner.rc`) so that updated users
+aren't logged out; the archive name also stayed the same, because the server
+looks for it. When updating, the installer removes old `SemEng.exe` files and
+shortcuts by itself. Those who installed from the archive should, after
+extracting the new version, run `SE-mobile.exe` instead and delete the old
+`SemEng.exe` and its shortcut.
 
-**Где взять.** Workflow **Build Windows** (Actions → Build Windows → Run
-workflow) кладёт в релиз этой версии рядом с APK два файла:
+**Where to get it.** The **Build Windows** workflow (Actions → Build Windows →
+Run workflow) puts two files into this version's release next to the APK:
 
-- `SE-mobile-setup-<версия>.exe` — установщик: ставит без прав администратора,
-  с ярлыком в «Пуске»; новая версия ставится им же поверх. Для раздачи
-  удобнее всего.
-- `SemEng-windows-<версия>.zip` — то же без установки: распаковать в любую
-  папку и запустить `SE-mobile.exe`. Его же сервер предлагает приложению как
-  обновление.
+- `SE-mobile-setup-<version>.exe` — the installer: installs without admin
+  rights, with a Start menu shortcut; new versions install over it the same
+  way. The most convenient option for distribution.
+- `SemEng-windows-<version>.zip` — the same without installation: extract to
+  any folder and run `SE-mobile.exe`. This is also what the server offers the
+  app as an update.
 
-Библиотеки Visual C++ лежат рядом с `SE-mobile.exe`, так что отдельно ставить
-«Visual C++ Redistributable» не нужно. Сама сборка запускается только
-после правок `windows/`: минута Windows в Actions стоит вдвое дороже.
+The Visual C++ libraries sit next to `SE-mobile.exe`, so there's no need to
+install the "Visual C++ Redistributable" separately. The build itself only runs
+after changes to `windows/`: a Windows minute in Actions costs twice as much.
 
-Из релиза архив, как и APK, сам приезжает на сервер (`deploy/fetch-apk.sh`,
-раз в десять минут), и версия для компьютера, как телефон, говорит на
-главном экране «Вышла версия …». Архив собирается не с каждой версией: в
-релизе без него на сервере остаётся прежний. Чтобы браузер называл его
-архивом, а не APK, обновите конфиг nginx (`deploy/README.md`, «Обновить
-конфиг nginx») — скачивается он и без этого.
+Like the APK, the archive arrives on the server from the release by itself
+(`deploy/fetch-apk.sh`, every ten minutes), and the desktop version, like the
+phone, says "Version … is out" on the home screen. The archive isn't built
+with every version: if a release doesn't include it, the server keeps the
+previous one. To make the browser call it an archive rather than an APK, update
+the nginx config (`deploy/README.md`, "Update the nginx config", «Обновить
+конфиг nginx») — it downloads fine without this, too.
 
-**Собрать у себя** (если Actions недоступны). Нужны 64-битная Windows 10/11,
-Flutter 3.47.6 и Visual Studio 2022 или 2026 (или Build Tools) с набором
-«Разработка классических приложений на C++». В Windows должен быть включён
-режим разработчика (`start ms-settings:developers`): без него Flutter не
-собирает плагины. Затем в папке проекта, в обычном PowerShell:
+**Building it yourself** (if Actions is unavailable). You need 64-bit Windows
+10/11, Flutter 3.47.6 and Visual Studio 2022 or 2026 (or Build Tools) with the
+"Desktop development with C++" workload. Developer Mode must be enabled in
+Windows (`start ms-settings:developers`): without it Flutter can't build
+plugins. Then, in the project folder, in a regular PowerShell:
 
 ```bat
 flutter pub get --enforce-lockfile
 flutter build windows --release
 ```
 
-Готовое — в `build\windows\x64\runner\Release`: эту папку целиком и
-раздают (один `SE-mobile.exe` без соседних файлов не запустится).
+The result is in `build\windows\x64\runner\Release`: distribute this whole
+folder (a lone `SE-mobile.exe` without the files next to it won't start).
 
-Установщик — Inno Setup 6:
-`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=<версия из pubspec> windows\installer\SE-mobile.iss`,
-готовый файл — в `build\installer`. Чтобы сервер раздавал сборку как
-обновление, архив папки Release под именем `SemEng-windows-<версия>.zip`
-кладётся в релиз `v<версия с «-» вместо «+»>` на GitHub.
+The installer uses Inno Setup 6:
+`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=<version from pubspec> windows\installer\SE-mobile.iss`,
+and the output file is in `build\installer`. For the server to distribute the
+build as an update, an archive of the Release folder named
+`SemEng-windows-<version>.zip` goes into the GitHub release
+`v<version with "-" instead of "+">`.
 
-**Проверить на своём сервере**, не трогая настоящий: адрес сервера
-подменяется при сборке — `--dart-define=API_BASE_URL=http://127.0.0.1:5000`.
+**Testing against your own server** without touching the real one: the server
+address is overridden at build time —
+`--dart-define=API_BASE_URL=http://127.0.0.1:5000`.
