@@ -23,6 +23,7 @@ import 'utils/error_log.dart';
 import 'utils/lang.dart';
 import 'utils/own_password.dart';
 import 'utils/secure_storage_helper.dart';
+import 'utils/web_safe_area.dart';
 import 'requests/web_handoff_request.dart';
 import 'widgets/motion.dart';
 import 'widgets/desktop_layout.dart';
@@ -149,7 +150,9 @@ class MyApp extends StatelessWidget {
             textScaler: media.textScaler
                 .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.3),
           ),
-          child: child ?? const SizedBox.shrink(),
+          // В браузере на iPhone — отступы под полоску «домой» и вырез,
+          // которых Flutter в вебе сам не знает (см. web_safe_area.dart).
+          child: WebSafeArea(child: child ?? const SizedBox.shrink()),
         );
         if (!isDesktop) return scaled;
         // Esc — «назад».

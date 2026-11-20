@@ -13,15 +13,23 @@
     экрана: логотип и колечко выходили в два с половиной раза мельче. Когда
     поднимется приложение, Flutter поставит свою такую же строку.
   -->
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--
+    viewport-fit=cover: без него Safari не сообщает размер «безопасной зоны»
+    (env(safe-area-inset-*) = 0), а на iPhone со значка экрана «Домой»
+    страница всё равно доходит до самого низа — полоска «домой» ложилась на
+    подписи нижней панели, а скруглённые углы срезали её края. С ним отступы
+    известны, и приложение само отодвигает панель (см. web_safe_area.dart).
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="SE-mobile — приложение сотрудников Semey Engineering">
 
   <!--
     iPhone: «Поделиться» → «На экран Домой» ставит приложение значком и
     открывает его без строки адреса, как обычное. Полоса сверху — светлая,
-    как у самого приложения, и не наезжает на экран (viewport-fit не cover):
-    иначе часы и вырез закрывали бы заголовок.
+    как у самого приложения, и при стиле default страница начинается под
+    ней. Если же браузер всё-таки пустит страницу под часы и вырез, это
+    придёт отступом сверху safe-area-inset-top, и заголовок сдвинется.
   -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -63,7 +71,40 @@
     <div class="spin"></div>
   </div>
   <noscript>Для работы SE-mobile включите JavaScript в настройках браузера.</noscript>
+  <!-- Щуп безопасной зоны: его отступы — это env(safe-area-inset-*). -->
+  <div id="safe-area-probe" style="position: fixed; left: 0; top: 0;
+       visibility: hidden; pointer-events: none;
+       padding: env(safe-area-inset-top) env(safe-area-inset-right)
+                env(safe-area-inset-bottom) env(safe-area-inset-left);"></div>
   <script>
+    // Flutter при запуске убирает нашу строку viewport и ставит свою — уже
+    // без viewport-fit=cover. Возвращаем его в любую такую строку.
+    (function () {
+      function cover() {
+        document.querySelectorAll('meta[name="viewport"]').forEach(function (m) {
+          var c = m.getAttribute('content') || '';
+          if (c.indexOf('viewport-fit') < 0) {
+            m.setAttribute('content', c + ', viewport-fit=cover');
+          }
+        });
+      }
+      new MutationObserver(cover).observe(document.head, {
+        childList: true, attributes: true, subtree: true,
+        attributeFilter: ['content'],
+      });
+    })();
+
+    // Отступы безопасной зоны в логических точках: [сверху, справа, снизу,
+    // слева]. Читает web_safe_area.dart; Flutter в браузере их не знает
+    // (MediaQuery.padding там всегда нули).
+    window.seSafeAreaInsets = function () {
+      var el = document.getElementById('safe-area-probe');
+      if (!el) return [0, 0, 0, 0];
+      var s = getComputedStyle(el);
+      return [s.paddingTop, s.paddingRight, s.paddingBottom, s.paddingLeft]
+        .map(function (v) { return parseFloat(v) || 0; });
+    };
+
     window.addEventListener('flutter-first-frame', function () {
       var el = document.getElementById('loading');
       if (el) el.remove();
