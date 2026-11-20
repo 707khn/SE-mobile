@@ -9,7 +9,7 @@ from models import db, Employee, Notification
 
 _AUTHOR = '0000002107'      # менеджер по учёту ТМЦ
 _PAYROLL = '0000001469'     # бухгалтер расчётной группы
-_CHIEF = '0000001298'       # главный бухгалтер
+_CHIEF = '0000001298'       # главный бухгалтер — не расчётная группа
 _ACCOUNTANT = '0000000726'  # бухгалтер — не расчётная группа
 _HEAD = '0000000016'        # начальник ПЭО — чужой начальник
 
@@ -57,7 +57,7 @@ def test_who_is_payroll(app):
     with app.app_context():
         get = lambda i: db.session.get(Employee, i)
         assert payslip_questions.is_payroll(get(_PAYROLL))
-        assert payslip_questions.is_payroll(get(_CHIEF))
+        assert not payslip_questions.is_payroll(get(_CHIEF))
         assert not payslip_questions.is_payroll(get(_ACCOUNTANT))
 
 
@@ -80,7 +80,7 @@ def test_ask_answer_clarify_close(app, client, pushes):
     item = r.get_json()['item']
     assert item['status'] == 'open'
     ids, title, body = pushes[-1]
-    assert ids == sorted([_PAYROLL, _CHIEF])
+    assert ids == [_PAYROLL]
     assert title == f'Вопрос по листку №{item["id"]}'
     # В оповещении — месяц, но ни суммы, ни строки листка.
     assert body.endswith('сентябрь 2026')
