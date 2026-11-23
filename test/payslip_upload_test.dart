@@ -58,7 +58,7 @@ void main() {
   test('кто загружает', () {
     expect(isPayroll('Бухгалтер расчетной группы'), isTrue);
     expect(isPayroll('Бухгалтер расчётной группы'), isTrue);
-    expect(isPayroll('Главный бухгалтер'), isTrue);
+    expect(isPayroll('Главный бухгалтер'), isFalse);
     expect(isPayroll('Бухгалтер'), isFalse);
     expect(isPayroll('Заместитель главного бухгалтера'), isFalse);
     expect(canUploadPayslips('Администратор системы'), isTrue);

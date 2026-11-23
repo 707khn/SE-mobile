@@ -35,7 +35,9 @@ bool isCanteenTech(String job) {
 /// кого он добавил списком PAYROLL_STAFF, приложение по должности не узнает.
 bool isPayroll(String job) {
   final lower = job.toLowerCase().replaceAll('ё', 'е').trim();
-  return lower.contains('расчетн') || lower.startsWith('главный бухгалтер');
+  // Главный бухгалтер — не расчётная группа: чужие листки ему открывают
+  // только вручную, на сервере.
+  return lower.contains('расчетн');
 }
 
 /// Кому в версии для компьютера показывать «Расчётные листы».
