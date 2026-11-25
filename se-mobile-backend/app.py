@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 import os
 import logging
 import math
@@ -21,7 +22,7 @@ from models import (db, Employee, AccessRecord, Payslip,
                     FcmToken, TurnstileEvent, MenuDate, MenuItem, AppliedSeed,
                     UserAccount, AuthToken, DirectoryEntry, NewsItem,
                     AuthMiss, Notification, PayslipUpload, PayrollGrant,
-                    ManagerOverride)
+                    ManagerOverride, PushLog)
 from parser_1c_xml import parse_1c_xml
 from parser_payslip_excel import parse_payslip_excel
 from parser_menu_excel import parse_menu_excel
@@ -180,7 +181,62 @@ _PUSH_CHANNELS = {
 _PUSH_DEFAULT_CHANNEL = 'general_channel'
 
 
-def _push_to(employee_ids, title, body, data=None):
+def _push_to(employee_ids, title, body, data=None, audience='person',
+             source='auto', sent_by=None):
+    """Шлёт уведомление и записывает в журнал вкладки «Уведомления».
+
+    Возвращает, скольким устройствам ушло — как и прежде. Сама отправка — в
+    _push_deliver; здесь только журнал: что, кому и чем кончилось.
+    """
+    ids = sorted({e for e in (employee_ids or []) if e})
+    stats = {'devices': 0, 'delivered': 0, 'failed': 0, 'telegram': 0,
+             'note': None}
+    status = 'sent'
+    try:
+        stats = _push_deliver(ids, title, body, data)
+    except Exception as e:
+        status = 'error'
+        stats['note'] = f'Ошибка отправки: {e}'[:300]
+        logging.warning('Уведомление «%s» не отправлено: %s', title, e)
+    if status == 'sent' and not stats['delivered'] and not stats['telegram']:
+        status = 'error'
+    _log_push(data, title, body, ids, audience=audience, source=source,
+              sent_by=sent_by, status=status, **stats)
+    return stats['delivered']
+
+
+# Сколько держать журнал рассылок. Три месяца — хватит разобраться, почему
+# кому-то не пришло, и таблица не растёт без конца.
+_PUSH_LOG_KEEP = timedelta(days=90)
+
+
+def _log_push(data, title, body, ids=(), audience='person', source='auto',
+              sent_by=None, status='sent', note=None, devices=0, delivered=0,
+              failed=0, telegram=0):
+    """Строка в журнал рассылок. Ошибка записи не роняет саму рассылку."""
+    data = {k: str(v) for k, v in (data or {}).items()}
+    try:
+        db.session.add(PushLog(
+            kind=(data.get('type') or 'general')[:20],
+            title=(title or '')[:200], body=(body or '')[:500],
+            audience=audience if audience in ('all', 'person') else 'person',
+            recipients=','.join(ids) if audience != 'all' else None,
+            people=len(ids), devices=devices, delivered=delivered,
+            failed=failed, telegram=telegram, status=status,
+            note=(note or None) and note[:300],
+            source=source if source in ('auto', 'manual') else 'auto',
+            sent_by=sent_by,
+            data=json.dumps(data, ensure_ascii=False) if data else None))
+        PushLog.query.filter(
+            PushLog.created_at < datetime.utcnow() - _PUSH_LOG_KEEP
+        ).delete(synchronize_session=False)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logging.warning('Журнал уведомлений не записан: %s', e)
+
+
+def _push_deliver(employee_ids, title, body, data=None):
     """Шлёт уведомление на устройства перечисленных сотрудников.
 
     Возвращает, скольким устройствам ушло. Молчит, если Firebase не настроен
@@ -192,20 +248,26 @@ def _push_to(employee_ids, title, body, data=None):
     путь. Здесь, а не у каждого повода отдельно: так в Telegram уходит ровно
     то, что уходит пушем, — и ничего, что в пуш не пускают.
     """
+    stats = {'devices': 0, 'delivered': 0, 'failed': 0, 'telegram': 0,
+             'note': None}
     employee_ids = [e for e in set(employee_ids or []) if e]
     if not employee_ids:
-        return 0
+        stats['note'] = 'Некому отправлять: ни у кого нет приложения или Telegram'
+        return stats
     try:
-        telegram_bot.deliver(employee_ids, title, body)
+        stats['telegram'] = telegram_bot.deliver(employee_ids, title, body) or 0
     except Exception as e:
         logging.warning('Уведомление в Telegram не поставлено: %s', e)
     if not _get_firebase():
-        return 0
+        stats['note'] = 'Пуши на телефоны выключены: Firebase не настроен'
+        return stats
 
     tokens = [t.token for t in FcmToken.query.filter(
         FcmToken.employee_id.in_(employee_ids)).all()]
+    stats['devices'] = len(tokens)
     if not tokens:
-        return 0
+        stats['note'] = 'Ни у кого из адресатов нет телефона с приложением'
+        return stats
 
     data = {k: str(v) for k, v in (data or {}).items()}
     channel = _PUSH_CHANNELS.get(data.get('type'), _PUSH_DEFAULT_CHANNEL)
@@ -233,6 +295,8 @@ def _push_to(employee_ids, title, body, data=None):
             response = fb_messaging.send_each_for_multicast(message)
         except Exception as e:
             logging.warning('Уведомление не ушло: %s', e)
+            failed += len(chunk)
+            first_error = first_error or e
             continue
         for index, result in enumerate(response.responses):
             if result.success:
@@ -255,7 +319,10 @@ def _push_to(employee_ids, title, body, data=None):
                 failed += 1
                 first_error = first_error or result.exception
 
+    stats['delivered'] = sent
+    stats['failed'] = failed + len(invalid)
     if failed:
+        stats['note'] = f'Не доставлено на {failed} устройств: {first_error}'
         logging.warning('Уведомление «%s»: не доставлено на %d из %d '
                         'устройств, например: %s', title, failed,
                         len(tokens), first_error)
@@ -267,7 +334,7 @@ def _push_to(employee_ids, title, body, data=None):
             db.session.commit()
         except Exception:
             db.session.rollback()
-    return sent
+    return stats
 
 
 # Очередь уведомлений и один работник на неё.
@@ -330,12 +397,13 @@ def _notify_loop(app):
 _ANNOUNCEMENT_PUSH_TEXT = 'Новое объявление — откройте SE-mobile'
 
 
-def _push_to_everyone(title, body, data=None):
+def _push_to_everyone(title, body, data=None, source='auto', sent_by=None):
     """Уведомление всем, у кого установлено приложение или подключён
     Telegram."""
     return _push_to([t.employee_id for t in FcmToken.query.all()]
                     + telegram_bot.linked_employee_ids(),
-                    title, body, data)
+                    title, body, data, audience='all', source=source,
+                    sent_by=sent_by)
 
 
 # Сколько держать оповещения в ленте. Полгода — с запасом на отпуск и
@@ -468,11 +536,34 @@ def _announce_menu(app, days):
     text = _menu_notice_text(days)
     _record_notice('menu', 'Столовая', text,
                    ref=days[0].isoformat() if days else None)
-    _notify_later(app, _notify_menu_published, text)
+    _notify_later(app, _notify_menu_published, text,
+                  days[0].isoformat() if days else None)
 
 
-def _notify_menu_published(text='Меню опубликовано'):
-    _push_to_everyone('Столовая', f'{text} 🍽️', {'type': 'menu'})
+def _notify_menu_published(text='Меню опубликовано', day=None, source='auto',
+                           sent_by=None):
+    data = {'type': 'menu'}
+    if day:
+        data['date'] = day
+    _push_to_everyone('Столовая', f'{text} 🍽️', data, source=source,
+                      sent_by=sent_by)
+
+
+def _menu_not_announced(days):
+    """В журнал: меню на эти дни перезалили, и уведомление нарочно не ушло.
+
+    Чтобы во вкладке «Уведомления» было видно, что это не поломка, и там же
+    можно было разослать вручную.
+    """
+    days = sorted(set(days))
+    if not days:
+        return
+    _log_push({'type': 'menu', 'date': days[0].isoformat()}, 'Столовая',
+              _menu_notice_text(days) + ' (повторная загрузка)',
+              audience='all', status='skipped',
+              note='Меню на этот день уже было опубликовано: повторная '
+                   'загрузка уведомление не шлёт, чтобы не будить всех '
+                   'из-за поправки. Разослать можно вручную.')
 
 
 def _turnstile_push_recipients():
@@ -4513,6 +4604,8 @@ def register_routes(app):
         db.session.commit()
         if was_new:
             _announce_menu(app, [menu_date])
+        else:
+            _menu_not_announced([menu_date])
         return jsonify({'message': 'Success'})
 
     @app.route('/api/menu/import-excel', methods=['POST'])
@@ -4588,9 +4681,11 @@ def register_routes(app):
         # перезаливают, и второе «меню опубликовано» про то же самое меню
         # разбудило бы всё предприятие ради одной цены.
         new_days = []
+        again_days = []
         for day in days:
             menu = MenuDate.query.filter_by(date=day['date']).first()
             if menu:
+                again_days.append(day['date'])
                 MenuItem.query.filter_by(menu_date_id=menu.id).delete()
             else:
                 new_days.append(day['date'])
@@ -4619,6 +4714,7 @@ def register_routes(app):
         db.session.commit()
         if new_days:
             _announce_menu(app, new_days)
+        _menu_not_announced(again_days)
 
         lines = [
             f"{d['date_display']} — {d['count']} блюд "
@@ -4814,6 +4910,196 @@ def register_routes(app):
                           _ANNOUNCEMENT_PUSH_TEXT,
                           {'type': 'news', 'id': item.id})
         return jsonify({'message': 'Success', 'item': _news_json(item)})
+
+    # ── Вкладка «Уведомления» в админ-панели ─────────────────────────────────
+
+    def _push_log_json(row, names):
+        ids = [e for e in (row.recipients or '').split(',') if e]
+        try:
+            data = json.loads(row.data) if row.data else {}
+        except ValueError:
+            data = {}
+        return {
+            'id': row.id,
+            'created_at': row.created_at.isoformat() + 'Z',
+            'kind': row.kind, 'title': row.title, 'body': row.body,
+            'audience': row.audience, 'people': row.people,
+            'devices': row.devices, 'delivered': row.delivered,
+            'failed': row.failed, 'telegram': row.telegram,
+            'status': row.status, 'note': row.note or '',
+            'source': row.source,
+            'sent_by': names.get(row.sent_by, row.sent_by or ''),
+            # Первые несколько адресатов по имени — чтобы было понятно, кому
+            # ушло «Зарплата: листок готов», не открывая базу.
+            'recipients': [names.get(e, e) for e in ids[:5]],
+            'date': data.get('date', ''),
+        }
+
+    def _manual_result(viewer, since_id):
+        row = (PushLog.query.filter(PushLog.id > since_id,
+                                    PushLog.source == 'manual',
+                                    PushLog.sent_by == viewer.employee_id)
+               .order_by(PushLog.id.desc()).first())
+        if row is None:
+            return None
+        names = {e.employee_id: e.full_name for e in Employee.query.filter(
+            Employee.employee_id.in_(
+                [x for x in (row.recipients or '').split(',')[:5] if x]
+                + [viewer.employee_id]))}
+        return _push_log_json(row, names)
+
+    def _last_log_id():
+        return db.session.query(db.func.max(PushLog.id)).scalar() or 0
+
+    def _send_menu_now(day, viewer):
+        """Разослать «меню на … опубликовано» вручную — в обход защиты от
+        повторов. Лента под колокольчиком — тоже, иначе пуш ведёт в пустоту."""
+        text = _menu_notice_text([day])
+        _record_notice('menu', 'Столовая', text, ref=day.isoformat())
+        _notify_menu_published(text, day.isoformat(), source='manual',
+                               sent_by=viewer.employee_id)
+
+    @app.route('/api/admin/notifications', methods=['GET'])
+    @require_auth
+    def admin_notifications():
+        """История рассылок: что, кому и чем кончилось."""
+        if not _is_admin_account():
+            return _deny()
+        try:
+            limit = max(1, min(int(request.args.get('limit', 200)), 500))
+        except ValueError:
+            limit = 200
+        query = PushLog.query
+        kind = (request.args.get('kind') or '').strip()
+        if kind:
+            query = query.filter(PushLog.kind == kind)
+        rows = query.order_by(PushLog.id.desc()).limit(limit).all()
+        wanted = {r.sent_by for r in rows if r.sent_by}
+        for r in rows:
+            wanted.update(e for e in (r.recipients or '').split(',')[:5] if e)
+        names = {e.employee_id: e.full_name for e in Employee.query.filter(
+            Employee.employee_id.in_(wanted))} if wanted else {}
+        kinds = sorted(k for (k,) in db.session.query(PushLog.kind).distinct())
+        telegram_people = len(set(telegram_bot.linked_employee_ids()))
+        return jsonify({
+            'message': 'Success',
+            'push': _push_state(),
+            'telegram': {'enabled': telegram_bot.enabled(),
+                         'people': telegram_people},
+            'kinds': kinds,
+            'items': [_push_log_json(r, names) for r in rows],
+        })
+
+    @app.route('/api/admin/notifications/send', methods=['POST'])
+    @require_auth
+    def admin_notifications_send():
+        """Своё уведомление — всем или выбранным сотрудникам.
+
+        Текст уходит через серверы Google (пуш) и Telegram, поэтому в
+        приложении рядом с полем написано: ни сумм, ни личного.
+        """
+        if not _is_admin_account():
+            return _deny()
+        viewer = g.employee
+        data = _json_body()
+        title = _text(data, 'title')[:200]
+        body = _text(data, 'body')[:500]
+        if not title:
+            return jsonify({'message': 'Failure', 'error': 'title_required'}), 400
+        audience = _text(data, 'audience') or 'all'
+        if audience not in ('all', 'person'):
+            return jsonify({'message': 'Failure', 'error': 'bad_audience'}), 400
+        feed = data.get('feed', True) is not False
+
+        before = _last_log_id()
+        payload = {'type': 'general'}
+        if audience == 'all':
+            if feed:
+                _record_notice('general', title, body)
+            _push_to_everyone(title, body, payload, source='manual',
+                              sent_by=viewer.employee_id)
+        else:
+            raw = data.get('employee_ids')
+            if not isinstance(raw, list):
+                return jsonify({'message': 'Failure',
+                                'error': 'employees_required'}), 400
+            ids = []
+            for value in raw:
+                value = str(value).strip() if isinstance(value, (str, int)) else ''
+                if value:
+                    ids.append(_resolve_employee_id(value))
+            known = {e for (e,) in db.session.query(Employee.employee_id)
+                     .filter(Employee.employee_id.in_(ids))} if ids else set()
+            ids = sorted(known)
+            if not ids:
+                return jsonify({'message': 'Failure',
+                                'error': 'employees_required'}), 400
+            if feed:
+                _record_notice('general', title, body, employee_ids=ids,
+                               repeat=True)
+            _push_to(ids, title, body, payload, audience='person',
+                     source='manual', sent_by=viewer.employee_id)
+        return jsonify({'message': 'Success',
+                        'item': _manual_result(viewer, before)})
+
+    @app.route('/api/admin/notifications/menu', methods=['POST'])
+    @require_auth
+    def admin_notifications_menu():
+        """«Меню на … опубликовано» ещё раз — для перезалитого меню."""
+        if not _is_admin_account():
+            return _deny()
+        data = _json_body()
+        try:
+            day = date.fromisoformat(_text(data, 'date') or _plant_today().isoformat())
+        except ValueError:
+            return jsonify({'message': 'Failure', 'error': 'bad_date'}), 400
+        menu = MenuDate.query.filter_by(date=day).first()
+        if menu is None or not menu.items:
+            return jsonify({'message': 'Failure', 'error': 'no_menu',
+                            'date': day.isoformat()}), 404
+        before = _last_log_id()
+        _send_menu_now(day, g.employee)
+        return jsonify({'message': 'Success',
+                        'item': _manual_result(g.employee, before)})
+
+    @app.route('/api/admin/notifications/<int:log_id>/resend', methods=['POST'])
+    @require_auth
+    def admin_notifications_resend(log_id):
+        """Повторить рассылку из истории — тем же людям, тем же текстом."""
+        if not _is_admin_account():
+            return _deny()
+        row = db.session.get(PushLog, log_id)
+        if row is None:
+            return jsonify({'message': 'Failure', 'error': 'not_found'}), 404
+        try:
+            payload = json.loads(row.data) if row.data else {}
+        except ValueError:
+            payload = {}
+        before = _last_log_id()
+        viewer = g.employee
+        # Меню — через ту же дорогу, что и кнопка «Меню»: пропущенная строка
+        # хранит пометку «(повторная загрузка)», а не текст уведомления.
+        if row.kind == 'menu' and payload.get('date'):
+            try:
+                day = date.fromisoformat(payload['date'])
+            except ValueError:
+                day = None
+            if day is not None:
+                _send_menu_now(day, viewer)
+                return jsonify({'message': 'Success',
+                                'item': _manual_result(viewer, before)})
+        if row.audience == 'all':
+            _push_to_everyone(row.title, row.body, payload, source='manual',
+                              sent_by=viewer.employee_id)
+        else:
+            ids = [e for e in (row.recipients or '').split(',') if e]
+            if not ids:
+                return jsonify({'message': 'Failure',
+                                'error': 'no_recipients'}), 400
+            _push_to(ids, row.title, row.body, payload, audience='person',
+                     source='manual', sent_by=viewer.employee_id)
+        return jsonify({'message': 'Success',
+                        'item': _manual_result(viewer, before)})
 
     @app.route('/api/news/announcements', methods=['POST'])
     def push_announcement():

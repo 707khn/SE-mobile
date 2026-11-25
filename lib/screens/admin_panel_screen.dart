@@ -13,13 +13,15 @@ import '../widgets/app_drawer.dart';
 import '../widgets/custom_text.dart';
 import '../widgets/skeleton.dart';
 import 'admin_employee_screen.dart';
+import 'admin_notifications_tab.dart';
 import 'rollout_screen.dart';
 import '../utils/app_theme.dart';
 import '../utils/load_problem.dart';
 import '../widgets/load_error_view.dart';
 
 /// Staff directory for the system administrator: search anyone, open their
-/// turnstile report, payslips and leave.
+/// turnstile report, payslips and leave. Вторая вкладка — «Уведомления»:
+/// журнал рассылок и отправка вручную.
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({Key? key}) : super(key: key);
 
@@ -27,8 +29,14 @@ class AdminPanelScreen extends StatefulWidget {
   State<AdminPanelScreen> createState() => _AdminPanelScreenState();
 }
 
-class _AdminPanelScreenState extends State<AdminPanelScreen> {
+class _AdminPanelScreenState extends State<AdminPanelScreen>
+    with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
+  late final TabController _tabs = TabController(length: 2, vsync: this)
+    ..addListener(() {
+      if (mounted) setState(() {});
+    });
+  final _notificationsKey = GlobalKey<AdminNotificationsTabState>();
 
   List<AdminEmployee> _all = [];
   bool _loading = true;
@@ -47,6 +55,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _tabs.dispose();
     super.dispose();
   }
 
@@ -122,11 +131,34 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'refresh'.tr,
-            onPressed: _loading ? null : _load,
+            onPressed: _tabs.index == 1
+                ? () => _notificationsKey.currentState?.reload()
+                : (_loading ? null : _load),
           ),
         ],
+        bottom: TabBar(
+          controller: _tabs,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          tabs: [
+            Tab(text: 'admin_tab_people'.tr),
+            Tab(text: 'admin_tab_notifications'.tr),
+          ],
+        ),
       ),
-      body: Column(
+      body: TabBarView(
+        controller: _tabs,
+        children: [
+          _buildPeople(list),
+          AdminNotificationsTab(key: _notificationsKey),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeople(List<AdminEmployee> list) {
+    return Column(
         children: [
           _buildSearchBar(),
           if (!_loading && !_error) _buildFilters(),
@@ -147,7 +179,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           ),
           ),
         ],
-      ),
     );
   }
 
