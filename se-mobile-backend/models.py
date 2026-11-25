@@ -217,6 +217,46 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class PushLog(db.Model):
+    """Журнал разосланного — для вкладки «Уведомления» в админ-панели.
+
+    Лента под колокольчиком (Notification) — это то, что видит сотрудник.
+    Здесь — то, что сервер пытался доставить на телефоны и в Telegram, и чем
+    кончилось: сколько людей, сколько телефонов, сколько чатов. А ещё — что
+    сервер нарочно не отправил (status='skipped'): повторная загрузка меню на
+    тот же день, например. Без этой строки «уведомление не пришло» ничем не
+    отличалось от «уведомления сломались».
+    """
+    __tablename__ = 'push_log'
+    __table_args__ = (
+        db.Index('ix_push_log_created', 'created_at'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Тот же повод, что в data['type'] пуша: menu, payslip, news, it…
+    kind = db.Column(db.String(20), nullable=False, default='general')
+    title = db.Column(db.String(200), nullable=False, default='')
+    body = db.Column(db.String(500), nullable=False, default='')
+    # 'all' — всем; 'person' — списку из `recipients`.
+    audience = db.Column(db.String(10), nullable=False, default='person')
+    # Табельные через запятую — чтобы можно было отправить повторно тем же.
+    recipients = db.Column(db.Text)
+    people = db.Column(db.Integer, nullable=False, default=0)
+    devices = db.Column(db.Integer, nullable=False, default=0)
+    delivered = db.Column(db.Integer, nullable=False, default=0)
+    failed = db.Column(db.Integer, nullable=False, default=0)
+    telegram = db.Column(db.Integer, nullable=False, default=0)
+    # 'sent' | 'skipped' | 'error'
+    status = db.Column(db.String(10), nullable=False, default='sent')
+    # Почему не ушло или почему пропущено — простыми словами.
+    note = db.Column(db.String(300))
+    # 'auto' — сервер сам по событию; 'manual' — администратор из вкладки.
+    source = db.Column(db.String(10), nullable=False, default='auto')
+    sent_by = db.Column(db.String(10))
+    # Пуш несёт data (тип, номер новости, дата меню) — его повторяем как есть.
+    data = db.Column(db.Text)
+
+
 class TurnstileEvent(db.Model):
     __tablename__ = 'turnstile_events'
     # Табель выбирает события за сутки или за месяц — то есть диапазоном по
