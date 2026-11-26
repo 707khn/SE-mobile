@@ -13,6 +13,7 @@ from datetime import datetime
 
 from flask import g, jsonify, request
 
+import demo
 from it_requests import _norm, _utc, is_it_staff
 from models import db
 
@@ -124,7 +125,9 @@ def register(app, core):
         if denied:
             return denied
         query = ' '.join((request.args.get('q') or '').split())
-        rows = _ordered(ItAsset.query.filter_by(written_off=False)).all()
+        # Техника гостевого мира (demo.py) в учёт ОИТиС не входит.
+        rows = _ordered(ItAsset.query.filter_by(written_off=False).filter(
+            demo.world(ItAsset.employee_id, viewer))).all()
         if query:
             words = _norm(query).split()
             people = _people(rows)
@@ -151,7 +154,9 @@ def register(app, core):
         if denied:
             return denied
         words = _norm(request.args.get('q') or '').split()
-        found = [e for e in Employee.query.order_by(Employee.full_name).all()
+        found = [e for e in Employee.query.filter(
+                     demo.world(Employee.employee_id, viewer))
+                 .order_by(Employee.full_name).all()
                  if all(w in _norm(e.full_name) for w in words)][:30]
         return jsonify({'message': 'Success', 'people': [
             {'id': e.employee_id, 'name': e.full_name,

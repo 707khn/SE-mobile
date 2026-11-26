@@ -22,6 +22,8 @@ const Map<String, String> payslipQuestionStringsKk = {
   'psq_reply_hint': 'Жауап немесе нақтылау',
   'psq_close': 'Сұрақ шешілді',
   'psq_closed_note': 'Сұрақ шешілді деп белгіленді',
+  'psq_err_demo_read_only':
+      'Қонақ режимі: тек қарауға болады, өзгерістер сақталмайды',
   'psq_err_text_required': 'Сұрақты жазыңыз',
   'psq_err_bad_period': 'Бұл ай үшін сұрақ қоюға болмайды',
   'psq_err_too_many_open': 'Ашық сұрақтар тым көп — алдымен біреуін жабыңыз',
@@ -51,6 +53,8 @@ const Map<String, String> payslipQuestionStringsRu = {
   'psq_reply_hint': 'Ответ или уточнение',
   'psq_close': 'Вопрос решён',
   'psq_closed_note': 'Отмечено: вопрос решён',
+  'psq_err_demo_read_only':
+      'Гостевой режим: только просмотр, изменения не сохраняются',
   'psq_err_text_required': 'Напишите вопрос',
   'psq_err_bad_period': 'За этот месяц вопрос задать нельзя',
   'psq_err_too_many_open':

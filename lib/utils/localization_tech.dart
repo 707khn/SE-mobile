@@ -55,6 +55,8 @@ const Map<String, String> techStringsKk = {
   'ta_release': 'Қайтарылды',
   'ta_writeoff': 'Есептен шығару',
   'ta_saved': 'Сақталды',
+  'ta_err_demo_read_only':
+      'Қонақ режимі: тек қарауға болады, өзгерістер сақталмайды.',
   'ta_err_bad_time': 'Уақытты тексеріңіз.',
   'ta_err_ends_before': 'Соңы басынан кейін болуы керек.',
   'ta_err_past': 'Бұл уақыт өтіп кетті.',
@@ -122,6 +124,8 @@ const Map<String, String> techStringsRu = {
   'ta_release': 'Сдал',
   'ta_writeoff': 'Списать',
   'ta_saved': 'Сохранено',
+  'ta_err_demo_read_only':
+      'Гостевой режим: только просмотр, изменения не сохраняются.',
   'ta_err_bad_time': 'Проверьте время.',
   'ta_err_ends_before': 'Конец должен быть позже начала.',
   'ta_err_past': 'Это время уже прошло.',

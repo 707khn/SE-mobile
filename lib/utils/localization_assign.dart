@@ -58,6 +58,8 @@ const Map<String, String> assignmentStringsKk = {
   'asg_ev_cancel': 'алып тастады',
   'asg_ev_remind': 'еске салды',
   'asg_ev_comment': 'пікір қалдырды',
+  'asg_err_demo_read_only':
+      'Қонақ режимі: тек қарауға болады, өзгерістер сақталмайды',
   'asg_err_title_required': 'Не істеу керегін жазыңыз',
   'asg_err_bad_date': 'Мерзімі дұрыс емес',
   'asg_err_assignee_required': 'Орындаушыны таңдаңыз',
@@ -128,6 +130,8 @@ const Map<String, String> assignmentStringsRu = {
   'asg_ev_cancel': 'снял задачу',
   'asg_ev_remind': 'напомнил',
   'asg_ev_comment': 'написал',
+  'asg_err_demo_read_only':
+      'Гостевой режим: только просмотр, изменения не сохраняются',
   'asg_err_title_required': 'Напишите, что сделать',
   'asg_err_bad_date': 'Неверный срок',
   'asg_err_assignee_required': 'Выберите исполнителя',

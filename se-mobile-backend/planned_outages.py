@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 
 from flask import g, jsonify
 
+import demo
 from it_requests import _norm, is_it_staff
 from models import db
 
@@ -88,9 +89,13 @@ def _title(outage, prefix='Отключение'):
 
 
 def _audience(outage):
+    """Кому объявлять. Мир — по автору: настоящее отключение гостевому миру
+    (demo.py) не объявляется, вымышленное — настоящим людям."""
     from models import Employee
+    guest = demo.is_demo_id(outage.author_id)
     return sorted(e.employee_id for e in Employee.query.all()
-                  if concerns(outage, e))
+                  if demo.is_demo_id(e.employee_id) == guest
+                  and concerns(outage, e))
 
 
 def _body(outage):
@@ -181,7 +186,8 @@ def register(app, core):
         if viewer is None:
             return _fail('unauthorized', 401)
         now = core._plant_now()
-        rows = (Outage.query.filter(Outage.ends_at >= now - _SHOW_PAST)
+        rows = (Outage.query.filter(Outage.ends_at >= now - _SHOW_PAST,
+                                    demo.world(Outage.author_id, viewer))
                 .order_by(Outage.starts_at, Outage.id).all())
         items = [_json(o, viewer, now) for o in rows]
         return jsonify({'message': 'Success',
@@ -195,6 +201,7 @@ def register(app, core):
         if not may_announce(viewer, core):
             return core._deny()
         names = sorted({d for (d,) in db.session.query(Employee.department)
+                        .filter(demo.world(Employee.employee_id, viewer))
                         .distinct() if d})
         return jsonify({'message': 'Success', 'departments': names})
 
@@ -226,6 +233,7 @@ def register(app, core):
         if not isinstance(raw, list):
             return _fail('bad_departments', 400)
         known = {_key(d): d for (d,) in db.session.query(Employee.department)
+                 .filter(demo.world(Employee.employee_id, viewer))
                  .distinct() if d}
         departments = []
         for name in raw:

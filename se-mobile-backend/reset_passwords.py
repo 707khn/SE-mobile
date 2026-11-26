@@ -12,7 +12,9 @@ issue_codes.py закрыл вход по табельному номеру те
   - тех, кто есть в CSV. Номер берётся из первого столбца. Обычно это
     codes.csv от issue_codes.py: этим людям коды только что выданы;
   - admin и другие нецифровые логины: через них входят в админ-панель;
-  - отключённые учётки.
+  - отключённые учётки;
+  - гостевую учётку (guest_account.py): её пароль раздан тем, кому
+    показывают приложение, и кадровику там раздавать нечего.
 
 Сначала пробный прогон. Он ничего не меняет и только показывает, кого
 заденет:
@@ -117,6 +119,7 @@ def _roles(app_module, employee):
 
 def plan(app_module, keep_numbers, keep_logins, only_temporary=False):
     """Кому сбросить пароль, и сколько кого не трогаем, по причинам."""
+    import demo
     from models import Employee, UserAccount
     employees = {e.employee_id: e for e in Employee.query.all()}
     skipped = Counter()
@@ -125,6 +128,8 @@ def plan(app_module, keep_numbers, keep_logins, only_temporary=False):
         number = _short(account.login) if account.login.isdigit() else None
         if not account.is_active:
             skipped['disabled'] += 1
+        elif demo.is_demo_id(account.employee_id):
+            skipped['demo'] += 1
         elif number is None:
             skipped['named'] += 1
         elif number in keep_numbers:
@@ -162,6 +167,8 @@ def _report(targets, skipped, csv_path, in_file, found, only_temporary):
         print(f"  из --keep: {skipped['keep']}")
     print(f"  admin и другие нецифровые логины: {skipped['named']}")
     print(f"  отключённые: {skipped['disabled']}")
+    if skipped['demo']:
+        print(f"  гостевая учётка (guest_account.py): {skipped['demo']}")
     if only_temporary:
         print(f"  свой пароль или вход с телефона: {skipped['own']}")
     print()

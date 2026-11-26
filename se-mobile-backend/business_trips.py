@@ -26,6 +26,7 @@ from datetime import date, datetime, timedelta
 
 from flask import g, jsonify, request
 
+import demo
 from it_requests import _norm, _utc
 from models import db
 
@@ -273,12 +274,16 @@ def register(app, core):
             people = _names([i.employee_id for i in pending])
             items = [i for i in pending
                      if people.get(i.employee_id) is not None
+                     and demo.same_world(viewer, i.employee_id)
                      and may_approve(viewer, people[i.employee_id])]
         elif scope == 'accounting':
             if not is_accountant(viewer):
                 return core._deny()
+            # Командировки гостевого мира (demo.py) настоящей бухгалтерии не
+            # видны: выдавать аванс вымышленному директору некому.
             items = (BusinessTrip.query
-                     .filter(BusinessTrip.status.in_(('approved', 'reported')))
+                     .filter(BusinessTrip.status.in_(('approved', 'reported')),
+                             demo.world(BusinessTrip.employee_id, viewer))
                      .order_by(BusinessTrip.date_from).limit(300).all())
             items.sort(key=lambda i: i.status != 'reported')
         else:

@@ -33,6 +33,7 @@ from parser_news_html import parse_news_html
 from parser_employees_excel import parse_employees_excel
 from parser_access_report import parse_access_report, is_outer_door
 from privacy import privacy_page
+import demo
 import it_requests
 import retired  # noqa: F401 — таблицы снятых разделов, см. retired.py
 import payslip_questions
@@ -483,8 +484,15 @@ def _record_notice(kind, title, body='', employee_ids=None, audience='all',
 
 def _visible_notices(viewer):
     """Оповещения, которые видит этот сотрудник: общие, свои и — админу —
-    служебные."""
+    служебные.
+
+    Гостю (demo.py) — только свои: общие — это объявления предприятия.
+    """
     from sqlalchemy import or_, and_
+    if demo.is_demo(viewer):
+        return Notification.query.filter(
+            Notification.audience == 'person',
+            Notification.employee_id == viewer.employee_id)
     allowed = [Notification.audience == 'all',
                and_(Notification.audience == 'person',
                     Notification.employee_id == viewer.employee_id)]
@@ -1280,10 +1288,19 @@ def require_auth(view):
     Пока REQUIRE_AUTH выключен, запрос без пропуска проходит, но считается:
     по тому, как это число падает, видно, дошла ли новая сборка до всех и
     можно ли включать проверку (см. /api/admin/rollout).
+
+    Гостевая учётная запись (demo.py) только смотрит: всё, что меняет
+    данные, ей отвечает отказом здесь, до самого маршрута. Иначе каждому
+    разделу пришлось бы помнить, что гость не должен ни записаться в
+    медпункт на настоящее время, ни отправить вопрос настоящей расчётной
+    группе.
     """
     @wraps(view)
     def wrapper(*args, **kwargs):
         g.employee = _resolve_token(_bearer_token())
+        refused = demo.refusal(g.employee)
+        if refused is not None:
+            return refused
         if g.employee is None:
             if _AUTH_REQUIRED:
                 return jsonify({'message': 'Failure', 'error': 'unauthorized'}), 401
@@ -1431,22 +1448,40 @@ def _visible_employee_ids():
     if viewer is None:
         # Пропуска нет, а проверки ещё не включены: старая сборка.
         return None
+    if demo.is_demo(viewer):
+        # Гость — генеральный директор своего маленького вымышленного
+        # предприятия: видит всех его людей и никого из настоящих.
+        if _is_manager_employee(viewer):
+            return demo.world_ids() | {viewer.employee_id}
+        return {viewer.employee_id}
     if _is_system_admin(viewer.job_title):
+        # «Всех» — и гостевой мир тоже: где это важно, списки отсекают его
+        # сами (_in_world).
         return None
 
+    in_world = demo.world(Employee.employee_id, viewer)
     hidden = _PLANT_WIDE_VIEWERS.get(_norm_title(viewer.job_title))
     if hidden is not None:
-        return {e.employee_id for e in Employee.query.all()
+        return {e.employee_id for e in Employee.query.filter(in_world).all()
                 if e.employee_id == viewer.employee_id
                 or _norm_title(e.job_title) not in hidden}
 
     if _is_manager_employee(viewer) and viewer.department:
         ids = {e.employee_id for e in
-               Employee.query.filter_by(department=viewer.department).all()}
+               Employee.query.filter_by(department=viewer.department)
+               .filter(in_world).all()}
         ids.add(viewer.employee_id)
         return ids
 
     return {viewer.employee_id}
+
+
+def _in_world(query, column=None):
+    """Запрос, суженный до мира смотрящего: настоящим — настоящие люди,
+    гостю — вымышленные (demo.py). Для списков «всех», где _visible_employee_ids
+    отвечает None — «без ограничений»."""
+    column = Employee.employee_id if column is None else column
+    return query.filter(demo.world(column, getattr(g, 'employee', None)))
 
 
 def _may_view(target_employee_id):
@@ -1565,8 +1600,10 @@ def _import_access_passes(passes, dry_run=False):
                           if not _access_doors_kept(p['door'])})
     kept = [p for p in passes if _access_doors_kept(p['door'])]
 
+    # Только настоящие люди: вымышленный тёзка из гостевого мира (demo.py)
+    # не должен ни забрать чужие проходы, ни сделать человека «тёзкой».
     by_name = {}
-    for emp in Employee.query.all():
+    for emp in Employee.query.filter(demo.real(Employee.employee_id)).all():
         by_name.setdefault(_norm_name(emp.full_name.replace('ё', 'е')
                                       .replace('Ё', 'Е')), set()).add(emp.employee_id)
 
@@ -1606,7 +1643,8 @@ def _import_access_passes(passes, dry_run=False):
         stale = AccessRecord.query.filter(
             AccessRecord.door_location.in_(other_doors),
             AccessRecord.access_date >= first,
-            AccessRecord.access_date <= last).all()
+            AccessRecord.access_date <= last,
+            demo.real(AccessRecord.employee_id)).all()
     result['removed'] = len(stale)
     stale_stamps = set()
     for rec in stale:
@@ -1801,7 +1839,9 @@ def _resolve_employee_id(tab_number):
     списка кадров заводила бы уже работающих людей заново.
     """
     account = db.session.get(UserAccount, tab_number)
-    if account is not None:
+    # Гостевой логин («1», см. guest_account.py) ведёт к вымышленному
+    # человеку: настоящего с табельным 1 к нему не приписываем.
+    if account is not None and not demo.is_demo_id(account.employee_id):
         return account.employee_id
     for candidate in (tab_number, tab_number.zfill(10)):
         if db.session.get(Employee, candidate) is not None:
@@ -2378,8 +2418,14 @@ def _data_freshness():
     Каждый раз об этом узнавали от людей, а не от приложения.
 
     Здесь то же самое видит тот, кто может это исправить.
+
+    Гостевой мир (demo.py) сюда не входит: его листки и проходы свежие
+    всегда, и с ними отставшая выгрузка выглядела бы догруженной — а по
+    этой сводке сторож и предупреждает «данные отстают».
     """
     today = _plant_today()
+    slips = demo.real(Payslip.employee_id)
+    passes = demo.real(AccessRecord.employee_id)
 
     def behind(value):
         if value is None:
@@ -2396,6 +2442,7 @@ def _data_freshness():
     out = []
     try:
         latest = (db.session.query(Payslip.period_year, Payslip.period_month)
+                  .filter(slips)
                   .order_by(Payslip.period_year.desc(),
                             Payslip.period_month.desc()).first())
         # Последний день месяца, а не первый: листок за июль закрывает июль,
@@ -2406,20 +2453,23 @@ def _data_freshness():
         # Считаем по последнему месяцу, а не по всей таблице: «сколько человек
         # получили листок» — это про свежую выгрузку, а не про историю.
         covered = (db.session.query(Payslip.employee_id)
-                   .filter(Payslip.period_year == latest[0],
+                   .filter(slips, Payslip.period_year == latest[0],
                            Payslip.period_month == latest[1])
                    .distinct().count()) if latest else 0
-        out.append(source('payslips', last, Payslip.query.count(), covered))
+        out.append(source('payslips', last, Payslip.query.filter(slips).count(),
+                          covered))
     except Exception as e:
         db.session.rollback()
         out.append(source('payslips', None, 0, None, str(e)))
 
     try:
-        last = db.session.query(db.func.max(AccessRecord.access_date)).scalar()
+        last = (db.session.query(db.func.max(AccessRecord.access_date))
+                .filter(passes).scalar())
         covered = (db.session.query(AccessRecord.employee_id)
-                   .filter(AccessRecord.access_date == last)
+                   .filter(passes, AccessRecord.access_date == last)
                    .distinct().count()) if last else 0
-        out.append(source('access', last, AccessRecord.query.count(), covered))
+        out.append(source('access', last, AccessRecord.query.filter(passes).count(),
+                          covered))
     except Exception as e:
         db.session.rollback()
         out.append(source('access', None, 0, None, str(e)))
@@ -2439,8 +2489,11 @@ def _data_freshness():
         out.append(source('news', None, 0, None, str(e)))
 
     try:
-        covered = db.session.query(LeaveBalance.employee_id).distinct().count()
-        out.append(source('leaves', None, LeaveBalance.query.count(), covered))
+        leaves = demo.real(LeaveBalance.employee_id)
+        covered = (db.session.query(LeaveBalance.employee_id).filter(leaves)
+                   .distinct().count())
+        out.append(source('leaves', None, LeaveBalance.query.filter(leaves).count(),
+                          covered))
     except Exception as e:
         db.session.rollback()
         out.append(source('leaves', None, 0, None, str(e)))
@@ -2452,8 +2505,10 @@ def _data_freshness():
         out.append(source('directory', None, 0, None, str(e)))
 
     try:
-        out.append(source('employees', None, Employee.query.count(),
-                          UserAccount.query.filter_by(is_active=True).count()))
+        out.append(source('employees', None,
+                          Employee.query.filter(demo.real(Employee.employee_id)).count(),
+                          UserAccount.query.filter_by(is_active=True).filter(
+                              demo.real(UserAccount.employee_id)).count()))
     except Exception as e:
         db.session.rollback()
         out.append(source('employees', None, 0, None, str(e)))
@@ -3426,7 +3481,7 @@ def register_routes(app):
         # Кумарова с потерянными проходами. Полные тёзки бывают, поэтому
         # не запрещаем, а показываем в отчёте.
         existing_names = {}
-        for emp in Employee.query.all():
+        for emp in Employee.query.filter(demo.real(Employee.employee_id)).all():
             existing_names.setdefault(emp.full_name.strip().lower(),
                                       emp.employee_id)
         warnings = []
@@ -3747,7 +3802,7 @@ def register_routes(app):
             return _deny()
 
         allowed = _visible_employee_ids()
-        query = Employee.query
+        query = _in_world(Employee.query)
         if allowed is not None:
             query = query.filter(Employee.employee_id.in_(allowed))
         viewer = getattr(g, 'employee', None)
@@ -4139,8 +4194,11 @@ def register_routes(app):
         _, refusal = _payroll_viewer()
         if refusal is not None:
             return refusal
+        # Листки гостевого мира (demo.py) — не загрузка бухгалтерии: ни в
+        # счёт месяца, ни в список, ни под удаление месяца они не идут.
         counts = (db.session.query(Payslip.period_year, Payslip.period_month,
                                    db.func.count(Payslip.id))
+                  .filter(demo.real(Payslip.employee_id))
                   .group_by(Payslip.period_year, Payslip.period_month).all())
         last = {}
         for up in PayslipUpload.query.order_by(PayslipUpload.at).all():
@@ -4181,7 +4239,8 @@ def register_routes(app):
         rows = (db.session.query(Payslip, Employee.full_name)
                 .join(Employee, Employee.employee_id == Payslip.employee_id)
                 .filter(Payslip.period_year == year,
-                        Payslip.period_month == month)
+                        Payslip.period_month == month,
+                        demo.real(Payslip.employee_id))
                 .order_by(Employee.full_name).all())
         return jsonify({
             'message': 'Success',
@@ -4215,7 +4274,8 @@ def register_routes(app):
         bad = _period_args(year, month)
         if bad is not None:
             return bad
-        query = Payslip.query.filter_by(period_year=year, period_month=month)
+        query = Payslip.query.filter_by(period_year=year, period_month=month)\
+            .filter(demo.real(Payslip.employee_id))
         if employee_id is not None:
             query = query.filter_by(employee_id=employee_id)
         slips = query.all()
@@ -4560,7 +4620,7 @@ def register_routes(app):
         except ValueError:
             return jsonify({'message': 'Failure', 'error': 'Invalid date'}), 400
 
-        menu = MenuDate.query.filter_by(date=query_date).first()
+        menu = _menu_of(query_date)
         if not menu:
             return jsonify({'message': 'Success', 'date': date_str, 'items': []})
 
@@ -5167,7 +5227,16 @@ def register_routes(app):
         Отдаётся целиком: 129 строк, меньше сотни килобайт. Поиск и разбивку
         по отделам делает приложение, зато справочник открывается мгновенно и
         работает, когда связь пропала.
+
+        Гостю (demo.py) — справочник его вымышленного предприятия: в
+        настоящем телефоны и почта всех сотрудников.
         """
+        if demo.is_demo(getattr(g, 'employee', None)):
+            return jsonify({
+                'message': 'Success', 'entries': demo.directory(),
+                'updated_at': datetime.combine(_plant_today(),
+                                               datetime.min.time()).isoformat(),
+            })
         rows = DirectoryEntry.query.order_by(DirectoryEntry.sort_order).all()
         # Все строки приезжают одной загрузкой, поэтому дата у них общая —
         # приложение показывает её как «справочник от такого-то числа».
@@ -5334,6 +5403,7 @@ def _find_reportable(name):
     allowed = _visible_employee_ids()
 
     def pick(query):
+        query = _in_world(query)
         if allowed is not None:
             query = query.filter(Employee.employee_id.in_(allowed))
         found = query.all()
@@ -5355,8 +5425,9 @@ def _find_reportable(name):
     if partial is not None:
         return partial
     # Есть, но не виден — пусть /director_report ответит «нет доступа», а не
-    # «не найден»: это разные ответы.
-    return Employee.query.filter(contains).first()
+    # «не найден»: это разные ответы. Только в своём мире: гостю незачем
+    # узнавать по «нет доступа», что такой человек на заводе есть.
+    return _in_world(Employee.query.filter(contains)).first()
 
 
 def _home_access(employee_id, today):
@@ -5420,8 +5491,19 @@ def _home_leave(employee_id):
                                   for b in balances)}
 
 
+def _menu_of(day):
+    """Меню дня. Гостю (demo.py) в день без меню — последнее выложенное до
+    этого дня: обычно вчерашнее. Пустая вкладка на показе не показывает
+    ничего, а выдумывать блюда незачем — меню столовой не секрет."""
+    menu = MenuDate.query.filter_by(date=day).first()
+    if (menu is None or not menu.items) and demo.is_demo(getattr(g, 'employee', None)):
+        menu = (MenuDate.query.filter(MenuDate.date <= day, MenuDate.items.any())
+                .order_by(MenuDate.date.desc()).first()) or menu
+    return menu
+
+
 def _home_menu(today):
-    menu = MenuDate.query.filter_by(date=today).first()
+    menu = _menu_of(today)
     items = sorted(menu.items, key=lambda i: i.id) if menu else []
     return {'count': len(items), 'dishes': [i.name for i in items[:3]]}
 
@@ -5442,14 +5524,31 @@ _ACCESS_COVERAGE_TTL = timedelta(minutes=10)
 _access_loaded_until = {'checked_at': None, 'date': None}
 
 
-def _loaded_until():
-    """До какого числа в базе есть проходы — по всему предприятию."""
+def _loaded_until(guest=False):
+    """До какого числа в базе есть проходы — по всему предприятию.
+
+    Гостевой мир (demo.py) — отдельно, `guest=True`: его проходы идут по
+    сегодня, и в общем «загружено по» они выдали бы месячную выгрузку СКУД
+    за свежую. Настоящий человек увидел бы «в эти дни вы не проходили»
+    вместо «за эти дни ещё не загружено».
+    """
+    if guest:
+        try:
+            ids = demo.world_ids()
+            return (db.session.query(db.func.max(AccessRecord.access_date))
+                    .filter(AccessRecord.employee_id.in_(ids)).scalar()
+                    if ids else None)
+        except Exception as e:
+            db.session.rollback()
+            logging.warning('Не смог узнать проходы гостевого мира: %s', e)
+            return None
     now = datetime.utcnow()
     checked = _access_loaded_until['checked_at']
     if checked is not None and now - checked < _ACCESS_COVERAGE_TTL:
         return _access_loaded_until['date']
     try:
-        latest = db.session.query(db.func.max(AccessRecord.access_date)).scalar()
+        latest = (db.session.query(db.func.max(AccessRecord.access_date))
+                  .filter(demo.real(AccessRecord.employee_id)).scalar())
     except Exception as e:
         db.session.rollback()
         logging.warning('Не смог узнать, по какое число загружены проходы: %s', e)
@@ -5496,7 +5595,7 @@ def _access_coverage(employee_id):
 
     Отсюда приложение и узнаёт, какой именно случай перед ним.
     """
-    until = _loaded_until()
+    until = _loaded_until(guest=demo.is_demo_id(employee_id))
     try:
         mine = (db.session.query(db.func.max(AccessRecord.access_date))
                 .filter(AccessRecord.employee_id == employee_id).scalar())
