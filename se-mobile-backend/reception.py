@@ -18,6 +18,7 @@ from datetime import date, datetime, time, timedelta
 
 from flask import g, jsonify, request
 
+import demo
 from business_trips import is_top
 from it_requests import _norm
 from models import db
@@ -82,8 +83,14 @@ def register(app, core):
         return jsonify({'message': 'Failure', 'error': error}), status
 
     def _hosts():
-        """К кому записываются: руководство, генеральный — первым."""
-        found = [e for e in Employee.query.order_by(Employee.full_name).all()
+        """К кому записываются: руководство, генеральный — первым.
+
+        Только мир смотрящего: гостю (demo.py) незачем видеть, к кому из
+        настоящего руководства и когда можно записаться.
+        """
+        found = [e for e in Employee.query.filter(
+                     demo.world(Employee.employee_id, _viewer()))
+                 .order_by(Employee.full_name).all()
                  if is_top(e)]
         found.sort(key=lambda e: (not _norm(e.job_title).startswith('генеральный'),
                                   e.full_name))
@@ -151,6 +158,7 @@ def register(app, core):
                 .order_by(ReceptionSlot.starts_at, ReceptionSlot.id).all())
         free = (ReceptionSlot.query.filter(
                     ReceptionSlot.employee_id.is_(None),
+                    demo.world(ReceptionSlot.host_id, viewer),
                     ReceptionSlot.starts_at >= now,
                     ReceptionSlot.starts_at < datetime.combine(
                         core._plant_today() + timedelta(days=_SLOTS_AHEAD), time()))

@@ -20,6 +20,7 @@ from datetime import date, datetime, time, timedelta
 
 from flask import g, jsonify, request
 
+import demo
 from it_requests import _norm, _utc
 from models import db
 
@@ -266,7 +267,9 @@ def register(app, core):
                          MedicalSlot.starts_at < datetime.combine(
                              day + timedelta(days=1), time()))
                  .order_by(MedicalSlot.starts_at, MedicalSlot.kind, MedicalSlot.id).all())
-        due = (MedicalExam.query.filter(MedicalExam.due_on <= today + _DUE_SOON)
+        # Сроки гостевого мира (demo.py) медпункту не видны — и наоборот.
+        due = (MedicalExam.query.filter(MedicalExam.due_on <= today + _DUE_SOON,
+                                        demo.world(MedicalExam.employee_id, viewer))
                .order_by(MedicalExam.due_on, MedicalExam.id).limit(300).all())
         people = _names([s.employee_id for s in slots] + [e.employee_id for e in due])
         return jsonify({
@@ -351,7 +354,8 @@ def register(app, core):
             return denied
         q = _norm(request.args.get('q', ''))
         people = []
-        for e in Employee.query.order_by(Employee.full_name):
+        for e in (Employee.query.filter(demo.world(Employee.employee_id, viewer))
+                  .order_by(Employee.full_name)):
             if not e.full_name:
                 continue
             if q and q not in _norm(e.full_name) and q not in _norm(e.job_title):
@@ -368,7 +372,8 @@ def register(app, core):
         if denied:
             return denied
         counts = {}
-        for e in Employee.query.filter(Employee.department.isnot(None)):
+        for e in Employee.query.filter(Employee.department.isnot(None),
+                                       demo.world(Employee.employee_id, viewer)):
             if e.department.strip():
                 counts[e.department] = counts.get(e.department, 0) + 1
         return jsonify({'message': 'Success', 'departments': [
@@ -464,7 +469,8 @@ def register(app, core):
             return denied
         today = core._plant_today()
         now = datetime.utcnow()
-        due = MedicalExam.query.filter(MedicalExam.due_on <= today + _REMIND_SOON).all()
+        due = MedicalExam.query.filter(MedicalExam.due_on <= today + _REMIND_SOON,
+                                       demo.world(MedicalExam.employee_id, viewer)).all()
         reminded = 0
         for exam in due:
             if exam.reminded_at and now - exam.reminded_at < _REMIND_EVERY:

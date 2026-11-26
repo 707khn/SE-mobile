@@ -43,6 +43,8 @@ const Map<String, String> medicalStringsKk = {
   'md_reminded': 'Еске салу жіберілді: @count',
   'md_yes': 'Иә',
   'md_saved': 'Жазылды',
+  'md_err_demo_read_only':
+      'Қонақ режимі: тек қарауға болады, өзгерістер сақталмайды',
   'md_err_taken': 'Бұл уақытқа біреу жазылып қойды',
   'md_err_too_many': 'Бір мезгілде екі жазылудан артық емес',
   'md_err_past': 'Бұл уақыт өтіп кетті',
@@ -96,6 +98,8 @@ const Map<String, String> medicalStringsRu = {
   'md_reminded': 'Напоминание отправлено: @count',
   'md_yes': 'Да',
   'md_saved': 'Готово',
+  'md_err_demo_read_only':
+      'Гостевой режим: только просмотр, изменения не сохраняются',
   'md_err_taken': 'На это время уже записались',
   'md_err_too_many': 'Не больше двух записей одновременно',
   'md_err_past': 'Это время уже прошло',

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 
 from flask import g, jsonify, request
 
+import demo
 from it_requests import _norm, _utc
 from models import db, PayrollGrant
 
@@ -188,9 +189,12 @@ def register(app, core):
             if not staff:
                 return core._deny()
             since = datetime.utcnow() - _QUEUE_CLOSED_FOR
+            # Вопросы гостевого мира (demo.py) в очередь расчётной группы не
+            # идут: отвечать на них некому и незачем.
             items = (PayslipQuestion.query
                      .filter(db.or_(PayslipQuestion.status == 'open',
-                                    PayslipQuestion.updated_at >= since))
+                                    PayslipQuestion.updated_at >= since),
+                             demo.world(PayslipQuestion.employee_id, viewer))
                      .order_by(PayslipQuestion.updated_at).limit(300).all())
             # Ждущие ответа — наверх, дольше ждущие — первыми.
             items.sort(key=lambda i: i.status != 'open')
@@ -209,7 +213,8 @@ def register(app, core):
                 'items': [_json(i, people, viewer, first=firsts.get(i.id))
                           for i in items]}
         if staff:
-            body['open'] = PayslipQuestion.query.filter_by(status='open').count()
+            body['open'] = PayslipQuestion.query.filter_by(status='open').filter(
+                demo.world(PayslipQuestion.employee_id, viewer)).count()
         return jsonify(body)
 
     @app.route('/api/payslip-questions', methods=['POST'])

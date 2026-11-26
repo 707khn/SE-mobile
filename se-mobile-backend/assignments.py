@@ -17,6 +17,7 @@ from datetime import date, datetime, timedelta
 
 from flask import g, jsonify, request
 
+import demo
 from it_requests import _norm, _utc
 from models import db
 
@@ -247,7 +248,10 @@ def register(app, core):
             return core._deny()
         q = _norm(request.args.get('q', ''))
         people = []
-        for e in Employee.query.order_by(Employee.full_name):
+        # Только свой мир: гостю (demo.py) — его вымышленные люди, руководству
+        # и администратору — без них.
+        for e in (Employee.query.filter(demo.world(Employee.employee_id, viewer))
+                  .order_by(Employee.full_name)):
             if not e.full_name or e.employee_id == viewer.employee_id:
                 continue
             if allowed is not None and e.employee_id not in allowed:

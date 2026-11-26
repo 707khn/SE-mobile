@@ -71,6 +71,8 @@ const Map<String, String> businessTripStringsKk = {
   'bt_ev_send_back': 'есепті қайтарды',
   'bt_ev_cancel': 'болдырмады',
   'bt_ev_comment': 'жазды',
+  'bt_err_demo_read_only':
+      'Қонақ режимі: тек қарауға болады, өзгерістер сақталмайды',
   'bt_err_destination_required': 'Қайда баратыныңызды көрсетіңіз',
   'bt_err_purpose_required': 'Мақсатын жазыңыз',
   'bt_err_bad_dates': 'Мерзімін тексеріңіз (60 күннен аспайды)',
@@ -154,6 +156,8 @@ const Map<String, String> businessTripStringsRu = {
   'bt_ev_send_back': 'вернул отчёт',
   'bt_ev_cancel': 'отменил',
   'bt_ev_comment': 'написал',
+  'bt_err_demo_read_only':
+      'Гостевой режим: только просмотр, изменения не сохраняются',
   'bt_err_destination_required': 'Укажите, куда',
   'bt_err_purpose_required': 'Напишите цель',
   'bt_err_bad_dates': 'Проверьте сроки (не больше 60 дней)',
